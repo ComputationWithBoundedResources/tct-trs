@@ -1,0 +1,87 @@
+Name:               tct-main
+Version:            3.0.0
+Author:
+  Martin Avanzini <martin.avanzini@uibk.ac.at>,
+  Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
+  Georg Moser <georg.moser@uibk.ac.at>,
+  Michael Schaper <michael.schaper@uibk.ac.at>,
+  Maria Schett <maria.schett@uibk.ac.at>
+Maintainer:
+  Martin Avanzini <martin.avanzini@uibk.ac.at>,
+  Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
+  Georg Moser <georg.moser@uibk.ac.at>,
+  Michael Schaper <michael.schaper@uibk.ac.at>,
+  Maria Schett <maria.schett@uibk.ac.at>
+Category: Program Analysis
+Stability: Experimental
+License: BSD3
+License-file: LICENSE
+Homepage: http://cl-informatik.uibk.ac.at/software/tct/
+Synopsis: A Complexity Analyser for Term Rewrite Systems
+Description:
+  The Tyrolean Complexity Tool (TcT for short) is a tool
+  for proving upper bounds on the derivational and runtime complexity
+  of term rewriting systems automatically.
+
+Cabal-version: >= 1.8
+Build-type: Simple
+
+Executable tctl
+  main-is: 
+    Main.hs
+  hs-source-dirs:
+    src
+  build-depends:
+    containers     >= 0.5 && < 0.6,
+    mtl            >= 2.1 && < 2.2,
+    base           == 4.*,
+
+    smtlib         == 0.*,
+    term-rewriting == 0.*,
+    tct-core       == 3.*,
+    tct-main       == 3.*
+  ghc-options:
+    -j -threaded -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+  extensions:
+    ConstraintKinds,
+    DataKinds,
+    DeriveDataTypeable,
+    FlexibleInstances,
+    GeneralizedNewtypeDeriving,
+    MultiParamTypeClasses, 
+    TypeFamilies,
+    TypeOperators
+
+Library
+  hs-source-dirs:
+    src
+  exposed-modules:
+    Tct.Trs
+    Tct.Trs.Problem
+    Tct.Trs.Orientation
+    Tct.Trs.Interpretation
+    Tct.Trs.Poly.PolynomialInterpretation
+    Tct.Trs.Poly.NaturalPolynomialInterpretation
+    Tct.Common.Polynomial
+    Tct.Common.Ring
+  build-depends:
+    containers     >= 0.5 && < 0.6,
+    mtl            >= 2.1 && < 2.2,
+    base           == 4.*,
+
+    smtlib         == 0.*,
+    term-rewriting == 0.*,
+    tct-core       == 3.*
+    
+  ghc-options:
+    -j -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+  extensions: 
+    ConstraintKinds,
+    DataKinds,
+    DeriveDataTypeable,
+    FlexibleInstances,
+    GeneralizedNewtypeDeriving,
+    MultiParamTypeClasses, 
+    TypeFamilies,
+    TypeOperators
+
