@@ -104,7 +104,7 @@ instance SParsable prob PI.Shape where
     [ P.symbol "stronglyLinerar" >> return PI.StronglyLinear
     , P.symbol "linear"          >> return PI.Linear
     , P.symbol "quadratic"       >> return PI.Quadratic
-    , P.symbol "mixed"           >> P.natural >>= return .PI.Mixed ]
+    , P.symbol "mixed"           >> P.nat >>= return .PI.Mixed ]
 
 
 instance Processor PolyInterProcessor where
