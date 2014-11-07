@@ -1,4 +1,4 @@
-Name:               tct-main
+Name:               tct-trs
 Version:            3.0.0
 Author:
   Martin Avanzini <martin.avanzini@uibk.ac.at>,
@@ -26,51 +26,25 @@ Description:
 Cabal-version: >= 1.8
 Build-type: Simple
 
-Executable tctl
-  main-is: 
-    Main.hs
-  hs-source-dirs:
-    src
-  build-depends:
-    containers     >= 0.5 && < 0.6,
-    mtl            >= 2.1 && < 2.2,
-    base           == 4.*,
-
-    smtlib         == 0.*,
-    term-rewriting == 0.*,
-    tct-core       == 3.*,
-    tct-main       == 3.*
-  ghc-options:
-    -j -threaded -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
-  extensions:
-    ConstraintKinds,
-    DataKinds,
-    DeriveDataTypeable,
-    FlexibleInstances,
-    GeneralizedNewtypeDeriving,
-    MultiParamTypeClasses, 
-    TypeFamilies,
-    TypeOperators
-
 Library
   hs-source-dirs:
     src
   exposed-modules:
     Tct.Trs
-    Tct.Trs.Problem
     Tct.Trs.Orientation
     Tct.Trs.Interpretation
-    Tct.Trs.Poly.PolynomialInterpretation
+    Tct.Trs.Data.Problem
     Tct.Trs.Poly.NaturalPolynomialInterpretation
-    Tct.Common.Polynomial
-    Tct.Common.Ring
+    Tct.Trs.TermRewriting
   build-depends:
     containers     >= 0.5 && < 0.6,
     mtl            >= 2.1 && < 2.2,
     base           == 4.*,
+    parsec         == 3.1.*,
 
     smtlib         == 0.*,
     term-rewriting == 0.*,
+    tct-common     == 3.*,
     tct-core       == 3.*
     
   ghc-options:

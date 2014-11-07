@@ -4,7 +4,7 @@ module Tct.Trs.Orientation
   ) where
 
 
-import qualified Tct.Common.Pretty as PP
+import qualified Tct.Core.Common.Pretty as PP
 
 
 data OrientationProof o

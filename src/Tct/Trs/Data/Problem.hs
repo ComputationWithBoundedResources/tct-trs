@@ -1,31 +1,34 @@
-module Tct.Trs.Problem
+module Tct.Trs.Data.Problem
   (
   TrsProblem (..)
+  , Trs
+  , Rule
   , Fun
   , Var
   , allRules
   , withBasicTerms
   , withAllTerms
-  , closed 
+  , closed
   , trsMode
+  , CC
   ) where
 
-  
 
-import Tct.Main
-import Tct.Core
-import Tct.Common.Error
-import qualified Tct.Common.Pretty as PP
-import qualified Tct.Common.Xml as Xml
-import Tct.Processors.Failing (failing)
 
-import qualified Data.Map.Strict as M (Map,fromList, keys)
-import Data.List ((\\))
-import Data.Data (Typeable)
+import           Tct.Core.Common.Error
+import qualified Tct.Core.Common.Pretty     as PP
+import qualified Tct.Core.Common.Xml        as Xml
+import           Tct.Core.Data
+import           Tct.Core.Main
+import           Tct.Core.Processor.Trivial (failing)
 
-import qualified Data.Rewriting.Problem as R 
-import qualified Data.Rewriting.Rule as R (Rule (..))
-import qualified Data.Rewriting.Term as R (Term (..), withArity, funsDL)
+import           Data.Data                  (Typeable)
+import           Data.List                  ((\\))
+import qualified Data.Map.Strict            as M (Map, fromList, keys)
+
+import qualified Data.Rewriting.Problem     as R
+import qualified Data.Rewriting.Rule        as R (Rule (..))
+import qualified Data.Rewriting.Term        as R (Term (..), funsDL, withArity)
 
 
 data TrsProblem f v = TrsProblem
@@ -39,6 +42,9 @@ data TrsProblem f v = TrsProblem
 
 type Fun = String
 type Var = String
+
+type Rule = R.Rule Fun Var
+type Trs  = TrsProblem Fun Var
 
 allRules :: TrsProblem f v -> [R.Rule f v]
 allRules prob = strictRules prob ++ weakRules prob
@@ -77,9 +83,9 @@ ccProperties cc = case cc of
   RCI -> (R.BasicTerms, R.Innermost)
 
 data TrsAnswer
-  = YES Complexity 
+  = YES Complexity
   | UNKNOWN
-  | NO 
+  | NO
   deriving Show
 
 instance PP.Pretty TrsAnswer where
@@ -98,22 +104,22 @@ parser s = case R.fromString s of
     , weakRules       = R.weakRules   (R.rules p)
     , signature       = sig
     , constructors    = consts }
-    where 
+    where
       rules = R.allRules (R.rules p)
       sig = M.fromList $ foldr k [] rules
         where k (R.Rule l r) = R.funsDL (R.withArity l) . R.funsDL (R.withArity r)
       consts = M.keys sig \\ froots
       froots = foldl k [] rules
-        where 
+        where
           k xs   (R.Rule (R.Fun f _) (R.Fun g _)) = f:g:xs
           k xs   (R.Rule (R.Fun f _) _        ) = f:xs
           k xs   (R.Rule _           (R.Fun g _)) = g:xs
           k xs _ = xs
 
 options :: Options CC
-options = option $ eopt 
-  `withArgLong` "complexity" 
-  `withCropped` 'c' 
+options = option $ eopt
+  `withArgLong` "complexity"
+  `withCropped` 'c'
   `withHelpDoc` PP.text "RCF - runtime complexity"
   `withDefault` RCF
 
@@ -125,7 +131,7 @@ answering :: Return (ProofTree l) -> Answer
 answering = answer . returning (YES . timeUB . certificate) (const UNKNOWN)
 
 
-trsMode :: TctMode (TrsProblem Fun Var) CC
+trsMode :: TctMode Trs CC
 trsMode = TctMode
   { modeParser          = parser
   , modeStrategies      = []
