@@ -31,7 +31,6 @@ Library
     src
   exposed-modules:
     Tct.Trs
-    Tct.Trs.Orientation
     Tct.Trs.Interpretation
     Tct.Trs.Data.Problem
     Tct.Trs.Poly.NaturalPolynomialInterpretation

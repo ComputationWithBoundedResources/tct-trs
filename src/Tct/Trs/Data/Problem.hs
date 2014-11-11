@@ -14,11 +14,11 @@ module Tct.Trs.Data.Problem
   ) where
 
 
+import           Tct.Common.Answer          (answering)
 
 import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml
-import           Tct.Core.Data
 import           Tct.Core.Main
 import           Tct.Core.Processor.Trivial (failing)
 
@@ -82,18 +82,6 @@ ccProperties cc = case cc of
   RCF -> (R.BasicTerms, R.Full)
   RCI -> (R.BasicTerms, R.Innermost)
 
-data TrsAnswer
-  = YES Complexity
-  | UNKNOWN
-  | NO
-  deriving Show
-
-instance PP.Pretty TrsAnswer where
-  pretty = PP.text . show
-
-instance Xml.Xml TrsAnswer where
-  toXml a = Xml.elt "answer" [Xml.text $ show a]
-
 parser :: String -> Either TctError (TrsProblem Fun Var)
 parser s = case R.fromString s of
   Left e  -> Left $ TctParseError (show e)
@@ -126,10 +114,6 @@ options = option $ eopt
 modifyer :: TrsProblem f v -> CC -> TrsProblem f v
 modifyer p cc = p { startTerms = ts, rewriteStrategy = st }
   where (ts,st) = ccProperties cc
-
-answering :: Return (ProofTree l) -> Answer
-answering = answer . returning (YES . timeUB . certificate) (const UNKNOWN)
-
 
 trsMode :: TctMode Trs CC
 trsMode = TctMode

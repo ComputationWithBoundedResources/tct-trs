@@ -28,6 +28,7 @@ import qualified Tct.Common.Polynomial               as P
 import qualified Tct.Common.PolynomialInterpretation as PI
 import           Tct.Common.Ring
 import           Tct.Common.SMT                      ()
+import           Tct.Common.Orientation
 
 import           Tct.Core.Common.Error               (liftIO)
 import qualified Tct.Core.Common.Pretty              as PP
@@ -37,7 +38,6 @@ import           Tct.Core.Data.Declaration.Parse     ()
 
 import           Tct.Trs
 import           Tct.Trs.Interpretation
-import           Tct.Trs.Orientation                 (OrientationProof (..))
 
 
 --- Instances --------------------------------------------------------------------------------------------------------
