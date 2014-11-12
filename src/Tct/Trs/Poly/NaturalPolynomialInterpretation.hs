@@ -43,9 +43,6 @@ import           Tct.Trs.Interpretation
 
 --- Instances --------------------------------------------------------------------------------------------------------
 
-polyInterProcessor :: PolyInterProcessor
-polyInterProcessor = PolyInterProc PI.StronglyLinear
-
 polyDeclaration ::Declaration ('[ Argument 'Required PI.Shape ] :-> Strategy Trs)
 polyDeclaration = declare "poly" ["Applies polynomial interpretation."] (OneTuple PI.shapeArg) poly
 
@@ -74,10 +71,10 @@ type Kind           = PI.Kind Fun
 type CoefficientVar = PI.CoefficientVar Fun
 
 data PolyOrder = PolyOrder
-  { strict_ :: [Rule]
-  , weak_   :: [Rule]
-  , inter_  :: PolyInter Int
-  , kind_   :: Kind
+  { kind_   :: Kind
+  , pint_   :: PolyInter Int
+  , strict_ :: [(Rule, P.Polynomial Int Var, P.Polynomial Int Var)]
+  , weak_   :: [(Rule, P.Polynomial Int Var, P.Polynomial Int Var)]
   } deriving Show
 
 
@@ -103,11 +100,12 @@ strict = StrictVar
 
 newProblem :: PolyOrder -> Trs -> Optional Id Trs
 newProblem order prob = Opt . Id $ prob 
-  { strictRules = strictRules prob L.\\ (strict_ order)
-  , weakRules   = L.nub $ weakRules prob ++ (strict_ order) }
+  { strictRules = strictRules prob L.\\ rs
+  , weakRules   = L.nub $ weakRules prob ++ rs }
+  where rs = (\(a,_,_) -> a) . unzip3 $ (strict_ order)
 
 degree :: PolyOrder -> Complexity
-degree order  = PI.degree (kind_ order) (inter_ order)
+degree order  = PI.degree (kind_ order) (pint_ order)
 
 certification :: PolyOrder -> Optional Id Certificate -> Certificate
 certification order Null         = timeUBCert (degree order)
@@ -122,12 +120,12 @@ interpret ebsi = interpretTerm interpretFun interpretVar
 
 entscheide :: PolyInterProcessor -> Trs -> IO (SMT.Sat PolyOrder)
 entscheide p prob = do
-  res :: SMT.Sat (M.Map CoefficientVar Int, M.Map StrictVar Int) <- SMT.solve SMT.minismt $ do
+  res :: SMT.Sat (M.Map CoefficientVar Int) <- SMT.solve SMT.minismt $ do
     SMT.setLogic "QF_NIA"
     -- encode abstract interpretation
     (ebsi,coefficientEncoder) <- SMT.memo $ PI.PolyInter `liftM` T.mapM encode absi
     -- encode strict vars
-    (svars, strictVarEncoder) <- SMT.memo $ mapM  (SMT.snvarm . StrictVar) rules
+    (_, strictVarEncoder) <- SMT.memo $ mapM  (SMT.snvarm . StrictVar) rules
 
     let
       encodeStrictVar   = SMT.fm . (strictVarEncoder M.!)
@@ -145,7 +143,7 @@ entscheide p prob = do
     SMT.assert $ SMT.bigAnd monotoneConstraints
     SMT.assert $ SMT.bigOr rulesConstraint
 
-    return $ SMT.decode (coefficientEncoder, strictVarEncoder)
+    return $ SMT.decode coefficientEncoder
   return $ mkOrder `fmap` res
   where
     encode :: Monad m
@@ -162,31 +160,41 @@ entscheide p prob = do
       if withBasicTerms prob
         then PI.ConstructorBased (shape p) (constructors prob)
         else PI.Unrestricted (shape p)
-    mkOrder (inter, stricts) = (PolyOrder strict' weak' pint kind)
+
+
+
+    mkOrder inter = PolyOrder
+      { kind_   = kind
+      , pint_   = pint
+      , strict_ = srs
+      , weak_   = wrs }
       where
-        pint = PI.PolyInter $ M.map (P.pfromViewWith (inter M.!)) absi
-        strictVar r = case M.lookup (strict r) stricts of
-          Just i  -> i > (0::Int)
-          Nothing -> False
-        strictOrder (R.Rule lhs rhs) = P.constantValue (interpret pint lhs `add` neg (interpret pint rhs)) > 0
-        (strict',weak') = L.partition (\r -> strictVar r || strictOrder r) rules
+        pint  = PI.PolyInter $ M.map (P.pfromViewWith (inter M.!)) absi
+        pints = [ (r, interpret pint lhs, interpret pint rhs) | r@(R.Rule lhs rhs)  <- rules ]
+        (srs,wrs) = L.partition (\(_,lhs,rhs) -> P.constantValue (lhs `sub` rhs) > 0) pints
 
 
 --- Proofdata --------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty PolyOrder where
-  pretty (PolyOrder s w i k) = PP.vcat
-    [ PP.text "We apply a polynomial interpretation of kind" PP.<+> PP.pretty k PP.<> PP.char ':'
-    , PP.indent 2 (PP.pretty i)
+  pretty order = PP.vcat
+    [ PP.text "We apply a polynomial interpretation of kind" PP.<+> PP.pretty (kind_ order) PP.<> PP.char ':'
+    , PP.indent 2 (PP.pretty (pint_ order))
+    , PP.text ""
     , PP.text "Following rules are strictly oriented:"
-    , PP.indent 2 (PP.vcat (map PP.pretty s))
+    , ppOrder (PP.text " > ") (strict_ order)
+    , PP.text ""
     , PP.text "Following rules are weakly oriented:"
-    , PP.indent 2 (PP.vcat (map PP.pretty w)) 
-    , PP.text "" 
-    , PP.vcat [ PP.pretty (interpret i rhs) PP.<+> PP.text "> " PP.<+> PP.pretty (interpret i lhs) | R.Rule rhs lhs <- s]
-    , PP.text "" 
-    , PP.vcat [ PP.pretty (interpret i rhs) PP.<+> PP.text ">=" PP.<+> PP.pretty (interpret i lhs) | R.Rule rhs lhs <- w]
-    ]
+    , ppOrder (PP.text " >= ") (weak_ order) ]
+    where
+      ppOrder ppOrd rs = PP.table [(PP.AlignRight, as), (PP.AlignLeft, bs), (PP.AlignLeft, cs)]
+        where
+          (as,bs,cs) = unzip3 $ concatMap ppRule rs
+          ppRule (R.Rule l r,lhs,rhs) = 
+            [ (PP.pretty l, PP.text " = ", PP.pretty lhs)
+            , (PP.empty   , ppOrd        , PP.pretty rhs)
+            , (PP.empty   , PP.text " = ", PP.pretty r)
+            , (PP.empty   , PP.empty     , PP.empty) ]
 
 instance Show PolyInterProof where 
   show (PolyInterProof order) = show order

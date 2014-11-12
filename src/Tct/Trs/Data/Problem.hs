@@ -60,7 +60,7 @@ instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (TrsProblem f v) where
   pretty prob = PP.vcat
     [ PP.text "Strict Rules:"
     , PP.indent 2 $ PP.vcat (map PP.pretty $ strictRules prob)
-    , PP.text "Weak Rules"
+    , PP.text "Weak Rules:"
     , PP.indent 2 $ PP.vcat (map PP.pretty $ weakRules prob) ]
 
 instance (Show f, Show v) => Xml.Xml (TrsProblem f v) where
