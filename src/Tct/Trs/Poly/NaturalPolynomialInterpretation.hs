@@ -2,8 +2,9 @@
 module Tct.Trs.Poly.NaturalPolynomialInterpretation
   (
   -- * Declaration
-  poly
+  polyDeclaration
   -- * Strategies
+  , poly
   , stronglyLinear
   , linear
   , quadratic
@@ -45,8 +46,12 @@ import           Tct.Trs.Interpretation
 polyInterProcessor :: PolyInterProcessor
 polyInterProcessor = PolyInterProc PI.StronglyLinear
 
-poly ::Declaration ('[ Argument 'Required PI.Shape ] :-> Strategy Trs)
-poly = declaration polyInterProcessor
+polyDeclaration ::Declaration ('[ Argument 'Required PI.Shape ] :-> Strategy Trs)
+polyDeclaration = declare "poly" ["Applies polynomial interpretation."] (OneTuple PI.shapeArg) poly
+
+poly :: PI.Shape -> Strategy Trs
+poly = Proc . PolyInterProc
+
 
 stronglyLinear, linear, quadratic :: Strategy Trs
 stronglyLinear = Proc (PolyInterProc PI.StronglyLinear)
@@ -80,8 +85,6 @@ instance Processor PolyInterProcessor where
   type ProofObject PolyInterProcessor = PolyInterProof
   type Problem PolyInterProcessor     = Trs
   type Forking PolyInterProcessor     = Optional Id
-  type ProcessorArgs PolyInterProcessor = 
-    '[ Argument 'Required PI.Shape ]
   solve p prob
     | null (strictRules prob) = return . resultToTree p prob $
        (Success Null (PolyInterProof Empty) (const $ timeUBCert constant))
@@ -91,7 +94,7 @@ instance Processor PolyInterProcessor where
           SMT.Sat (order) ->
             Success (newProblem order prob) (PolyInterProof $ Order order) (certification order)
           _                         -> Fail (PolyInterProof Incompatible)
-  declaration _ = declareProcessor "poly" [] (OneTuple PI.shapeArg) (Proc . PolyInterProc)
+
 
 newtype StrictVar = StrictVar Rule deriving (Eq, Ord)
 
