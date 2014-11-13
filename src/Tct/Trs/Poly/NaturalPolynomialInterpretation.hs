@@ -114,7 +114,7 @@ certification order (Opt (Id c)) = updateTimeUBCert c (`add` degree order)
 interpret :: (SemiRing c, Eq c, Ord fun, Ord var) => PI.PolyInter fun c -> R.Term fun var -> P.Polynomial c var
 interpret ebsi = interpretTerm interpretFun interpretVar
   where
-    interpretFun f = P.substituteVars interp . M.fromList . zip [PI.SomeIndeterminate 0..]
+    interpretFun f = P.substituteVariables interp . M.fromList . zip [PI.SomeIndeterminate 0..]
       where interp = PI.interpretations ebsi M.! f
     interpretVar      = P.variable
 
@@ -149,7 +149,7 @@ entscheide p prob = do
     encode :: Monad m
       => P.PolynomialView (PI.CoefficientVar Fun) PI.SomeIndeterminate
       -> SMT.MemoSMT CoefficientVar m (PI.SomePolynomial SMT.Expr)
-    encode = P.pfromViewWithM enc where
+    encode = P.fromViewWithM enc where
       enc c
         | PI.restrict c = SMT.fm `liftM` SMT.snvarm c
         | otherwise     = SMT.fm `liftM` SMT.nvarm c
@@ -169,7 +169,7 @@ entscheide p prob = do
       , strict_ = srs
       , weak_   = wrs }
       where
-        pint  = PI.PolyInter $ M.map (P.pfromViewWith (inter M.!)) absi
+        pint  = PI.PolyInter $ M.map (P.fromViewWith (inter M.!)) absi
         pints = [ (r, interpret pint lhs, interpret pint rhs) | r@(R.Rule lhs rhs)  <- rules ]
         (srs,wrs) = L.partition (\(_,lhs,rhs) -> P.constantValue (lhs `sub` rhs) > 0) pints
 
