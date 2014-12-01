@@ -147,7 +147,7 @@ entscheide p prob = do
   return $ mkOrder `fmap` res
   where
     encode :: Monad m
-      => P.PolynomialView (PI.CoefficientVar Fun) PI.SomeIndeterminate
+      => P.PView (PI.CoefficientVar Fun) PI.SomeIndeterminate
       -> SMT.MemoSMT CoefficientVar m (PI.SomePolynomial SMT.Expr)
     encode = P.fromViewWithM enc where
       enc c
