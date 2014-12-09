@@ -36,8 +36,7 @@ Library
     Tct.Trs.Data.Mode
     Tct.Trs.Data.Trs
     Tct.Trs.Data.RuleSelector
-    --Tct.Trs.Poly.NaturalPolynomialInterpretation
-    --Tct.Trs.TermRewriting
+    Tct.Trs.Data.Rewriting
     Tct.Trs.Method.Compose
     Tct.Trs.Method.Poly.NaturalPI
   build-depends:
