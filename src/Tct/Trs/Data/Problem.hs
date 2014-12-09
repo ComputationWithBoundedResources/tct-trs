@@ -1,127 +1,124 @@
 module Tct.Trs.Data.Problem
-  (
-  TrsProblem (..)
-  , Trs
-  , Rule
-  , Fun
-  , Var
-  , allRules
-  , withBasicTerms
-  , withAllTerms
-  , closed
-  , trsMode
-  , CC
-  ) where
+  where
 
+import qualified Data.Map.Strict            as M
+import qualified Data.Set as S
 
-import           Tct.Common.Answer          (answering)
+import qualified Data.Rewriting.Problem as R
+import qualified Data.Rewriting.Rule as R (Rule (..))
+import qualified Data.Rewriting.Term as R
 
-import           Tct.Core.Common.Error
 import qualified Tct.Core.Common.Pretty     as PP
-import qualified Tct.Core.Common.Xml        as Xml
-import           Tct.Core.Main
-import           Tct.Core.Processor.Trivial (failing)
 
-import           Data.Data                  (Typeable)
-import           Data.List                  ((\\))
-import qualified Data.Map.Strict            as M (Map, fromList, keys)
+import Tct.Trs.Data.Trs (Trs, Var, Fun)
+import qualified Tct.Trs.Data.Trs as Trs
 
-import qualified Data.Rewriting.Problem     as R
-import qualified Data.Rewriting.Rule        as R (Rule (..))
-import qualified Data.Rewriting.Term        as R (Term (..), funsDL, withArity)
+data SymbolKind
+  = Defined
+  | Constructor
+  deriving (Eq, Show)
+
+type Signature = M.Map Fun Int
+type Constructors = S.Set Fun
+type DefinedSymbols = S.Set Fun
+
+data Problem = Problem
+  { startTerms :: R.StartTerms
+  , strategy   :: R.Strategy
+  , symbols    :: (Signature, DefinedSymbols, Constructors)
+
+  , strictDPs  :: Trs
+  , strictTrs  :: Trs
+  , weakDPs    :: Trs
+  , weakTrs    :: Trs
+  
+  } deriving (Show)
+
+signature :: Problem -> Signature
+signature = (\(sig, _,_) -> sig) . symbols
+
+constructors :: Problem -> Constructors
+constructors = (\(_, _,cs) -> cs) . symbols
+
+-- TODO: tpdb format - funs with different arities?
+sanitise :: Problem -> Problem
+sanitise prob = prob { symbols = (sig, ds, cs) }
+  where
+    rules = Trs.ruleList $ allComponents prob
+    sig = foldl k M.empty rules
+      where 
+        k m (R.Rule l r) = funs l `M.union` funs r `M.union` m
+        funs t = M.fromList (R.funs $ R.withArity t)
+    ds = foldl k S.empty rules
+      where
+        k s (R.Rule (R.Fun f _) _) = f `S.insert` s
+        k s _ = s
+    cs = S.fromList (M.keys sig) `S.difference` ds
+
+fromRewriting :: R.Problem Fun Var -> Problem
+fromRewriting prob = sanitise Problem
+  { startTerms = R.startTerms prob
+  , strategy   = R.strategy prob
+  , symbols    = undefined
+
+  , strictDPs  = Trs.empty
+  , strictTrs  = Trs.fromRuleList $ R.strictRules (R.rules prob)
+  , weakDPs    = Trs.empty
+  , weakTrs    = Trs.fromRuleList $ R.weakRules (R.rules prob) }
 
 
-data TrsProblem f v = TrsProblem
-  { startTerms      :: R.StartTerms
-  , rewriteStrategy :: R.Strategy
-  , strictRules     :: [R.Rule f v]
-  , weakRules       :: [R.Rule f v]
-  , signature       :: M.Map f Int
-  , constructors    :: [f]
-  } deriving (Show, Typeable)
 
-type Fun = String
-type Var = String
+strictComponents, weakComponents, allComponents :: Problem -> Trs
+strictComponents prob = strictDPs prob `Trs.union` strictTrs prob
+weakComponents prob   = weakDPs prob `Trs.union` weakTrs prob
+allComponents prob    = strictComponents prob `Trs.union` weakComponents prob
 
-type Rule = R.Rule Fun Var
-type Trs  = TrsProblem Fun Var
+dpComponents, trsComponents :: Problem -> Trs
+dpComponents prob  = strictDPs prob `Trs.union` weakDPs prob
+trsComponents prob = strictTrs prob `Trs.union` weakTrs prob
 
-allRules :: TrsProblem f v -> [R.Rule f v]
-allRules prob = strictRules prob ++ weakRules prob
+isRCProblem, isDCProblem :: Problem -> Bool
+isRCProblem prob = startTerms prob == R.BasicTerms
+isDCProblem prob = startTerms prob == R.AllTerms
 
-withBasicTerms, withAllTerms :: TrsProblem f v -> Bool
-withBasicTerms prob = startTerms prob == R.BasicTerms
-withAllTerms prob   = startTerms prob == R.AllTerms
+note :: Bool -> String -> Maybe String
+note b st = if b then Just st else Nothing
 
-closed :: TrsProblem f v -> Bool
-closed = null . strictRules
+isRCProblem', isDCProblem' :: Problem -> Maybe String
+isRCProblem' prob = note (not $ isRCProblem  prob) " not a RC problem"
+isDCProblem' prob = note (not $ isDCProblem  prob) " not a DC problem"
 
-instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (TrsProblem f v) where
-  pretty prob = PP.vcat
-    [ PP.text "Strict Rules:"
-    , PP.indent 2 $ PP.vcat (map PP.pretty $ strictRules prob)
-    , PP.text "Weak Rules:"
-    , PP.indent 2 $ PP.vcat (map PP.pretty $ weakRules prob) ]
+isTrivial :: Problem -> Bool
+isTrivial = Trs.isEmpty . strictComponents
 
-instance (Show f, Show v) => Xml.Xml (TrsProblem f v) where
-  toXml a = Xml.elt "trs" [Xml.text $ show a]
+-- * ruleset
+data Ruleset = Ruleset 
+  { sdp  :: Trs -- ^ strict dependency pairs                          
+  , wdp  :: Trs -- ^ weak dependency pairs
+  , strs :: Trs -- ^ strict rules
+  , wtrs :: Trs -- ^ weak rules
+  }
 
-data CC = DCF | DCI | RCF | RCI deriving (Eq, Read)
+ruleset :: Problem -> Ruleset
+ruleset prob = Ruleset 
+  { sdp  = strictDPs prob
+  , wdp  = weakDPs prob
+  , strs = strictTrs prob
+  , wtrs = weakTrs prob }
 
-instance Show CC where
-  show DCF = "DCF"
-  show DCI = "DCI"
-  show RCF = "RCF"
-  show RCI = "RCI"
+emptyRuleset :: Ruleset
+emptyRuleset = Ruleset Trs.empty Trs.empty Trs.empty Trs.empty
 
 
-ccProperties :: CC -> (R.StartTerms, R.Strategy)
-ccProperties cc = case cc of
-  DCF -> (R.AllTerms,   R.Full)
-  DCI -> (R.AllTerms,   R.Innermost)
-  RCF -> (R.BasicTerms, R.Full)
-  RCI -> (R.BasicTerms, R.Innermost)
+-- * pretty printing
 
-parser :: String -> Either TctError (TrsProblem Fun Var)
-parser s = case R.fromString s of
-  Left e  -> Left $ TctParseError (show e)
-  Right p -> Right TrsProblem
-    { startTerms      = R.startTerms p
-    , rewriteStrategy = R.strategy p
-    , strictRules     = R.strictRules (R.rules p)
-    , weakRules       = R.weakRules   (R.rules p)
-    , signature       = sig
-    , constructors    = consts }
-    where
-      rules = R.allRules (R.rules p)
-      sig = M.fromList $ foldr k [] rules
-        where k (R.Rule l r) = R.funsDL (R.withArity l) . R.funsDL (R.withArity r)
-      consts = M.keys sig \\ froots
-      froots = foldl k [] rules
-        where
-          k xs   (R.Rule (R.Fun f _) (R.Fun g _)) = f:g:xs
-          k xs   (R.Rule (R.Fun f _) _        ) = f:xs
-          k xs   (R.Rule _           (R.Fun g _)) = g:xs
-          k xs _ = xs
+ppProblem :: Problem -> PP.Doc
+ppProblem prob =  PP.vcat
+  [ PP.text "Strict Rules:"
+  , PP.indent 2 $ PP.pretty (strictComponents prob)
+  , PP.text "Weak Rules:"
+  , PP.indent 2 $ PP.pretty (weakComponents prob) ]
 
-options :: Options CC
-options = option $ eopt
-  `withArgLong` "complexity"
-  `withCropped` 'c'
-  `withHelpDoc` PP.text "RCF - runtime complexity"
-  `withDefault` RCF
-
-modifyer :: TrsProblem f v -> CC -> TrsProblem f v
-modifyer p cc = p { startTerms = ts, rewriteStrategy = st }
-  where (ts,st) = ccProperties cc
-
-trsMode :: TctMode Trs CC
-trsMode = TctMode
-  { modeParser          = parser
-  , modeStrategies      = []
-
-  , modeDefaultStrategy = failing
-  , modeOptions         = options
-  , modeModifyer        = modifyer
-  , modeAnswer          = answering }
+instance PP.Pretty Problem where
+  pretty = ppProblem
 

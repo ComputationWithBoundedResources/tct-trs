@@ -33,8 +33,13 @@ Library
     Tct.Trs
     Tct.Trs.Interpretation
     Tct.Trs.Data.Problem
-    Tct.Trs.Poly.NaturalPolynomialInterpretation
-    Tct.Trs.TermRewriting
+    Tct.Trs.Data.Mode
+    Tct.Trs.Data.Trs
+    Tct.Trs.Data.RuleSelector
+    --Tct.Trs.Poly.NaturalPolynomialInterpretation
+    --Tct.Trs.TermRewriting
+    Tct.Trs.Method.Compose
+    Tct.Trs.Method.Poly.NaturalPI
   build-depends:
     containers     >= 0.5 && < 0.6,
     mtl            >= 2.1 && < 2.2,
