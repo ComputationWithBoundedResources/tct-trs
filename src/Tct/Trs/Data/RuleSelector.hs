@@ -12,6 +12,7 @@ module Tct.Trs.Data.RuleSelector
   -- * Selector Expressions
   , SelectorExpression (..)
   , ExpressionSelector
+  , selectorArg
   -- ** Boolean Selectors
   , selAnyOf
   , selAllOf
@@ -20,9 +21,14 @@ module Tct.Trs.Data.RuleSelector
   ) where
 
 
-import qualified Tct.Trs.Data.Problem as Prob
-import           Tct.Trs.Data.Trs     (SelectorExpression (..), Trs)
-import qualified Tct.Trs.Data.Trs     as Trs
+import           Data.Typeable
+
+import qualified Tct.Core.Common.Parser as P
+import qualified Tct.Core.Data          as T
+
+import qualified Tct.Trs.Data.Problem   as Prob
+import           Tct.Trs.Data.Trs       (SelectorExpression (..), Trs)
+import qualified Tct.Trs.Data.Trs       as Trs
 
 
 -- | This datatype is used to select a subset of rules recorded in a problem.
@@ -30,23 +36,33 @@ data RuleSelector a = RuleSelector
   { rsName   :: String            -- ^ Name of the rule selector.
   , rsSelect :: Prob.Problem -> a -- ^ Given a problem, computes an 'SelectorExpression' that
                                   -- determines which rules to select.
-  }
+  } deriving Typeable
+
+instance Show (RuleSelector a) where show = rsName
 
 type RuleSetSelector    = RuleSelector Prob.Ruleset
 type ExpressionSelector = RuleSelector SelectorExpression
 
-instance Show (RuleSelector a) where show = rsName
+selectorArg :: T.Argument 'T.Required ExpressionSelector
+selectorArg = T.arg { T.argName  = "selector" }
 
-{-instance AssocArgument (RuleSelector SelectorExpression) where -}
-    {-assoc _ = [ ("any " ++ n, selAnyOf s) | (n,s) <- prims ]-}
-              {-++ [ ("all " ++ n, selAllOf s) | (n,s) <- prims ]-}
-      {-where prims = [ ("all", selDPs `selUnion` selRules)-}
-                    {-, ("dps", selDPs)-}
-                    {-, ("rules", selRules)-}
-                    {-, ("stricts", selStricts)-}
-                    {-, ("weaks", selWeaks)-}
-                    {-, ("first congruence", selFirstCongruence)                       -}
-                    {-, ("first strict congruence", selFirstStrictCongruence)]-}
+instance T.SParsable prob ExpressionSelector where
+  parseS = P.choice
+    [ P.symbol (sym1 ++ sym2) >> return (comb prim)| (sym1,comb) <- combs, (sym2,prim) <- prims ]
+    where
+      combs =
+        [ ("any ", selAnyOf)
+        , ("all ", selAllOf)]
+      prims =
+        [ ("all", selDPs `selUnion` selRules)
+        , ("dps", selDPs)
+        , ("rules", selRules)
+        , ("stricts", selStricts)
+        , ("weaks", selWeaks) ]
+        {-, ("first congruence", selFirstCongruence)                      -}
+        {-, ("first strict congruence", selFirstStrictCongruence) ]-}
+
+
 
 {-
 -- | Inverses the selection.
@@ -59,9 +75,10 @@ selInverse s = RuleSelector { rsName = "inverse of " ++ rsName s
                                  , Prob.wtrs = inv Prob.weakTrs Prob.wtrs }
             where rs = rsSelect s prob
                   inv pfn rfn = pfn prob Trs.\\ rfn rs
+-}
 
 -- | Combine two rule-selectors component-wise.
-selCombine :: (String -> String -> String) -> (Trs.Trs -> Trs.Trs -> Trs.Trs) -> (RuleSetSelector -> RuleSetSelector -> RuleSetSelector)
+selCombine :: (String -> String -> String) -> (Trs.Trs -> Trs.Trs -> Trs.Trs) -> RuleSetSelector -> RuleSetSelector -> RuleSetSelector
 selCombine cn ctrs s1 s2 = RuleSelector { rsName = cn (rsName s1) (rsName s2)
                                         , rsSelect = fn }
         where fn prob = Prob.Ruleset { Prob.sdp  = un Prob.sdp
@@ -76,6 +93,7 @@ selCombine cn ctrs s1 s2 = RuleSelector { rsName = cn (rsName s1) (rsName s2)
 selUnion :: RuleSetSelector -> RuleSetSelector -> RuleSetSelector
 selUnion = selCombine (\ n1 n2 -> "union of " ++ n1 ++ " and " ++ n2) Trs.union
 
+{-
 -- | Select intersection of selections of given rule-selectors.
 selInter :: RuleSetSelector -> RuleSetSelector -> RuleSetSelector
 selInter= selCombine (\ n1 n2 -> "intersect of " ++ n1 ++ " and " ++ n2) Trs.intersect

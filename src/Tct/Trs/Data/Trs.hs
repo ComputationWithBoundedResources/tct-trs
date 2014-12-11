@@ -17,6 +17,7 @@ module Tct.Trs.Data.Trs
   ) where
 
 
+import Data.Typeable
 import qualified Data.Set as S
 import qualified Data.Foldable as F
 
@@ -43,7 +44,7 @@ data SelectorExpression
   | SelectTrs Rule
   | BigAnd [SelectorExpression]
   | BigOr [SelectorExpression]
-  deriving Show
+  deriving (Show, Typeable)
 
 ruleList :: Trs -> [Rule]
 ruleList (TrsT rs) = S.elems rs

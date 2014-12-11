@@ -37,6 +37,7 @@ Library
     Tct.Trs.Data.Trs
     Tct.Trs.Data.RuleSelector
     Tct.Trs.Data.Rewriting
+    Tct.Trs.Data.PartialProcessor
     Tct.Trs.Method.Compose
     Tct.Trs.Method.Poly.NaturalPI
   build-depends:
