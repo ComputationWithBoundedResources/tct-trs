@@ -10,7 +10,7 @@ import qualified Data.Rewriting.Term as R
 
 import qualified Tct.Core.Common.Pretty     as PP
 
-import Tct.Trs.Data.Trs (Trs, Var, Fun)
+import Tct.Trs.Data.Trs (Trs, Fun(..))
 import qualified Tct.Trs.Data.Trs as Trs
 
 data SymbolKind
@@ -55,16 +55,17 @@ sanitise prob = prob { symbols = (sig, ds, cs) }
         k s _ = s
     cs = S.fromList (M.keys sig) `S.difference` ds
 
-fromRewriting :: R.Problem Fun Var -> Problem
+fromRewriting :: R.Problem String String -> Problem
 fromRewriting prob = sanitise Problem
   { startTerms = R.startTerms prob
   , strategy   = R.strategy prob
   , symbols    = undefined
 
   , strictDPs  = Trs.empty
-  , strictTrs  = Trs.fromRuleList $ R.strictRules (R.rules prob)
+  , strictTrs  = Trs.fromRuleList $ map ruleMap $ R.strictRules (R.rules prob)
   , weakDPs    = Trs.empty
-  , weakTrs    = Trs.fromRuleList $ R.weakRules (R.rules prob) }
+  , weakTrs    = Trs.fromRuleList $ map ruleMap $ R.weakRules (R.rules prob) }
+  where ruleMap (R.Rule l r) = let k = R.map TrsFun id in R.Rule (k l) (k r)
 
 
 

@@ -2,7 +2,7 @@
 module Tct.Trs.Data.Trs
   (
   Trs
-  , Fun, Var, Rule
+  , Fun (..), Var, Rule
   , ruleList, fromRuleList
   , empty, singleton, union, unions, difference, intersect
   , SelectorExpression (..)
@@ -28,7 +28,19 @@ import qualified Data.Rewriting.Rule        as R
 import qualified Tct.Trs.Data.Rewriting     as R 
 
 
-type Fun  = String
+data Fun
+  = TrsFun String
+  | DepFun String
+  | ComFun Int
+  deriving (Eq, Ord, Show)
+
+-- TODO: MS are there some rules; how they should look like
+-- eg what happens if the initial Trs has a symbol ending with #
+instance PP.Pretty Fun where
+  pretty (TrsFun s) = PP.pretty s
+  pretty (DepFun s) = PP.pretty s PP.<> PP.char '#'
+  pretty (ComFun i) = PP.pretty "c_" PP.<> PP.int i
+
 type Var  = String
 type Rule = R.Rule Fun Var
 

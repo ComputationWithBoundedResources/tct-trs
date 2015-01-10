@@ -21,7 +21,8 @@ import Tct.Trs.Data.Problem
 
 trsMode :: TctMode Problem CC
 trsMode = TctMode
-  { modeParser          = parser
+  { modeId              = "trs"
+  , modeParser          = parser
   , modeStrategies      = []
 
   , modeDefaultStrategy = failing
