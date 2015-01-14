@@ -18,21 +18,18 @@ import qualified Data.Map.Strict                     as M
 import qualified Data.Traversable                    as T
 
 import qualified Data.Rewriting.Rule                 as R (Rule (..))
-import qualified SmtLib.Logic.Core                   as SMT
-import qualified SmtLib.Logic.Int                    as SMT
-import qualified SmtLib.SMT                          as SMT
-import qualified SmtLib.Solver                       as SMT
 
 import qualified Data.Rewriting.Term                 as R
 
 import qualified Tct.Common.Polynomial               as P
 import qualified Tct.Common.PolynomialInterpretation as PI
 import           Tct.Common.Ring
-import           Tct.Common.SMT                      ()
+import qualified Tct.Common.SMT                      as SMT
 import           Tct.Common.ProofCombinators
 
 import           Tct.Core.Common.Error               (liftIO)
 import qualified Tct.Core.Common.Pretty              as PP
+import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Data                       as T
 import           Tct.Core.Data.Declaration.Parse     ()
 
@@ -64,7 +61,7 @@ data PolyInterProcessor = PolyInterProc
   } deriving Show
 
 
-newtype PolyInterProof = PolyInterProof (OrientationProof PolyOrder)
+newtype PolyInterProof = PolyInterProof (OrientationProof PolyOrder) deriving Show
 
 type PolyInter      = PI.PolyInter Fun
 type Kind           = PI.Kind Fun
@@ -81,18 +78,18 @@ data PolyOrder = PolyOrder
 
 
 instance T.Processor PolyInterProcessor where
-  type ProofObject PolyInterProcessor = PolyInterProof
+  type ProofObject PolyInterProcessor = ApplicationProof PolyInterProof
   type Problem PolyInterProcessor     = Problem
   type Forking PolyInterProcessor     = T.Optional T.Id
   solve p prob
     | isTrivial prob = return . T.resultToTree p prob $
-       T.Success T.Null (PolyInterProof Empty) (const $ T.timeUBCert T.constant)
+       T.Success T.Null Closed (const $ T.timeUBCert T.constant)
     | otherwise  = do
         res <- liftIO $ entscheide p prob
         return . T.resultToTree p prob $ case res of
           SMT.Sat order ->
-            T.Success (newProblem order prob) (PolyInterProof $ Order order) (certification order)
-          _                         -> T.Fail (PolyInterProof Incompatible)
+            T.Success (newProblem order prob) (Applicable $ PolyInterProof $ Order order) (certification order)
+          _                         -> T.Fail (Applicable $ PolyInterProof Incompatible)
 
 
 newtype StrictVar = StrictVar Rule deriving (Eq, Ord)
@@ -127,17 +124,17 @@ interpret ebsi = interpretTerm interpretFun interpretVar
       where interp = PI.interpretations ebsi M.! f
     interpretVar      = P.variable
 
-entscheide :: PolyInterProcessor -> Problem -> IO (SMT.Sat PolyOrder)
+entscheide :: PolyInterProcessor -> Problem -> IO (SMT.Result PolyOrder)
 entscheide p prob = do
-  res :: SMT.Sat (M.Map CoefficientVar Int) <- SMT.solve SMT.minismt $ do
-    SMT.setLogic "QF_NIA"
+  res :: SMT.Result (M.Map CoefficientVar Int) <- SMT.solveStM SMT.minismt $ do
+    SMT.setFormat "QF_NIA"
     -- encode abstract interpretation
     (ebsi,coefficientEncoder) <- SMT.memo $ PI.PolyInter `liftM` T.mapM encode absi
     -- encode strict vars
-    (_, strictVarEncoder) <- SMT.memo $ mapM  (SMT.snvarm . StrictVar) rules
+    (_, strictVarEncoder) <- SMT.memo $ mapM  (SMT.snvarMO . StrictVar) rules
 
     let
-      encodeStrictVar   = SMT.fm . (strictVarEncoder M.!)
+      encodeStrictVar   = (strictVarEncoder M.!)
 
     let
       p1 `gte` p2 = SMT.bigAnd [ c SMT..>= SMT.zero | c <- P.coefficients $ p1 `add` neg p2 ]
@@ -145,8 +142,8 @@ entscheide p prob = do
       orderConstraints     =
         [ lhs `gte`  (rhs `add` P.constant (encodeStrictVar $ strict r))
         | (r,lhs,rhs) <- interpreted ]
-      monotoneConstraints = [ SMT.fm c SMT..> SMT.zero | (v,c) <- M.assocs coefficientEncoder, isSimple (PI.argpos v)]
-      rulesConstraint     = [ SMT.fm s SMT..> SMT.zero | r <- ruleList (strictComponents prob), let s = encodeStrictVar (StrictVar r) ]
+      monotoneConstraints = [ c SMT..> SMT.zero | (v,c) <- M.assocs coefficientEncoder, isSimple (PI.argpos v)]
+      rulesConstraint     = [ s SMT..> SMT.zero | r <- ruleList (strictComponents prob), let s = encodeStrictVar (StrictVar r) ]
 
     SMT.assert $ SMT.bigAnd orderConstraints
     SMT.assert $ SMT.bigAnd monotoneConstraints
@@ -159,19 +156,16 @@ entscheide p prob = do
       [(_,1)] -> True
       _       -> False
 
-    encode :: Monad m
-      => P.PView (PI.CoefficientVar Fun) PI.SomeIndeterminate
-      -> SMT.MemoSMT CoefficientVar m (PI.SomePolynomial SMT.Expr)
     encode = P.fromViewWithM enc where
       enc c
-        | PI.restrict c = SMT.fm `liftM` SMT.snvarm c
-        | otherwise     = SMT.fm `liftM` SMT.nvarm c
+        | PI.restrict c = SMT.snvarMO c
+        | otherwise     = SMT.nvarMO c
     rules = ruleList (allComponents prob)
     sig   = signature prob
     absi  = M.mapWithKey (curry (PI.mkInterpretation kind)) sig
     kind  =
       if isRCProblem prob 
-        then PI.ConstructorBased (shape p) (constructors prob)
+        then PI.ConstructorBased (shape p) (constructorSymbols $ startTerms prob)
         else PI.Unrestricted (shape p)
 
     mkOrder inter = PolyOrder
@@ -211,9 +205,12 @@ instance PP.Pretty PolyOrder where
             , (PP.empty   , PP.text " = ", PP.pretty r)
             , (PP.empty   , PP.empty     , PP.empty) ]
 
-instance Show PolyInterProof where 
-  show (PolyInterProof order) = show order
+instance PP.Pretty PolyInterProof where
+  pretty (PolyInterProof order) = PP.pretty order
 
-instance PP.Pretty PolyInterProof 
-  where pretty (PolyInterProof order) = PP.pretty order
+instance Xml.Xml PolyOrder where
+  toXml _ = Xml.text "polyorder"
+
+instance Xml.Xml PolyInterProof where
+  toXml (PolyInterProof order) = Xml.toXml order
 

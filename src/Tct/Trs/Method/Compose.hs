@@ -13,6 +13,7 @@ import qualified Data.Rewriting.Term           as R (isVariantOf)
 
 import qualified Tct.Core.Common.Parser        as P
 import qualified Tct.Core.Common.Pretty        as PP
+import qualified Tct.Core.Common.Xml           as Xml
 import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Data                 as T
 
@@ -155,6 +156,8 @@ instance PP.Pretty DecomposeProof where
       ppRules s rs = PP.text s PP.<$$> PP.indent 2 (PP.pretty rs)
       stricts = ppRemovableDPs pp `union` ppRemovableTrs pp
 
+instance Xml.Xml DecomposeProof where
+  toXml _ = Xml.text "decompose"
 
 progress :: DecomposeProof -> Bool
 progress DecomposeStaticProof{..} =
@@ -217,6 +220,7 @@ instance T.Processor DecomposeDynamicProcessor where
         else T.Continue $ T.Progress (pn (Applicable proof)) certfn (T.Pair (T.fromReturn (ppResult pp), T.Open sProb))
     return $ case app of
       Inapplicable s -> T.resultToTree p prob $ T.Fail (Inapplicable s)
+      Closed         -> T.resultToTree p prob $ T.Fail Closed
       Applicable pt  -> pt
     where
       test = maybe (return ()) (ApplicationT . return . Inapplicable)

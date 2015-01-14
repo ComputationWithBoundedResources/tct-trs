@@ -1,71 +1,79 @@
 module Tct.Trs.Data.Problem
   where
 
-import qualified Data.Map.Strict            as M
 import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 
 import qualified Data.Rewriting.Problem as R
 import qualified Data.Rewriting.Rule as R (Rule (..))
 import qualified Data.Rewriting.Term as R
 
 import qualified Tct.Core.Common.Pretty     as PP
+import qualified Tct.Core.Common.Xml        as Xml
 
-import Tct.Trs.Data.Trs (Trs, Fun(..))
+import Tct.Trs.Data.Trs (Trs, Fun)
 import qualified Tct.Trs.Data.Trs as Trs
 
-data SymbolKind
-  = Defined
-  | Constructor
-  deriving (Eq, Show)
 
-type Signature = M.Map Fun Int
-type Constructors = S.Set Fun
-type DefinedSymbols = S.Set Fun
+data StartTerms
+  = AllTerms 
+    { allSymbols :: S.Set Fun }
+  | BasicTerms 
+    { definedSymbols     :: S.Set Fun
+    , constructorSymbols :: S.Set Fun }
+  deriving (Show, Eq)
+
+data Strategy
+  = Innermost
+  | Outermost
+  | Full
+  deriving (Show, Eq)
 
 data Problem = Problem
-  { startTerms :: R.StartTerms
-  , strategy   :: R.Strategy
-  , symbols    :: (Signature, DefinedSymbols, Constructors)
+  { startTerms :: StartTerms
+  , strategy   :: Strategy
+  , signature  :: Trs.Signature
 
   , strictDPs  :: Trs
   , strictTrs  :: Trs
   , weakDPs    :: Trs
   , weakTrs    :: Trs
   
-  } deriving (Show)
+  } deriving (Show, Eq)
 
-signature :: Problem -> Signature
-signature = (\(sig, _,_) -> sig) . symbols
-
-constructors :: Problem -> Constructors
-constructors = (\(_, _,cs) -> cs) . symbols
-
--- TODO: tpdb format - funs with different arities?
 sanitise :: Problem -> Problem
-sanitise prob = prob { symbols = (sig, ds, cs) }
-  where
-    rules = Trs.ruleList $ allComponents prob
-    sig = foldl k M.empty rules
-      where 
-        k m (R.Rule l r) = funs l `M.union` funs r `M.union` m
-        funs t = M.fromList (R.funs $ R.withArity t)
-    ds = foldl k S.empty rules
-      where
-        k s (R.Rule (R.Fun f _) _) = f `S.insert` s
-        k s _ = s
-    cs = S.fromList (M.keys sig) `S.difference` ds
+sanitise prob = prob 
+  { startTerms = restrictST (startTerms prob)
+  , signature  = sig }
+  where 
+    sig   = Trs.restrictSignature sig (Trs.funs $ allComponents prob)
+    allfs = S.fromList (M.keys sig)
+    restrictST (AllTerms fs)      = AllTerms (fs `S.intersection` allfs)
+    restrictST (BasicTerms ds cs) = BasicTerms (ds `S.intersection` allfs) (cs `S.intersection` allfs)
 
 fromRewriting :: R.Problem String String -> Problem
-fromRewriting prob = sanitise Problem
-  { startTerms = R.startTerms prob
-  , strategy   = R.strategy prob
-  , symbols    = undefined
+fromRewriting prob = Problem
+  { startTerms   = case R.startTerms prob of
+      R.AllTerms   -> AllTerms (defs `S.union` cons)
+      R.BasicTerms -> BasicTerms defs cons
+  , strategy = case R.strategy prob of
+      R.Innermost -> Innermost
+      R.Full      -> Full
+      R.Outermost -> Outermost
+  , signature  = sig
 
   , strictDPs  = Trs.empty
-  , strictTrs  = Trs.fromRuleList $ map ruleMap $ R.strictRules (R.rules prob)
+  , strictTrs  = sTrs
   , weakDPs    = Trs.empty
-  , weakTrs    = Trs.fromRuleList $ map ruleMap $ R.weakRules (R.rules prob) }
-  where ruleMap (R.Rule l r) = let k = R.map TrsFun id in R.Rule (k l) (k r)
+  , weakTrs    = wTrs }
+  where 
+    toFun (R.Rule l r) = let k = R.map Trs.TrsFun id in R.Rule (k l) (k r)
+    sTrs = Trs.fromRuleList . map toFun $ R.strictRules (R.rules prob)
+    wTrs = Trs.fromRuleList . map toFun $ R.weakRules (R.rules prob)
+    trs  = sTrs `Trs.union` wTrs
+    sig  = Trs.mkSignature trs
+    defs = Trs.mkDefinedSymbols trs
+    cons = Trs.mkConstructorSymbols sig defs
 
 
 
@@ -79,8 +87,12 @@ dpComponents prob  = strictDPs prob `Trs.union` weakDPs prob
 trsComponents prob = strictTrs prob `Trs.union` weakTrs prob
 
 isRCProblem, isDCProblem :: Problem -> Bool
-isRCProblem prob = startTerms prob == R.BasicTerms
-isDCProblem prob = startTerms prob == R.AllTerms
+isRCProblem prob = case startTerms prob of
+  BasicTerms{} -> True
+  _            -> False
+isDCProblem prob = case startTerms prob of
+  AllTerms{} -> True
+  _          -> False
 
 note :: Bool -> String -> Maybe String
 note b st = if b then Just st else Nothing
@@ -122,4 +134,10 @@ ppProblem prob =  PP.vcat
 
 instance PP.Pretty Problem where
   pretty = ppProblem
+
+xmlProblem :: Problem -> Xml.XmlContent
+xmlProblem _ = Xml.text "trsInput"
+
+instance Xml.Xml Problem where
+  toXml = xmlProblem
 
