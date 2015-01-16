@@ -20,44 +20,44 @@ import qualified Data.Rewriting.Rule as R
 
 import Tct.Core.Common.Xml
 
+
 import Tct.Trs.Data.Trs
 import qualified Tct.Trs.Data.Problem as Prob
 
-
 var :: Show v => v -> XmlContent
-var v = elt "var" (text $ show v)
+var v = elt "var" [text $ show v]
 
 fun :: Show f => AFun f -> XmlContent
-fun (TrsFun f) = elt "name" (text $ show f)
-fun (DpFun f)  = elt "sharp" $ elt "name" (text $ show f)
-fun (ComFun f) = elt "comm" $ elt "name" (text $ show f) -- TODO
+fun (TrsFun f) = elt "name" [text $ show f]
+fun (DpFun f)  = elt "sharp" [elt "name" [text $ show f]]
+fun (ComFun f) = elt "comm" [elt "name" [text $ show f]] -- TODO
 
 term :: (Show f, Show v) => R.Term (AFun f) v -> XmlContent
-term (R.Fun f ts) = elts "funapp" $ fun f :  [ elt "arg" (term t) | t <- ts ]
+term (R.Fun f ts) = elt "funapp" $ fun f :  [ elt "arg" [term t] | t <- ts ]
 term (R.Var v)    = var v
 
 rule :: (Show f, Show v) => R.Rule (AFun f) v -> XmlContent 
-rule r = elts "rule" 
-  [ elt "lhs" (term $ R.lhs r)
-  , elt "rhs" (term $ R.rhs r) ]
+rule r = elt "rule" 
+  [ elt "lhs" [term $ R.lhs r]
+  , elt "rhs" [term $ R.rhs r] ]
 
 rules :: Trs -> XmlContent
-rules rs = elts "rules" [ rule r | r <- ruleList rs ]
+rules rs = elt "rules" [ rule r | r <- ruleList rs ]
 
 signature :: Show f => M.Map (AFun f) Int -> XmlContent
-signature sig = elts "signature" [ symb f i | (f,i) <- M.toList sig ]
-  where symb f i = elts "symbol" [ fun f, elt "arity" (text $ show i) ]
+signature sig = elt "signature" [ symb f i | (f,i) <- M.toList sig ]
+  where symb f i = elt "symbol" [ fun f, elt "arity" [text $ show i] ]
 
 strategy :: Prob.Strategy -> XmlContent
-strategy Prob.Innermost = elts "innermost" []
-strategy Prob.Outermost = elts "outermost" []
-strategy Prob.Full      = elts "full" []
+strategy Prob.Innermost = elt "innermost" []
+strategy Prob.Outermost = elt "outermost" []
+strategy Prob.Full      = elt "full" []
 
 startTerms :: Prob.StartTerms -> Signature -> XmlContent
 startTerms (Prob.AllTerms fs) sig =
-  elts "derivationalComplexity" [signature $ restrictSignature sig fs]
+  elt "derivationalComplexity" [signature $ restrictSignature sig fs]
 startTerms (Prob.BasicTerms ds cs) sig =
-  elts "runtimeComplexity" $ map signature [restrictSignature sig cs, restrictSignature sig ds]
+  elt "runtimeComplexity" $ map signature [restrictSignature sig cs, restrictSignature sig ds]
 
   
 {-complexityProblem :: Prob.Problem -> Proof.Answer -> XmlContent-}
@@ -106,5 +106,19 @@ startTerms (Prob.BasicTerms ds cs) sig =
   {---         misc = []-}
   {---         symtab = []-}
 
+xmlProblem :: Prob.Problem -> XmlContent
+xmlProblem prob = elt "problem"
+  [ elt "strictTrs"         [rules (Prob.strictTrs prob)]
+  , elt "weakTrs"           [rules (Prob.strictTrs prob)]
+  , elt "strictDPs"         [rules (Prob.strictTrs prob)]
+  , elt "weakDPs"           [rules (Prob.strictTrs prob)]
+  -- ceta compatible
+  , elt "trs"               [rules (Prob.allComponents prob)]
+  , elt "strategy"          [strategy (Prob.strategy prob)]
+  , elt "relativeRules"     [rules (Prob.weakComponents prob)]
+  , elt "complexityMeasure" [startTerms (Prob.startTerms prob) (Prob.signature prob)] ]
+
+instance Xml Prob.Problem where
+  toXml = xmlProblem
 
 

@@ -10,13 +10,17 @@ import qualified Data.Set                   as S
 
 import           Tct.Core.Common.Error      (TctError (..))
 import qualified Tct.Core.Common.Pretty     as PP
+import qualified Tct.Core.Common.Xml        as Xml (putXml)
+import           Tct.Core.Data              (ProofTree)
 import           Tct.Core.Main
 import           Tct.Core.Processor.Trivial (failing)
 
 import qualified Data.Rewriting.Problem     as R
 
+import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
 import           Tct.Trs.Data.Trs
+import           Tct.Trs.Data.Xml           ()
 
 
 trsMode :: TctMode Problem CC
@@ -28,8 +32,12 @@ trsMode = TctMode
   , modeDefaultStrategy = failing
   , modeOptions         = options
   , modeModifyer        = modifyer
-  , modeAnswer          = const $ return () }
+  , modeAnswer          = answering }
 
+answering :: ProofTree Problem -> IO ()
+answering pt = case cetaOutput pt of
+  Left s    -> putStrLn s
+  Right xml -> Xml.putXml xml
 
 data CC = DCF | DCI | RCF | RCI deriving (Eq, Read)
 

@@ -35,6 +35,7 @@ import           Tct.Core.Data.Declaration.Parse     ()
 
 import           Tct.Trs
 import           Tct.Trs.Data.Trs
+import           Tct.Trs.Data.Xml ()
 import           Tct.Trs.Interpretation
 
 
@@ -82,8 +83,9 @@ instance T.Processor PolyInterProcessor where
   type Problem PolyInterProcessor     = Problem
   type Forking PolyInterProcessor     = T.Optional T.Id
   solve p prob
-    | isTrivial prob = return . T.resultToTree p prob $
-       T.Success T.Null Closed (const $ T.timeUBCert T.constant)
+    {-| isTrivial prob = return . T.resultToTree p prob $-}
+       {-T.Success T.Null Closed (const $ T.timeUBCert T.constant)-}
+    | isTrivial prob = return . T.resultToTree p prob $ T.Fail Closed
     | otherwise  = do
         res <- liftIO $ entscheide p prob
         return . T.resultToTree p prob $ case res of
@@ -209,7 +211,7 @@ instance PP.Pretty PolyInterProof where
   pretty (PolyInterProof order) = PP.pretty order
 
 instance Xml.Xml PolyOrder where
-  toXml _ = Xml.text "polyorder"
+  toXml _ = Xml.elt "polyorder" []
 
 instance Xml.Xml PolyInterProof where
   toXml (PolyInterProof order) = Xml.toXml order

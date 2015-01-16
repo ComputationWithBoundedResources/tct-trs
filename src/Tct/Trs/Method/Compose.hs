@@ -25,6 +25,7 @@ import           Tct.Trs.Data.Problem
 import qualified Tct.Trs.Data.Rewriting        as R
 import           Tct.Trs.Data.RuleSelector
 import           Tct.Trs.Data.Trs
+import           Tct.Trs.Data.Xml ()
 
 
 data DecomposeBound
@@ -157,7 +158,7 @@ instance PP.Pretty DecomposeProof where
       stricts = ppRemovableDPs pp `union` ppRemovableTrs pp
 
 instance Xml.Xml DecomposeProof where
-  toXml _ = Xml.text "decompose"
+  toXml _ = Xml.elt "decompose" []
 
 progress :: DecomposeProof -> Bool
 progress DecomposeStaticProof{..} =

@@ -9,7 +9,6 @@ import qualified Data.Rewriting.Rule as R (Rule (..))
 import qualified Data.Rewriting.Term as R
 
 import qualified Tct.Core.Common.Pretty     as PP
-import qualified Tct.Core.Common.Xml        as Xml
 
 import Tct.Trs.Data.Trs (Trs, Fun)
 import qualified Tct.Trs.Data.Trs as Trs
@@ -134,10 +133,4 @@ ppProblem prob =  PP.vcat
 
 instance PP.Pretty Problem where
   pretty = ppProblem
-
-xmlProblem :: Problem -> Xml.XmlContent
-xmlProblem _ = Xml.text "trsInput"
-
-instance Xml.Xml Problem where
-  toXml = xmlProblem
 
