@@ -1,29 +1,35 @@
+{- | 
+Set like data type for Term Rewrite Systems (TRSs).
+
+Should be imported qualified.
+ -}
 {-# LANGUAGE DeriveFoldable #-}
 module Tct.Trs.Data.Trs
   (
   Trs
-  , AFun (..), Fun, Var, Rule
-  , ruleList, fromRuleList
   , Signature
   , Symbols
-  , funs
-  , mkSignature
-  , restrictSignature
-  , mkDefinedSymbols
-  , mkConstructorSymbols
-  , empty, singleton, union, unions, difference, intersect
   , SelectorExpression (..)
+
+  , toList, fromList
+  , funs
+
+  , signature
+  , restrictSignature
+  , definedSymbols
+  , constructorSymbols
+
+  , empty, singleton, union, unions, difference, intersect
     
-  , isEmpty
+  , null
   , isDuplicating, isLinear
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
 
   , isLinear', isNonErasing', isNonSizeIncreasing', isNonDuplicating'
-  
-  -- , module Data.Rewriting.Rules
   ) where
 
 
+import Prelude hiding (null)
 import qualified Data.Map.Strict as M
 import Data.Typeable
 import qualified Data.Set as S
@@ -31,119 +37,105 @@ import qualified Data.Foldable as F
 
 import qualified Tct.Core.Common.Pretty as PP
 
+import Data.Rewriting.Rule (Rule)
 import qualified Data.Rewriting.Rule        as R 
 import qualified Data.Rewriting.Term        as T
 
 import qualified Tct.Trs.Data.Rewriting     as R 
 
 
--- | Annotated function symbol.
-data AFun f
-  = TrsFun f
-  | DpFun f
-  | ComFun Int
-  deriving (Eq, Ord, Show)
 
--- TODO: MS are there some rules; how they should look like
--- eg what happens if the initial Trs has a symbol ending with #
-instance PP.Pretty f => PP.Pretty (AFun f) where
-  pretty (TrsFun s) = PP.pretty s
-  pretty (DpFun s) = PP.pretty s PP.<> PP.char '#'
-  pretty (ComFun i) = PP.pretty "c_" PP.<> PP.int i
 
-type Var  = String
-type Fun  = AFun String
-type Rule = R.Rule Fun Var
-
-type RuleSet = S.Set Rule
+type RuleSet f v = S.Set (Rule f v)
 
 newtype TrsT a = TrsT (S.Set a)
   deriving (Eq, Ord, Show, F.Foldable)
 
-type Trs = TrsT Rule
+type Trs f v = TrsT (R.Rule f v)
 
-data SelectorExpression
-  = SelectDP Rule
-  | SelectTrs Rule
-  | BigAnd [SelectorExpression]
-  | BigOr [SelectorExpression]
+data SelectorExpression f v
+  = SelectDP (Rule f v)
+  | SelectTrs (Rule f v)
+  | BigAnd [SelectorExpression f v]
+  | BigOr [SelectorExpression f v]
   deriving (Show, Typeable)
 
-ruleList :: Trs -> [Rule]
-ruleList (TrsT rs) = S.elems rs
+toList :: Trs f v -> [Rule f v]
+toList (TrsT rs) = S.elems rs
 
-fromRuleList :: [Rule] -> Trs
-fromRuleList = TrsT . S.fromList 
+fromList :: (Ord f, Ord v) => [Rule f v] -> Trs f v
+fromList = TrsT . S.fromList 
 
-type Signature      = M.Map Fun Int
-type Symbols        = S.Set Fun
+type Signature f    = M.Map f Int
+type Symbols f      = S.Set f
+
+funs :: (Ord f, Ord v) => Trs f v -> Symbols f
+funs (TrsT rs) = S.foldl k S.empty rs
+  where k acc = S.union acc . S.fromList . R.funs 
 
 -- FIXME: is not safe
-mkSignature :: Trs -> Signature
-mkSignature rules = foldl k M.empty (ruleList rules)
+signature :: Ord f => Trs f v -> Signature f
+signature rules = foldl k M.empty (toList rules)
   where 
     k m (R.Rule l r) = M.unions [m, fa l, fa r]
     fa t = M.fromList (T.funs $ T.withArity t)
 
-funs :: Trs -> Symbols
-funs (TrsT rs) = S.foldl k S.empty rs
-  where k acc = S.union acc . S.fromList . R.funs 
-
-restrictSignature :: Signature -> Symbols -> Signature
+restrictSignature :: (Ord f) => Signature f -> Symbols f -> Signature f
 restrictSignature sig fs = M.filterWithKey k sig
   where k f _ = f `S.member` fs
 
-mkDefinedSymbols :: Trs -> Symbols
-mkDefinedSymbols (TrsT rs) = S.foldl ofRule S.empty rs
+definedSymbols :: (Ord f, Ord v) => Trs f v -> Symbols f
+definedSymbols (TrsT rs) = S.foldl ofRule S.empty rs
   where 
    ofRule acc (R.Rule l r) = ofTerm (ofTerm acc l) r
    ofTerm acc (T.Fun f _) = f `S.insert` acc
    ofTerm acc _           = acc
 
-mkConstructorSymbols :: Signature -> Symbols -> Symbols
-mkConstructorSymbols sig defineds = alls `S.difference` defineds
+constructorSymbols :: Ord f => Signature f -> Symbols f -> Symbols f
+constructorSymbols sig defineds = alls `S.difference` defineds
   where alls = S.fromList (M.keys sig)
 
-lift1 :: (RuleSet -> a) -> Trs -> a
+
+lift1 :: (RuleSet f v -> a) -> Trs f v -> a
 lift1 f (TrsT rs) = f rs 
 
-lift2 :: (RuleSet -> RuleSet -> a) -> Trs -> Trs -> a
+lift2 :: (RuleSet f v -> RuleSet f v -> a) -> Trs f v -> Trs f v -> a
 lift2 f (TrsT rs1)  (TrsT rs2) = f rs1 rs2
 
-empty :: Trs
+empty :: Trs f v
 empty = TrsT S.empty
 
-singleton :: Rule -> Trs
+singleton :: Rule f v -> Trs f v
 singleton = TrsT . S.singleton
 
-union :: Trs -> Trs -> Trs
+union :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
 union trs1 trs2 = TrsT $ lift2 S.union trs1 trs2
 
-unions :: [Trs] -> Trs
+unions :: [Trs f v] -> Trs f v
 unions = undefined
 
-intersect :: Trs -> Trs -> Trs
+intersect :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
 intersect trs1 trs2 = TrsT $ lift2 S.intersection trs1 trs2
 
-difference :: Trs -> Trs -> Trs
+difference :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
 difference trs1 trs2 = TrsT $ lift2 S.difference trs1 trs2
 
 
 -- * properties
-any' :: (Rule -> Bool) -> Trs -> Bool
+any' :: (Rule f v -> Bool) -> Trs f v -> Bool
 any' f (TrsT rs) = S.foldr ((||) . f) False rs
 
-all' :: (Rule -> Bool) -> Trs -> Bool
+all' :: (Rule f v -> Bool) -> Trs f v -> Bool
 all' f (TrsT rs) = S.foldr ((&&) . f) True rs
 
-isEmpty :: Trs -> Bool
-isEmpty = lift1 S.null
+null :: Trs f v -> Bool
+null = lift1 S.null
 
-isLinear, isDuplicating :: Trs -> Bool
+isLinear, isDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
 isLinear         = all' R.isLinear
 isDuplicating    = any' R.isDuplicating
 
-isNonErasing, isNonSizeIncreasing, isNonDuplicating :: Trs -> Bool
+isNonErasing, isNonSizeIncreasing, isNonDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
 isNonErasing        = all' R.isNonErasing
 isNonSizeIncreasing = all' R.isNonSizeIncreasing
 isNonDuplicating    = not . isDuplicating
@@ -154,10 +146,10 @@ isNonDuplicating    = not . isDuplicating
 note :: Bool -> String -> Maybe String
 note b st = if b then Just st else Nothing
 
-isLinear'  :: Trs -> Maybe String
+isLinear'  :: (Ord f, Ord v) => Trs f v -> Maybe String
 isLinear' trs = note (not $ isLinear trs) " some rule is non-linear"
 
-isNonErasing', isNonSizeIncreasing', isNonDuplicating' :: Trs -> Maybe String
+isNonErasing', isNonSizeIncreasing', isNonDuplicating' :: (Ord f, Ord v) => Trs f v -> Maybe String
 isNonErasing' trs        = note (not $ isNonErasing trs) " some rule is erasing"
 isNonSizeIncreasing' trs = note (not $ isNonSizeIncreasing trs) " some rule is size-increasing"
 isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is duplicating"
@@ -167,10 +159,10 @@ isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is dupl
 
 -- * pretty printing --
 
-ppTrs :: Trs -> PP.Doc
+ppTrs :: (PP.Pretty f, PP.Pretty v) => Trs f v -> PP.Doc
 ppTrs = F.foldl k PP.empty
   where k doc rs = doc PP.<$$> PP.pretty rs
 
-instance PP.Pretty Trs where
+instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
   pretty = ppTrs
 

@@ -13,11 +13,11 @@ import qualified Tct.Common.CeTA as C
 import Tct.Trs.Data.Problem
 import Tct.Trs.Data.Xml ()
 
+
 import Debug.Trace
 
-
 certifiable :: [String]
-certifiable = ["rIsEmpty"]
+certifiable = ["rIsEmpty", "ruleShifting", "dtTransformation"]
 
 cetaOutput :: T.ProofTree Problem -> Either String Xml.XmlDocument
 cetaOutput pt = case T.timeUB (T.certificate pt) of
@@ -50,7 +50,8 @@ cetaSubProblem pt@(T.Progress pn _ _) = cetaProblem (T.problem pn) pt
 
 
 isCertifiable :: Xml.XmlContent -> Bool
-isCertifiable c = let t = Xml.rootTag c `elem` certifiable in traceShow (Xml.rootTag c) t
+isCertifiable c | traceShow (Xml.rootTag c) False = undefined
+isCertifiable c = Xml.rootTag c `elem` certifiable
 
 cetaProof :: Xml.Xml t => T.ProofTree t -> Xml.XmlContent
 cetaProof = C.complexityProof . cetaProof'
@@ -61,8 +62,8 @@ cetaProof' (T.NoProgress _ spt)      = cetaProof' spt
 cetaProof' pt@(T.Progress pn _ spts) = case F.toList spts of
   []  | isCertifiable xmlpn -> xmlpn
   [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn [cetaProof t]
-  ts                          -> C.unknownProof "description" (cetaSubProblem pt) (map mkSubProofs ts)
+  ts                        -> C.unknownProof "description" (cetaSubProblem pt) (map mkSubProofs ts)
   where 
-    xmlpn   = Xml.toXml (T.proof pn)
+    xmlpn   = Xml.toCeTA (T.proof pn)
     mkSubProofs spt = C.subProof (cetaSubProblem spt) (cetaProof spt)
 

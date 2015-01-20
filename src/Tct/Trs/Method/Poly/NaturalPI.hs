@@ -33,11 +33,11 @@ import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Data                       as T
 import           Tct.Core.Data.Declaration.Parse     ()
 
-import           Tct.Trs
-import           Tct.Trs.Data.Trs
-import           Tct.Trs.Data.Xml ()
-import           Tct.Trs.Interpretation
-
+import Tct.Trs.Interpretation
+import qualified Tct.Trs.Data.Xml as Xml
+import qualified Tct.Trs.Data.Trs as Trs
+import Tct.Trs.Data.Problem (Problem (..), Rule, Fun, Signature, Var)
+import qualified Tct.Trs.Data.Problem as Prob
 
 --- Instances --------------------------------------------------------------------------------------------------------
 
@@ -71,6 +71,7 @@ type CoefficientVar = PI.CoefficientVar Fun
 data PolyOrder = PolyOrder
   { kind_      :: Kind
   , pint_      :: PolyInter Int
+  , sig_       :: Signature
   , strictDPs_ :: [(Rule, (P.Polynomial Int Var, P.Polynomial Int Var))]
   , strictTrs_ :: [(Rule, (P.Polynomial Int Var, P.Polynomial Int Var))]
   , weakDPs_   :: [(Rule, (P.Polynomial Int Var, P.Polynomial Int Var))]
@@ -85,7 +86,7 @@ instance T.Processor PolyInterProcessor where
   solve p prob
     {-| isTrivial prob = return . T.resultToTree p prob $-}
        {-T.Success T.Null Closed (const $ T.timeUBCert T.constant)-}
-    | isTrivial prob = return . T.resultToTree p prob $ T.Fail Closed
+    | Prob.isTrivial prob = return . T.resultToTree p prob $ T.Fail Closed
     | otherwise  = do
         res <- liftIO $ entscheide p prob
         return . T.resultToTree p prob $ case res of
@@ -101,13 +102,13 @@ strict = StrictVar
 
 newProblem :: PolyOrder -> Problem -> T.Optional T.Id Problem
 newProblem order prob = T.Opt . T.Id $ prob 
-  { strictDPs = strictDPs prob `difference` sDPs
-  , strictTrs = strictTrs prob `difference` sTrs
-  , weakDPs = weakDPs prob `union` sDPs
-  , weakTrs = weakTrs prob `union` sTrs
+  { strictDPs = strictDPs prob `Trs.difference` sDPs
+  , strictTrs = strictTrs prob `Trs.difference` sTrs
+  , weakDPs = weakDPs prob `Trs.union` sDPs
+  , weakTrs = weakTrs prob `Trs.union` sTrs
   }
   where 
-    rules = fromRuleList . fst . unzip
+    rules = Trs.fromList . fst . unzip
     sDPs = rules (strictDPs_ order)
     sTrs = rules (strictTrs_ order)
     
@@ -145,7 +146,7 @@ entscheide p prob = do
         [ lhs `gte`  (rhs `add` P.constant (encodeStrictVar $ strict r))
         | (r,lhs,rhs) <- interpreted ]
       monotoneConstraints = [ c SMT..> SMT.zero | (v,c) <- M.assocs coefficientEncoder, isSimple (PI.argpos v)]
-      rulesConstraint     = [ s SMT..> SMT.zero | r <- ruleList (strictComponents prob), let s = encodeStrictVar (StrictVar r) ]
+      rulesConstraint     = [ s SMT..> SMT.zero | r <- Trs.toList (Prob.strictComponents prob), let s = encodeStrictVar (StrictVar r) ]
 
     SMT.assert $ SMT.bigAnd orderConstraints
     SMT.assert $ SMT.bigAnd monotoneConstraints
@@ -162,26 +163,27 @@ entscheide p prob = do
       enc c
         | PI.restrict c = SMT.snvarMO c
         | otherwise     = SMT.nvarMO c
-    rules = ruleList (allComponents prob)
-    sig   = signature prob
+    rules = Trs.toList (Prob.allComponents prob)
+    sig   = Prob.signature prob
     absi  = M.mapWithKey (curry (PI.mkInterpretation kind)) sig
     kind  =
-      if isRCProblem prob 
-        then PI.ConstructorBased (shape p) (constructorSymbols $ startTerms prob)
+      if Prob.isRCProblem prob 
+        then PI.ConstructorBased (shape p) (Prob.constructorSymbols $ Prob.startTerms prob)
         else PI.Unrestricted (shape p)
 
     mkOrder inter = PolyOrder
       { kind_      = kind
       , pint_      = pint
+      , sig_       = sig
       , strictDPs_ = sDPs
       , strictTrs_ = sTrs
       , weakDPs_   = wDPs
       , weakTrs_   = wTrs }
       where
         pint        = PI.PolyInter $ M.map (P.fromViewWith (inter M.!)) absi
-        dpPints     = [ (r, (interpret pint lhs, interpret pint rhs)) | r@(R.Rule lhs rhs)  <- ruleList (dpComponents prob) ]
+        dpPints     = [ (r, (interpret pint lhs, interpret pint rhs)) | r@(R.Rule lhs rhs)  <- Trs.toList (Prob.dpComponents prob) ]
         (sDPs,wDPs) = L.partition (\(_,(lhs,rhs)) -> P.constantValue (lhs `sub` rhs) > 0) dpPints
-        trsPints    = [ (r, (interpret pint lhs, interpret pint rhs)) | r@(R.Rule lhs rhs)  <- ruleList (trsComponents prob) ]
+        trsPints    = [ (r, (interpret pint lhs, interpret pint rhs)) | r@(R.Rule lhs rhs)  <- Trs.toList (Prob.trsComponents prob) ]
         (sTrs,wTrs) = L.partition (\(_,(lhs,rhs)) -> P.constantValue (lhs `sub` rhs) > 0) trsPints
 
 
@@ -211,7 +213,25 @@ instance PP.Pretty PolyInterProof where
   pretty (PolyInterProof order) = PP.pretty order
 
 instance Xml.Xml PolyOrder where
-  toXml _ = Xml.elt "polyorder" []
+  toXml order = Xml.elt "ruleShifting"
+    [ orderingConstraintProof
+    , Xml.elt "trs" [trs] ]
+    where 
+      orderingConstraintProof =
+        Xml.elt "orderingConstraintProof" 
+          [ Xml.elt "redPair" [Xml.elt "interpretation" (xtype :xinters)]]
+      xtype   = Xml.elt "type" [Xml.elt "polynomial" [xdomain, xdegree]]
+      xdegree = Xml.elt "degree" $ 
+        case PI.degree (kind_ order) (pint_ order) of
+          T.Poly (Just k) -> [Xml.int k]
+          _               -> [Xml.text "unknown"]
+      xdomain = Xml.elt "domain" [Xml.elt "naturals" []]
+      xinters = (map xinter . M.toList . PI.interpretations $ pint_ order)
+      xinter (f,p) = Xml.elt "interpret"
+        [ Xml.fun f
+        , Xml.elt "arity" [Xml.int $ sig_ order M.! f]
+        , Xml.elt "polynomial" [Xml.toXml p]]
+      trs = Xml.rulesL (map fst (strictTrs_ order ++ strictDPs_ order) )
 
 instance Xml.Xml PolyInterProof where
   toXml (PolyInterProof order) = Xml.toXml order

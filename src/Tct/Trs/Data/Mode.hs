@@ -19,7 +19,7 @@ import qualified Data.Rewriting.Problem     as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Data.Trs
+import qualified Tct.Trs.Data.Trs as Trs
 import           Tct.Trs.Data.Xml           ()
 
 
@@ -55,8 +55,8 @@ ccProperties cc trs sig = case cc of
   RCI -> (BasicTerms defs cons , Innermost)
   where
     fs   = defs `S.union` cons
-    defs = mkDefinedSymbols trs
-    cons = mkConstructorSymbols sig defs
+    defs = Trs.definedSymbols trs
+    cons = Trs.constructorSymbols sig defs
 
 parser :: String -> Either TctError Problem
 parser s = case R.fromString s of

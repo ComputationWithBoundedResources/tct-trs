@@ -33,16 +33,17 @@ Executable trs
   hs-source-dirs:
     src
   build-depends:
-    containers       >= 0.5 && < 0.6,
-    mtl              >= 2.1 && < 2.2,
-    base             == 4.*,
+    bytestring      == 0.10.4.*,
+    containers      >= 0.5 && < 0.6,
+    mtl             >= 2.1 && < 2.2,
+    base            == 4.*,
 
-    term-rewriting   == 0.*,
+    term-rewriting  == 0.*,
 
-    slogic           == 0.*,
-    tct-common       == 3.*,
-    tct-core         == 3.*,
-    tct-trs          == 3.*
+    slogic          == 0.*,
+    tct-common      == 3.*,
+    tct-core        == 3.*,
+    tct-trs         == 3.*
 
   extensions: 
     DataKinds,
@@ -61,7 +62,6 @@ Library
     Tct.Trs
     Tct.Trs.Data.CeTA
     Tct.Trs.Data.Mode
-    Tct.Trs.Data.PartialProcessor
     Tct.Trs.Data.Problem
     Tct.Trs.Data.Rewriting
     Tct.Trs.Data.RuleSelector
@@ -70,8 +70,10 @@ Library
     Tct.Trs.Interpretation
     Tct.Trs.Processor
     Tct.Trs.Method.Compose
+    Tct.Trs.Method.DP.DependencyPairs
     Tct.Trs.Method.Poly.NaturalPI
   build-depends:
+    bytestring     == 0.10.4.*,
     containers     >= 0.5 && < 0.6,
     mtl            >= 2.1 && < 2.2,
     base           == 4.*,

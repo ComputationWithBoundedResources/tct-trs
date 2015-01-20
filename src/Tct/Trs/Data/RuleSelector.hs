@@ -40,13 +40,13 @@ data RuleSelector a = RuleSelector
 
 instance Show (RuleSelector a) where show = rsName
 
-type RuleSetSelector    = RuleSelector Prob.Ruleset
-type ExpressionSelector = RuleSelector SelectorExpression
+type RuleSetSelector f v    = RuleSelector (Prob.Ruleset f v)
+type ExpressionSelector f v = RuleSelector (SelectorExpression f v)
 
-selectorArg :: T.Argument 'T.Required ExpressionSelector
+selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
 selectorArg = T.arg { T.argName  = "selector" }
 
-instance T.SParsable prob ExpressionSelector where
+instance T.SParsable prob (ExpressionSelector Prob.Fun Prob.Var) where
   parseS = P.choice
     [ P.symbol (sym1 ++ sym2) >> return (comb prim)| (sym1,comb) <- combs, (sym2,prim) <- prims ]
     where
@@ -78,7 +78,7 @@ selInverse s = RuleSelector { rsName = "inverse of " ++ rsName s
 -}
 
 -- | Combine two rule-selectors component-wise.
-selCombine :: (String -> String -> String) -> (Trs.Trs -> Trs.Trs -> Trs.Trs) -> RuleSetSelector -> RuleSetSelector -> RuleSetSelector
+selCombine :: (String -> String -> String) -> (Trs.Trs f v -> Trs.Trs f v -> Trs.Trs f v) -> RuleSetSelector f v -> RuleSetSelector f v -> RuleSetSelector f v
 selCombine cn ctrs s1 s2 = RuleSelector { rsName = cn (rsName s1) (rsName s2)
                                         , rsSelect = fn }
         where fn prob = Prob.Ruleset { Prob.sdp  = un Prob.sdp
@@ -90,7 +90,7 @@ selCombine cn ctrs s1 s2 = RuleSelector { rsName = cn (rsName s1) (rsName s2)
                       un rfn = rfn rs1 `ctrs` rfn rs2
 
 -- | Select union of selections of given rule-selectors.
-selUnion :: RuleSetSelector -> RuleSetSelector -> RuleSetSelector
+selUnion :: (Ord f, Ord v) => RuleSetSelector f v -> RuleSetSelector f v -> RuleSetSelector f v
 selUnion = selCombine (\ n1 n2 -> "union of " ++ n1 ++ " and " ++ n2) Trs.union
 
 {-
@@ -100,7 +100,7 @@ selInter= selCombine (\ n1 n2 -> "intersect of " ++ n1 ++ " and " ++ n2) Trs.int
 -}
 
 -- | Select rewrite rules, i.e., non dependency pair rules.
-selRules :: RuleSetSelector
+selRules :: RuleSetSelector Prob.Fun Prob.Var
 selRules = RuleSelector { rsName   = "rewrite-rules" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Trs.empty
@@ -109,7 +109,7 @@ selRules = RuleSelector { rsName   = "rewrite-rules" , rsSelect = fn } where
     , Prob.wtrs = Prob.weakTrs prob }
 
 -- | Select dependency pairs.
-selDPs :: RuleSetSelector
+selDPs :: RuleSetSelector Prob.Fun Prob.Var
 selDPs = RuleSelector { rsName = "DPs" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Prob.strictDPs prob
@@ -118,7 +118,7 @@ selDPs = RuleSelector { rsName = "DPs" , rsSelect = fn } where
     , Prob.wtrs = Trs.empty }
 
 -- | Select strict rules.
-selStricts :: RuleSetSelector
+selStricts :: RuleSetSelector Prob.Fun Prob.Var
 selStricts = RuleSelector { rsName = "strict-rules" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Prob.strictDPs prob
@@ -127,7 +127,7 @@ selStricts = RuleSelector { rsName = "strict-rules" , rsSelect = fn } where
     , Prob.wtrs = Trs.empty }
 
 -- | Select strict rules.
-selWeaks :: RuleSetSelector
+selWeaks :: RuleSetSelector Prob.Fun Prob.Var
 selWeaks = RuleSelector { rsName = "weak-rules" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Trs.empty
@@ -238,16 +238,16 @@ selCloseBackward = selCloseWith mkWdg (\n -> n ++ ", backward closed")
 
 -}
 
-selAnyOf :: RuleSetSelector -> ExpressionSelector
+selAnyOf :: (Ord f, Ord v) => RuleSetSelector f v -> ExpressionSelector f v
 selAnyOf s = RuleSelector { rsName = "any " ++ rsName s, rsSelect = f }
-  where f prob = BigOr $ [ SelectDP d | d <- Trs.ruleList $ Prob.sdp rs `Trs.union` Prob.wdp rs]
-                         ++ [ SelectTrs r | r <- Trs.ruleList $ Prob.strs rs `Trs.union` Prob.wtrs rs]
+  where f prob = BigOr $ [ SelectDP d | d <- Trs.toList $ Prob.sdp rs `Trs.union` Prob.wdp rs]
+                         ++ [ SelectTrs r | r <- Trs.toList $ Prob.strs rs `Trs.union` Prob.wtrs rs]
           where rs = rsSelect s prob
 
-selAllOf :: RuleSetSelector -> ExpressionSelector
+selAllOf :: (Ord f, Ord v) => RuleSetSelector f v -> ExpressionSelector f v
 selAllOf s = RuleSelector { rsName = "any " ++ rsName s, rsSelect = f }
-  where f prob = BigAnd $ [ SelectDP d | d <- Trs.ruleList $ Prob.sdp rs `Trs.union` Prob.wdp rs]
-                         ++ [ SelectTrs r | r <- Trs.ruleList $ Prob.strs rs `Trs.union` Prob.wtrs rs]
+  where f prob = BigAnd $ [ SelectDP d | d <- Trs.toList $ Prob.sdp rs `Trs.union` Prob.wdp rs]
+                         ++ [ SelectTrs r | r <- Trs.toList $ Prob.strs rs `Trs.union` Prob.wtrs rs]
           where rs = rsSelect s prob
 
 {-
@@ -278,7 +278,7 @@ selFirstAlternative rs = RuleSelector { rsName = "first alternative of " ++ rsNa
 -}
 
 -- | returns the pair of dps and rules mentioned in a 'SelectorExpression'
-rules :: SelectorExpression -> (Trs, Trs)
+rules :: SelectorExpression f v -> (Trs f v, Trs f v)
 rules e =
   case e of
     BigAnd ss   -> rules' ss
