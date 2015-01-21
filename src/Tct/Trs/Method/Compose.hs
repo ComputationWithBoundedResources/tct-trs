@@ -151,7 +151,7 @@ instance T.Processor DecomposeStaticProcessor where
     maybe decomposition (T.Fail . Inapplicable) maybeApplicable
     where
       decomposition
-        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) undefined
+        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) undefined -- FIXME
         | otherwise      = T.Fail (Applicable proof)
       maybeApplicable = isApplicableRandS prob compfn <|> isApplicableRModuloS rProb sProb compfn
       (dps,trs) = rules $ BigAnd [ rsSelect rs prob, selectForcedRules prob compfn]

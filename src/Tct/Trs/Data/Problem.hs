@@ -36,12 +36,13 @@ data AFun f
   | ComFun Int
   deriving (Eq, Ord, Show)
 
-type Fun = AFun BS.ByteString
-type Var = BS.ByteString
-type Rule = R.Rule Fun Var
-type Trs = Trs.Trs Fun Var
+
+type Fun       = AFun BS.ByteString
+type Var       = BS.ByteString
+type Rule      = R.Rule Fun Var
+type Trs       = Trs.Trs Fun Var
 type Signature = Trs.Signature Fun
-type Symobols = Trs.Symbols Fun
+type Symobols  = Trs.Symbols Fun
 
 --
 -- TODO: MS are there some rules; how they should look like
@@ -68,7 +69,7 @@ sanitise prob = prob
   { startTerms = restrictST (startTerms prob)
   , signature  = sig }
   where 
-    sig   = Trs.restrictSignature sig (Trs.funs $ allComponents prob)
+    sig   = Trs.restrictSignature (signature prob) (Trs.funs $ allComponents prob)
     allfs = S.fromList (M.keys sig)
     restrictST (AllTerms fs)      = AllTerms (fs `S.intersection` allfs)
     restrictST (BasicTerms ds cs) = BasicTerms (ds `S.intersection` allfs) (cs `S.intersection` allfs)
@@ -108,6 +109,9 @@ dpComponents, trsComponents :: Problem -> Trs
 dpComponents prob  = strictDPs prob `Trs.union` weakDPs prob
 trsComponents prob = strictTrs prob `Trs.union` weakTrs prob
 
+isDPProblem :: Problem -> Bool
+isDPProblem prob = not $ Trs.null (strictDPs prob) && Trs.null (weakDPs prob)
+
 isRCProblem, isDCProblem :: Problem -> Bool
 isRCProblem prob = case startTerms prob of
   BasicTerms{} -> True
@@ -119,6 +123,10 @@ isDCProblem prob = case startTerms prob of
 note :: Bool -> String -> Maybe String
 note b st = if b then Just st else Nothing
 
+
+isDPProblem' :: Problem -> Maybe String
+isDPProblem' prob = note (not $ isDPProblem  prob) " not a DP problem"
+
 isRCProblem', isDCProblem' :: Problem -> Maybe String
 isRCProblem' prob = note (not $ isRCProblem  prob) " not a RC problem"
 isDCProblem' prob = note (not $ isDCProblem  prob) " not a DC problem"
@@ -128,10 +136,10 @@ isTrivial = Trs.null . strictComponents
 
 -- * ruleset
 data Ruleset f v = Ruleset
-  { sdp  :: Trs.Trs f v-- ^ strict dependency pairs                          
-  , wdp  :: Trs.Trs f v-- ^ weak dependency pairs
-  , strs :: Trs.Trs f v-- ^ strict rules
-  , wtrs :: Trs.Trs f v-- ^ weak rules
+  { sdp  :: Trs.Trs f v -- ^ strict dependency pairs                          
+  , wdp  :: Trs.Trs f v -- ^ weak dependency pairs
+  , strs :: Trs.Trs f v -- ^ strict rules
+  , wtrs :: Trs.Trs f v -- ^ weak rules
   }
 
 ruleset :: Problem -> Ruleset Fun Var

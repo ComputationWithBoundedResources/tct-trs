@@ -1,8 +1,14 @@
 {- | 
-Set like data type for Term Rewrite Systems (TRSs).
+Set like interface TRSs.
 
 Should be imported qualified.
  -}
+-- TODO: MS
+-- at some point check if lists actually would be better
+-- * often we use toList + map
+-- * often we use Prob.dpComponents ..., and we have to perform a union; for lists we could just concat the
+-- components assuming that problem itself is valid
+
 {-# LANGUAGE DeriveFoldable #-}
 module Tct.Trs.Data.Trs
   (
@@ -61,10 +67,10 @@ data SelectorExpression f v
   deriving (Show, Typeable)
 
 toList :: Trs f v -> [Rule f v]
-toList (TrsT rs) = S.elems rs
+toList (TrsT rs) = S.toList rs
 
 fromList :: (Ord f, Ord v) => [Rule f v] -> Trs f v
-fromList = TrsT . S.fromList 
+fromList = TrsT . S.fromList
 
 type Signature f    = M.Map f Int
 type Symbols f      = S.Set f
@@ -111,8 +117,9 @@ singleton = TrsT . S.singleton
 union :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
 union trs1 trs2 = TrsT $ lift2 S.union trs1 trs2
 
-unions :: [Trs f v] -> Trs f v
-unions = undefined
+unions :: (Ord f, Ord v) => [Trs f v] -> Trs f v
+unions []   = empty
+unions trss = foldl1 union trss
 
 intersect :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
 intersect trs1 trs2 = TrsT $ lift2 S.intersection trs1 trs2

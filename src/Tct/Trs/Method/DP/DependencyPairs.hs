@@ -2,7 +2,9 @@
 module Tct.Trs.Method.DP.DependencyPairs
   (
   dependencyPairs
+  , dependencyPairsDeclaration
   , dependencyTuples
+  , dependencyTuplesDeclaration
   ) where
 
 import           Control.Monad.State.Strict
@@ -28,12 +30,6 @@ import qualified Tct.Trs.Data.Xml            as Xml
 -- FIXME: 
 -- MS Compound Symbols should have identifier component
 -- it is necessary to compute a fresh symbol
-
-dependencyPairs :: T.Strategy Problem
-dependencyPairs = T.Proc (DPProc False)
-
-dependencyTuples :: T.Strategy Problem
-dependencyTuples = T.Proc (DPProc True)
 
 
 subtermsWDP :: Ord f => S.Set f -> R.Term f v -> [R.Term f v]
@@ -97,7 +93,7 @@ data DPProof = DPProof
 instance T.Processor DPProcessor where
   type ProofObject DPProcessor = ApplicationProof DPProof
   type Problem DPProcessor     = Prob.Problem
-  solve p prob = return . T.resultToTree p prob $ solveDP p prob
+  solve p prob                 = return . T.resultToTree p prob $ solveDP p prob
 
 solveDP :: (T.Forking p ~ T.Id, T.Problem p ~ Problem, T.ProofObject p ~ ApplicationProof DPProof) => DPProcessor -> Problem -> T.Result p
 solveDP p prob
@@ -105,7 +101,7 @@ solveDP p prob
   | useTuples_ p && (Prob.strategy prob /= Prob.Innermost) = T.Fail (Inapplicable "not an innermost problem")
 solveDP p prob = case Prob.startTerms prob of
   (Prob.AllTerms _)       -> T.Fail (Inapplicable "not an rc problem")
-  (Prob.BasicTerms ds cs) -> T.Success (T.Id nprob) (Applicable nproof) (\(T.Id c)  -> c)
+  (Prob.BasicTerms ds cs) -> T.Success (T.toId nprob) (Applicable nproof) T.fromId
     where
       useTuples = useTuples_ p
       (stricts, weaks) = flip evalState 0 $ do
@@ -130,8 +126,8 @@ solveDP p prob = case Prob.startTerms prob of
         , newSignature = nsig }
 
 
-----------------------------------------------------------------------------------------------------------------------
---  proofdata
+
+--- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty DPProof where
   pretty proof 
@@ -166,4 +162,20 @@ instance Xml.Xml DPProof where
         isCompound _ = False
         ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.rule old, Xml.rule new ]
         lhss (_, new)      = Xml.term (R.lhs new)
+
+--- * instances ------------------------------------------------------------------------------------------------------
+
+dependencyPairs :: T.Strategy Problem
+dependencyPairs = T.Proc (DPProc False)
+
+dependencyPairsDeclaration :: T.Declaration ('[] T.:-> T.Strategy Problem)
+dependencyPairsDeclaration = T.declare "dependencyPairs" description () dependencyPairs
+  where description = [ "Applies the (weak) dependency pairs transformation." ]
+
+dependencyTuples :: T.Strategy Problem
+dependencyTuples = T.Proc (DPProc True)
+
+dependencyTuplesDeclaration :: T.Declaration ('[] T.:-> T.Strategy Problem)
+dependencyTuplesDeclaration = T.declare "dependencyTuples" description () dependencyTuples
+  where description = [ "Applies the dependency tuples transformation." ]
 

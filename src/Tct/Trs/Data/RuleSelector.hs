@@ -278,7 +278,7 @@ selFirstAlternative rs = RuleSelector { rsName = "first alternative of " ++ rsNa
 -}
 
 -- | returns the pair of dps and rules mentioned in a 'SelectorExpression'
-rules :: SelectorExpression f v -> (Trs f v, Trs f v)
+rules :: (Ord f, Ord v) => SelectorExpression f v -> (Trs f v, Trs f v)
 rules e =
   case e of
     BigAnd ss   -> rules' ss

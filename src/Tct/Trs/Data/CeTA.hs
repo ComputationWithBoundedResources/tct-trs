@@ -14,10 +14,8 @@ import Tct.Trs.Data.Problem
 import Tct.Trs.Data.Xml ()
 
 
-import Debug.Trace
-
 certifiable :: [String]
-certifiable = ["rIsEmpty", "ruleShifting", "dtTransformation"]
+certifiable = ["rIsEmpty", "ruleShifting", "dtTransformation", "usableRules"]
 
 cetaOutput :: T.ProofTree Problem -> Either String Xml.XmlDocument
 cetaOutput pt = case T.timeUB (T.certificate pt) of
@@ -50,7 +48,6 @@ cetaSubProblem pt@(T.Progress pn _ _) = cetaProblem (T.problem pn) pt
 
 
 isCertifiable :: Xml.XmlContent -> Bool
-isCertifiable c | traceShow (Xml.rootTag c) False = undefined
 isCertifiable c = Xml.rootTag c `elem` certifiable
 
 cetaProof :: Xml.Xml t => T.ProofTree t -> Xml.XmlContent

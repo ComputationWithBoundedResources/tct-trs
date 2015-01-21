@@ -1,9 +1,9 @@
 module Tct.Trs.Processor 
   ( 
-  defaultSD 
+  defaultDeclarations
 
   , empty
-  , emptySD
+  , emptyDeclaration
   ) where
 
 
@@ -13,16 +13,24 @@ import qualified Tct.Core.Processor.Empty as E
 import           Tct.Trs.Data.Problem
 import           Tct.Trs.Data.Xml         ()
 
+import Tct.Trs.Method.DP.UsableRules (usableRulesDeclaration)
+import Tct.Trs.Method.DP.DependencyPairs (dependencyPairsDeclaration, dependencyTuplesDeclaration)
+import Tct.Trs.Method.Poly.NaturalPI (polyDeclaration)
 
-defaultSD :: [T.StrategyDeclaration Problem]
-defaultSD = 
-  [ T.SD emptySD ]
 
+defaultDeclarations :: [T.StrategyDeclaration Problem]
+defaultDeclarations = 
+  [ T.SD emptyDeclaration
+  , T.SD usableRulesDeclaration
+  , T.SD dependencyPairsDeclaration 
+  , T.SD dependencyTuplesDeclaration 
+  , T.SD polyDeclaration
+  ]
 
 empty :: T.Strategy Problem
 empty = E.empty isTrivial
 
-emptySD :: T.Declaration ('[] T.:-> T.Strategy Problem)
-emptySD = T.declare "empty" [desc] () empty
+emptyDeclaration :: T.Declaration ('[] T.:-> T.Strategy Problem)
+emptyDeclaration = T.declare "empty" [desc] () empty
   where desc = "Checks if the the strict components is empty."
 
