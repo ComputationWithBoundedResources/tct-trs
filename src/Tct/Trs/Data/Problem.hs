@@ -2,24 +2,25 @@ module Tct.Trs.Data.Problem
   where
 
 import qualified Data.Set as S
-import qualified Data.Map.Strict as M
 import qualified Data.ByteString.Char8 as BS
 
 import qualified Data.Rewriting.Problem as R
 import qualified Data.Rewriting.Rule as R (Rule (..))
 import qualified Data.Rewriting.Term as R
 
-import qualified Tct.Core.Common.Pretty     as PP
+import qualified Tct.Core.Common.Pretty  as PP
+import qualified Tct.Core.Common.Xml     as Xml
 
+import Tct.Trs.Data.Trs (Trs, Signature, Symbols)
 import qualified Tct.Trs.Data.Trs as Trs
 
 
-data StartTerms
+data StartTerms f
   = AllTerms 
-    { allSymbols :: S.Set Fun }
+    { alls         :: Symbols f }
   | BasicTerms 
-    { definedSymbols     :: S.Set Fun
-    , constructorSymbols :: S.Set Fun }
+    { defineds     :: Symbols f
+    , constructors :: Symbols f }
   deriving (Show, Eq)
 
 data Strategy
@@ -37,44 +38,64 @@ data AFun f
   deriving (Eq, Ord, Show)
 
 
-type Fun       = AFun BS.ByteString
-type Var       = BS.ByteString
-type Rule      = R.Rule Fun Var
-type Trs       = Trs.Trs Fun Var
-type Signature = Trs.Signature Fun
-type Symobols  = Trs.Symbols Fun
 
---
--- TODO: MS are there some rules; how they should look like
--- eg what happens if the initial Trs has a symbol ending with #
-instance PP.Pretty f => PP.Pretty (AFun f) where
-  pretty (TrsFun s) = PP.pretty s
-  pretty (DpFun s) = PP.pretty s PP.<> PP.char '#'
-  pretty (ComFun i) = PP.pretty "c_" PP.<> PP.int i
-
--- TODO: MS should problem be abstract?
-data Problem = Problem
-  { startTerms :: StartTerms
+data Problem f v = Problem
+  { startTerms :: StartTerms f
   , strategy   :: Strategy
-  , signature  :: Signature
+  , signature  :: Signature f
 
-  , strictDPs  :: Trs
-  , strictTrs  :: Trs
-  , weakDPs    :: Trs
-  , weakTrs    :: Trs
+  , strictDPs  :: Trs f v
+  , strictTrs  :: Trs f v
+  , weakDPs    :: Trs f v
+  , weakTrs    :: Trs f v
   } deriving (Show, Eq)
 
-sanitise :: Problem -> Problem
+newtype F = F (AFun BS.ByteString)
+  deriving (Eq, Ord, Show)
+
+markFun :: F -> F 
+markFun (F (TrsFun f)) = F (DpFun f)
+markFun _              = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
+
+compoundf :: Int -> F
+compoundf = F . ComFun
+
+isCompoundf :: F -> Bool
+isCompoundf (F (ComFun _)) = True
+isCompoundf _              = False
+
+instance PP.Pretty F where
+  pretty (F (TrsFun f)) = PP.text (BS.unpack f)
+  pretty (F (DpFun f))  = PP.text (BS.unpack f) PP.<> PP.char '#'
+  pretty (F (ComFun i)) = PP.pretty "c_" PP.<> PP.int i
+
+instance Xml.Xml F where
+  toXml (F (TrsFun f)) = Xml.elt "name" [Xml.text $ BS.unpack  f]
+  toXml (F (DpFun f))  = Xml.elt "sharp" [Xml.elt "name" [Xml.text $ BS.unpack f]]
+  toXml (F (ComFun f)) = Xml.elt "name" [Xml.text $ 'c':show f]
+
+newtype V = V BS.ByteString
+  deriving (Eq, Ord, Show)
+
+instance PP.Pretty V where
+  pretty (V v) = PP.text (BS.unpack v)
+
+instance Xml.Xml V where
+  toXml (V v) = Xml.elt "var" [Xml.text (BS.unpack v)]
+
+type TrsProblem = Problem F V
+
+sanitise :: (Ord f, Ord v) => Problem f v -> Problem f v
 sanitise prob = prob 
   { startTerms = restrictST (startTerms prob)
   , signature  = sig }
   where 
     sig   = Trs.restrictSignature (signature prob) (Trs.funs $ allComponents prob)
-    allfs = S.fromList (M.keys sig)
+    allfs = Trs.symbols sig
     restrictST (AllTerms fs)      = AllTerms (fs `S.intersection` allfs)
     restrictST (BasicTerms ds cs) = BasicTerms (ds `S.intersection` allfs) (cs `S.intersection` allfs)
 
-fromRewriting :: R.Problem String String -> Problem
+fromRewriting :: R.Problem String String -> TrsProblem
 fromRewriting prob = Problem
   { startTerms   = case R.startTerms prob of
       R.AllTerms   -> AllTerms (defs `S.union` cons)
@@ -90,7 +111,7 @@ fromRewriting prob = Problem
   , weakDPs    = Trs.empty
   , weakTrs    = wTrs }
   where 
-    toFun (R.Rule l r) = let k = R.map (TrsFun . BS.pack) BS.pack in R.Rule (k l) (k r)
+    toFun (R.Rule l r) = let k = R.map (F . TrsFun . BS.pack) (V . BS.pack) in R.Rule (k l) (k r)
     sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)
     wTrs = Trs.fromList . map toFun $ R.weakRules (R.rules prob)
     trs  = sTrs `Trs.union` wTrs
@@ -100,19 +121,19 @@ fromRewriting prob = Problem
 
 
 
-strictComponents, weakComponents, allComponents :: Problem -> Trs
-strictComponents prob = strictDPs prob `Trs.union` strictTrs prob
-weakComponents prob   = weakDPs prob `Trs.union` weakTrs prob
-allComponents prob    = strictComponents prob `Trs.union` weakComponents prob
+strictComponents, weakComponents, allComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
+strictComponents prob = strictDPs prob `Trs.concat` strictTrs prob
+weakComponents prob   = weakDPs prob `Trs.concat` weakTrs prob
+allComponents prob    = strictComponents prob `Trs.concat` weakComponents prob
 
-dpComponents, trsComponents :: Problem -> Trs
-dpComponents prob  = strictDPs prob `Trs.union` weakDPs prob
-trsComponents prob = strictTrs prob `Trs.union` weakTrs prob
+dpComponents, trsComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
+dpComponents prob  = strictDPs prob `Trs.concat` weakDPs prob
+trsComponents prob = strictTrs prob `Trs.concat` weakTrs prob
 
-isDPProblem :: Problem -> Bool
+isDPProblem :: Problem f v -> Bool
 isDPProblem prob = not $ Trs.null (strictDPs prob) && Trs.null (weakDPs prob)
 
-isRCProblem, isDCProblem :: Problem -> Bool
+isRCProblem, isDCProblem :: Problem f v -> Bool
 isRCProblem prob = case startTerms prob of
   BasicTerms{} -> True
   _            -> False
@@ -124,15 +145,15 @@ note :: Bool -> String -> Maybe String
 note b st = if b then Just st else Nothing
 
 
-isDPProblem' :: Problem -> Maybe String
+isDPProblem' :: Problem f v -> Maybe String
 isDPProblem' prob = note (not $ isDPProblem  prob) " not a DP problem"
 
-isRCProblem', isDCProblem' :: Problem -> Maybe String
+isRCProblem', isDCProblem' :: Problem f v -> Maybe String
 isRCProblem' prob = note (not $ isRCProblem  prob) " not a RC problem"
 isDCProblem' prob = note (not $ isDCProblem  prob) " not a DC problem"
 
-isTrivial :: Problem -> Bool
-isTrivial = Trs.null . strictComponents
+isTrivial :: (Ord f, Ord v) => Problem f v -> Bool
+isTrivial prob = Trs.null (strictDPs prob) && Trs.null (strictComponents prob)
 
 -- * ruleset
 data Ruleset f v = Ruleset
@@ -142,7 +163,7 @@ data Ruleset f v = Ruleset
   , wtrs :: Trs.Trs f v -- ^ weak rules
   }
 
-ruleset :: Problem -> Ruleset Fun Var
+ruleset :: Problem f v -> Ruleset f v
 ruleset prob = Ruleset 
   { sdp  = strictDPs prob
   , wdp  = weakDPs prob
@@ -157,13 +178,15 @@ emptyRuleset = Ruleset Trs.empty Trs.empty Trs.empty Trs.empty
 instance PP.Pretty BS.ByteString where
   pretty = PP.text . BS.unpack
 
-ppProblem :: Problem -> PP.Doc
-ppProblem prob =  PP.vcat
-  [ PP.text "Strict Rules:"
-  , PP.indent 2 $ PP.pretty (strictComponents prob)
-  , PP.text "Weak Rules:"
-  , PP.indent 2 $ PP.pretty (weakComponents prob) ]
+instance Xml.Xml BS.ByteString where
+  toXml = Xml.text . BS.unpack
 
-instance PP.Pretty Problem where
-  pretty = ppProblem
+instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
+  pretty prob = PP.vcat
+    [ PP.text "Strict Rules:"
+    , PP.indent 2 $ PP.pretty (strictDPs prob)
+    , PP.indent 2 $ PP.pretty (strictTrs prob)
+    , PP.text "Weak Rules:"
+    , PP.indent 2 $ PP.pretty (weakDPs prob)
+    , PP.indent 2 $ PP.pretty (weakTrs prob) ]
 

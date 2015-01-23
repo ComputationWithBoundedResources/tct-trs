@@ -32,21 +32,21 @@ import qualified Tct.Trs.Data.Trs       as Trs
 
 
 -- | This datatype is used to select a subset of rules recorded in a problem.
-data RuleSelector a = RuleSelector
+data RuleSelector f v a = RuleSelector
   { rsName   :: String            -- ^ Name of the rule selector.
-  , rsSelect :: Prob.Problem -> a -- ^ Given a problem, computes an 'SelectorExpression' that
+  , rsSelect :: Prob.Problem f v -> a -- ^ Given a problem, computes an 'SelectorExpression' that
                                   -- determines which rules to select.
   } deriving Typeable
 
-instance Show (RuleSelector a) where show = rsName
+instance Show (RuleSelector f v a) where show = rsName
 
-type RuleSetSelector f v    = RuleSelector (Prob.Ruleset f v)
-type ExpressionSelector f v = RuleSelector (SelectorExpression f v)
+type RuleSetSelector f v    = RuleSelector f v (Prob.Ruleset f v)
+type ExpressionSelector f v = RuleSelector f v (SelectorExpression f v)
 
 selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
 selectorArg = T.arg { T.argName  = "selector" }
 
-instance T.SParsable prob (ExpressionSelector Prob.Fun Prob.Var) where
+instance T.SParsable prob (ExpressionSelector Prob.F Prob.V) where
   parseS = P.choice
     [ P.symbol (sym1 ++ sym2) >> return (comb prim)| (sym1,comb) <- combs, (sym2,prim) <- prims ]
     where
@@ -100,7 +100,7 @@ selInter= selCombine (\ n1 n2 -> "intersect of " ++ n1 ++ " and " ++ n2) Trs.int
 -}
 
 -- | Select rewrite rules, i.e., non dependency pair rules.
-selRules :: RuleSetSelector Prob.Fun Prob.Var
+selRules :: RuleSetSelector f v
 selRules = RuleSelector { rsName   = "rewrite-rules" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Trs.empty
@@ -109,7 +109,7 @@ selRules = RuleSelector { rsName   = "rewrite-rules" , rsSelect = fn } where
     , Prob.wtrs = Prob.weakTrs prob }
 
 -- | Select dependency pairs.
-selDPs :: RuleSetSelector Prob.Fun Prob.Var
+selDPs :: RuleSetSelector f v
 selDPs = RuleSelector { rsName = "DPs" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Prob.strictDPs prob
@@ -118,7 +118,7 @@ selDPs = RuleSelector { rsName = "DPs" , rsSelect = fn } where
     , Prob.wtrs = Trs.empty }
 
 -- | Select strict rules.
-selStricts :: RuleSetSelector Prob.Fun Prob.Var
+selStricts :: RuleSetSelector f v
 selStricts = RuleSelector { rsName = "strict-rules" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Prob.strictDPs prob
@@ -127,7 +127,7 @@ selStricts = RuleSelector { rsName = "strict-rules" , rsSelect = fn } where
     , Prob.wtrs = Trs.empty }
 
 -- | Select strict rules.
-selWeaks :: RuleSetSelector Prob.Fun Prob.Var
+selWeaks :: RuleSetSelector f v
 selWeaks = RuleSelector { rsName = "weak-rules" , rsSelect = fn } where
   fn prob = Prob.Ruleset
     { Prob.sdp  = Trs.empty

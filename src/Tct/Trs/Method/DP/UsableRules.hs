@@ -24,10 +24,9 @@ import qualified Tct.Core.Data                     as T
 
 import           Tct.Common.ProofCombinators
 
-import           Tct.Trs.Data.Problem              (Problem, Trs)
+import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem              as Prob
 import qualified Tct.Trs.Data.Trs                  as Trs
-import qualified Tct.Trs.Data.Xml                  as Xml
 
 
 -- MS: stolen from mzini/hoca
@@ -73,9 +72,9 @@ usableRulesOf' rhss trs = Trs.fromList $ usableRulesOf rhss (Trs.toList trs)
 data UsableRulesProcessor = UsableRulesProc deriving Show
 
 data UsableRulesProof = UsableRulesProof
-  { strictUsables :: Trs       -- ^ Usable strict rules
-  , weakUsables   :: Trs       -- ^ Usable weak rules
-  , nonUsables    :: Trs       -- ^ Not usable rules
+  { strictUsables :: Trs F V      -- ^ Usable strict rules
+  , weakUsables   :: Trs F V      -- ^ Usable weak rules
+  , nonUsables    :: Trs F V      -- ^ Not usable rules
   } deriving Show
 
 progress :: UsableRulesProof -> Bool
@@ -83,7 +82,7 @@ progress = not . Trs.null . nonUsables
 
 instance T.Processor UsableRulesProcessor where
   type ProofObject UsableRulesProcessor = ApplicationProof UsableRulesProof
-  type Problem UsableRulesProcessor     = Problem
+  type Problem UsableRulesProcessor     = TrsProblem
 
   solve p prob                          = return . T.resultToTree p prob $
     maybe usables (T.Fail . Inapplicable) (Prob.isDPProblem' prob)
@@ -124,19 +123,19 @@ instance PP.Pretty UsableRulesProof where
 instance Xml.Xml UsableRulesProof where
   toXml proof =
     Xml.elt "usablerules"
-      [ Xml.elt "strict" [Xml.rules (strictUsables proof)]
-      , Xml.elt "weak"   [Xml.rules (weakUsables proof)] ]
+      [ Xml.elt "strict" [Xml.toXml (strictUsables proof)]
+      , Xml.elt "weak"   [Xml.toXml (weakUsables proof)] ]
   toCeTA proof =
     Xml.elt "usableRules"
-      [ Xml.elt "nonUsableRules" [Xml.rules (nonUsables proof)] ]
+      [ Xml.elt "nonUsableRules" [Xml.toXml (nonUsables proof)] ]
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-usableRules :: T.Strategy Problem
+usableRules :: T.Strategy TrsProblem
 usableRules = T.Proc UsableRulesProc
 
-usableRulesDeclaration :: T.Declaration ('[] T.:-> T.Strategy Problem)
+usableRulesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
 usableRulesDeclaration = T.declare "usableRules" description () usableRules where
   description =
     [ "This processor restricts the strict- and weak-rules to usable rules with"                                                                                                              

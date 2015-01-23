@@ -21,16 +21,14 @@ import qualified Tct.Core.Data               as T
 
 import           Tct.Common.ProofCombinators
 
-import           Tct.Trs.Data.Problem        (AFun (..), Fun, Problem, Signature, Trs, Var, Rule)
+import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.Trs            as Trs
-import qualified Tct.Trs.Data.Xml            as Xml
 
 
 -- FIXME: 
 -- MS Compound Symbols should have identifier component
 -- it is necessary to compute a fresh symbol
-
 
 subtermsWDP :: Ord f => S.Set f -> R.Term f v -> [R.Term f v]
 subtermsWDP defineds s@(R.Fun f ss)
@@ -51,29 +49,24 @@ subtermsWDT defineds s@(R.Fun f ss)
   where subs = concatMap (subtermsWDT defineds) ss
 subtermsWDT _ _ = []
 
-markFun :: AFun f -> AFun f
-markFun (TrsFun f) = DpFun f
-markFun _          = error "Tct.Trs.Method.DP.dependencyPairs.markRule: not a trs symbol"
-
-
-markRule :: (R.Term (AFun f) v -> [R.Term (AFun f) v]) -> R.Rule (AFun f) v -> State Int (R.Rule (AFun f) v)
+markRule :: (R.Term F V -> [R.Term F V]) -> R.Rule F V -> State Int (R.Rule F V)
 markRule subtermsOf (R.Rule lhs rhs)= do
   i <- modify succ >> get
-  return $ R.Rule (markTerm lhs) (R.Fun (ComFun i) (map markTerm $ subtermsOf rhs))
+  return $ R.Rule (markTerm lhs) (R.Fun (Prob.compoundf i) (map markTerm $ subtermsOf rhs))
   where
-    markTerm (R.Fun f fs) = R.Fun (markFun f) fs
-    markTerm v = v
+    markTerm (R.Fun f fs) = R.Fun (Prob.markFun f) fs
+    markTerm v            = v
 
 -- | (Original Rule, DP Rule)
-type Transformation = (Rule, Rule)
+type Transformation f v = (R.Rule f v, R.Rule f v)
 
-fromTransformation :: [Transformation] -> Trs
+fromTransformation :: (Ord f, Ord v) => [Transformation f v] -> Trs f v
 fromTransformation = Trs.fromList . snd . unzip
 
-markRules :: (R.Term Fun Var -> [R.Term Fun Var]) -> Trs -> State Int [Transformation]
+markRules :: (R.Term F V -> [R.Term F V]) -> Trs F V -> State Int [Transformation F V]
 markRules subtermsOf trs = F.mapM (\r -> markRule subtermsOf r >>= \r' -> return (r,r')) (Trs.toList trs)
 
-dependencyPairsOf :: Bool -> Prob.Strategy -> Trs -> State Int [Transformation]
+dependencyPairsOf :: Bool -> Prob.Strategy -> Trs F V -> State Int [Transformation F V]
 dependencyPairsOf useTuples strat trs
   | useTuples               = markRules (subtermsWDT defineds) trs
   | strat == Prob.Innermost = markRules (subtermsWIDP defineds) trs
@@ -81,21 +74,24 @@ dependencyPairsOf useTuples strat trs
   where defineds = Trs.definedSymbols trs
 
 
+--- * processor ------------------------------------------------------------------------------------------------------
+
 data DPProcessor = DPProc { useTuples_ :: Bool } deriving Show
 
 data DPProof = DPProof
-  { strictTransformation :: [Transformation]
-  , weakTransformation   :: [Transformation]
+  { strictTransformation :: [Transformation F V]
+  , weakTransformation   :: [Transformation F V]
   , tuplesUsed           :: Bool
-  , newSignature         :: Signature }
+  , newSignature         :: Signature F }
   deriving Show
 
 instance T.Processor DPProcessor where
   type ProofObject DPProcessor = ApplicationProof DPProof
-  type Problem DPProcessor     = Prob.Problem
+  type Problem DPProcessor     = TrsProblem
   solve p prob                 = return . T.resultToTree p prob $ solveDP p prob
 
-solveDP :: (T.Forking p ~ T.Id, T.Problem p ~ Problem, T.ProofObject p ~ ApplicationProof DPProof) => DPProcessor -> Problem -> T.Result p
+solveDP :: (T.Forking p ~ T.Id, T.Problem p ~ TrsProblem, T.ProofObject p ~ ApplicationProof DPProof) 
+  => DPProcessor -> TrsProblem -> T.Result p
 solveDP p prob
   | not (Trs.null $ Prob.dpComponents prob)                 = T.Fail (Inapplicable "already contains dependency pairs")
   | useTuples_ p && (Prob.strategy prob /= Prob.Innermost) = T.Fail (Inapplicable "not an innermost problem")
@@ -110,9 +106,10 @@ solveDP p prob = case Prob.startTerms prob of
         return (ss,ws)
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks
-      nsig = M.unions [Prob.signature prob, Trs.signature sDPs, Trs.signature wDPs]
+      nsig = unite [Prob.signature prob, Trs.signature sDPs, Trs.signature wDPs]
+        where unite = Signature . M.unions . map runSignature
       nprob = prob
-        { Prob.startTerms = Prob.BasicTerms (markFun `S.map` ds) cs
+        { Prob.startTerms = Prob.BasicTerms (Prob.markFun `S.map` ds) cs
         , Prob.signature  = nsig
 
         , Prob.strictDPs = sDPs
@@ -146,36 +143,34 @@ instance Xml.Xml DPProof where
   toXml proof =
     Xml.elt "dp"
       [ Xml.elt (if tuplesUsed proof then "tuples" else "pairs") []
-      , Xml.elt "strictDPs" [Xml.rules (fromTransformation $ strictTransformation proof) ]
-      , Xml.elt "weakDPs" [Xml.rules (fromTransformation $ weakTransformation proof)] ]
-  -- FXIME: for some unknown reason toCeTA is not called; whereas it works for eg empty processor
+      , Xml.elt "strictDPs" [Xml.toXml (fromTransformation $ strictTransformation proof) ]
+      , Xml.elt "weakDPs" [Xml.toXml (fromTransformation $ weakTransformation proof)] ]
   toCeTA proof
     | not (tuplesUsed proof) = Xml.elt "unknown" []
     | otherwise = 
       Xml.elt "dtTransformation"
-        [ Xml.signature (M.filterWithKey (\k _ -> isCompound k) $ newSignature proof)
+        [ Xml.toXml (M.filterWithKey (\k _ -> Prob.isCompoundf k) `Trs.onSignature` newSignature proof)
         , Xml.elt "strictDTs" (map ruleWith $ strictTransformation proof)
         , Xml.elt "weakDTs" (map ruleWith $ weakTransformation proof)
         , Xml.elt "innermostLhss" (map lhss $ strictTransformation proof ++ weakTransformation proof) ] --TODO: MS left hand sides of all components?
       where 
-        isCompound (ComFun _) = True
-        isCompound _ = False
-        ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.rule old, Xml.rule new ]
-        lhss (_, new)      = Xml.term (R.lhs new)
+        ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.toXml old, Xml.toXml new ]
+        lhss (_, new)      = Xml.toXml (R.lhs new)
+
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-dependencyPairs :: T.Strategy Problem
+dependencyPairs :: T.Strategy TrsProblem
 dependencyPairs = T.Proc (DPProc False)
 
-dependencyPairsDeclaration :: T.Declaration ('[] T.:-> T.Strategy Problem)
+dependencyPairsDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
 dependencyPairsDeclaration = T.declare "dependencyPairs" description () dependencyPairs
   where description = [ "Applies the (weak) dependency pairs transformation." ]
 
-dependencyTuples :: T.Strategy Problem
+dependencyTuples :: T.Strategy TrsProblem
 dependencyTuples = T.Proc (DPProc True)
 
-dependencyTuplesDeclaration :: T.Declaration ('[] T.:-> T.Strategy Problem)
+dependencyTuplesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
 dependencyTuplesDeclaration = T.declare "dependencyTuples" description () dependencyTuples
   where description = [ "Applies the dependency tuples transformation." ]
 

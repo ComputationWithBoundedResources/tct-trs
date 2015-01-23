@@ -6,8 +6,10 @@ module Tct.Trs.Method.Compose
   ) where
 
 import           Data.Typeable
+import           Control.Applicative
 
 import qualified Data.Rewriting.Term           as R (isVariantOf)
+import qualified Data.Rewriting.Rule           as R (Rule)
 
 import qualified Tct.Core.Common.Parser        as P
 import qualified Tct.Core.Common.Pretty        as PP
@@ -16,12 +18,11 @@ import qualified Tct.Core.Data                 as T
 
 import           Tct.Common.ProofCombinators
 
-import           Control.Applicative
 import qualified Tct.Trs.Data.Problem as Prob
 import qualified Tct.Trs.Data.Rewriting        as R
 import           Tct.Trs.Data.RuleSelector
+import Tct.Trs.Data
 import qualified Tct.Trs.Data.Trs as Trs
-import           Tct.Trs.Data.Xml ()
 
 data DecomposeBound
   = Add
@@ -31,7 +32,7 @@ data DecomposeBound
   deriving (Eq, Show, Typeable)
 
 -- checks condition on R and S
-isApplicableRandS :: Prob.Problem -> DecomposeBound -> Maybe String
+isApplicableRandS :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> Maybe String
 isApplicableRandS prob compfn = case compfn of
   Add          -> Prob.isDCProblem' prob <|> Trs.isLinear' trs <|> Trs.isNonErasing' trs
   RelativeAdd  -> Nothing
@@ -40,7 +41,7 @@ isApplicableRandS prob compfn = case compfn of
   where trs = Prob.allComponents prob
 
 -- for Add and RelativeComp rules in rProb have to be non-size increasing
-selectForcedRules :: Prob.Problem -> DecomposeBound -> SelectorExpression Prob.Fun Prob.Var
+selectForcedRules :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> SelectorExpression f v
 selectForcedRules prob compfn =
   BigAnd $ [SelectDP r | r <- forcedDps ] ++ [SelectTrs r | r <- forcedTrs ]
   where
@@ -52,12 +53,12 @@ selectForcedRules prob compfn =
         where fsi f = [ rule | rule <- Trs.toList (f prob), not (R.isNonSizeIncreasing rule)]
 
 -- for Add rProb and sProb commute
-isApplicableRModuloS :: Prob.Problem -> Prob.Problem -> DecomposeBound -> Maybe String
+isApplicableRModuloS :: (Ord f, Ord v) => Problem f v -> Problem f v -> DecomposeBound -> Maybe String
 isApplicableRModuloS rProb sProb Add = Prob.note (not $ isCommutative rRules sRules) "commutative criterion not fulfilled"
   where (rRules, sRules)   = (Trs.toList $ Prob.allComponents rProb, Trs.toList $ Prob.allComponents sProb)
 isApplicableRModuloS _ _ _ = Nothing
 
-isCommutative :: [Prob.Rule] -> [Prob.Rule] -> Bool
+isCommutative :: (Ord f, Ord v) => [R.Rule f v] -> [R.Rule f v] -> Bool
 isCommutative rRules' sRules' = isCommutative' 5 cps
   where
     rews               = R.rewrites (rRules' ++ sRules')
@@ -66,7 +67,7 @@ isCommutative rRules' sRules' = isCommutative' 5 cps
     cps                = R.toPairs $ R.forwardPairs rRules' sRules'
     isCommutative' n    = all (\(l,r) -> r `reductOf` take n (reducts l))
 
-mkProbs :: Prob.Problem -> DecomposeBound -> Prob.Trs -> Prob.Trs -> (Prob.Problem, Prob.Problem)
+mkProbs :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> Trs f v -> Trs f v -> (Problem f v, Problem f v)
 mkProbs prob compfn dps trs = (rProb, sProb)
   where
     rDps = dps `Trs.intersect` Prob.strictDPs prob
@@ -95,9 +96,9 @@ mkProbs prob compfn dps trs = (rProb, sProb)
 data DecomposeProof
   = DecomposeStaticProof
     { proofBound       :: DecomposeBound
-    , proofSelectedTrs :: Prob.Trs
-    , proofSelectedDPs :: Prob.Trs
-    , proofSubProblems :: (Prob.Problem, Prob.Problem) }
+    , proofSelectedTrs :: Trs F V
+    , proofSelectedDPs :: Trs F V
+    , proofSubProblems :: (TrsProblem, TrsProblem) }
     deriving Show
 
 instance PP.Pretty DecomposeProof where
@@ -140,12 +141,12 @@ progress DecomposeStaticProof{..} =
 
 -- * Decompose Static
 
-data DecomposeStaticProcessor = DecomposeStaticProc (ExpressionSelector Prob.Fun Prob.Var) DecomposeBound
+data DecomposeStaticProcessor = DecomposeStaticProc (ExpressionSelector F V) DecomposeBound
   deriving Show
 
 instance T.Processor DecomposeStaticProcessor where
   type ProofObject DecomposeStaticProcessor = ApplicationProof DecomposeProof
-  type Problem DecomposeStaticProcessor = Prob.Problem
+  type Problem DecomposeStaticProcessor = TrsProblem
   type Forking DecomposeStaticProcessor = T.Pair
   solve p@(DecomposeStaticProc rs compfn) prob = return . T.resultToTree p prob $
     maybe decomposition (T.Fail . Inapplicable) maybeApplicable
@@ -165,13 +166,13 @@ instance T.Processor DecomposeStaticProcessor where
 
 --- * Instances ------------------------------------------------------------------------------------------------------
 
-decompose :: ExpressionSelector Prob.Fun Prob.Var -> DecomposeBound -> T.Strategy Prob.Problem
+decompose :: ExpressionSelector F V -> DecomposeBound -> T.Strategy TrsProblem
 decompose rs = T.Proc . DecomposeStaticProc rs
 
 decomposeDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional (ExpressionSelector Prob.Fun Prob.Var)
+  '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional DecomposeBound ]
-   T.:-> T.Strategy Prob.Problem )
+   T.:-> T.Strategy TrsProblem )
 decomposeDeclaration = T.declare "decomposeStatic" description (selectorArg', boundArg') decompose
   where
     boundArg'    = boundArg `T.optional` RelativeAdd

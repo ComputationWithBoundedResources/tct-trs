@@ -1,4 +1,4 @@
-{- | 
+{- |
 Set like interface TRSs.
 
 Should be imported qualified.
@@ -13,10 +13,15 @@ Should be imported qualified.
 module Tct.Trs.Data.Trs
   (
   Trs
-  , Signature
+  , Signature (..)
+  , arity
+  , symbols
+  , elems
+  , onSignature
   , Symbols
   , SelectorExpression (..)
 
+  , map
   , toList, fromList
   , funs
 
@@ -25,8 +30,8 @@ module Tct.Trs.Data.Trs
   , definedSymbols
   , constructorSymbols
 
-  , empty, singleton, union, unions, difference, intersect
-    
+  , empty, singleton, concat, union, unions, difference, intersect, filter
+
   , null
   , isDuplicating, isLinear
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
@@ -35,19 +40,20 @@ module Tct.Trs.Data.Trs
   ) where
 
 
-import Prelude hiding (null)
-import qualified Data.Map.Strict as M
-import Data.Typeable
-import qualified Data.Set as S
-import qualified Data.Foldable as F
+import qualified Data.Foldable          as F
+import qualified Data.Map.Strict        as M
+import           Data.Maybe             (fromMaybe)
+import qualified Data.Set               as S
+import           Data.Typeable
+import           Prelude                hiding (filter, concat, map, null)
 
 import qualified Tct.Core.Common.Pretty as PP
 
-import Data.Rewriting.Rule (Rule)
-import qualified Data.Rewriting.Rule        as R 
-import qualified Data.Rewriting.Term        as T
+import           Data.Rewriting.Rule    (Rule)
+import qualified Data.Rewriting.Rule    as R
+import qualified Data.Rewriting.Term    as T
 
-import qualified Tct.Trs.Data.Rewriting     as R 
+import qualified Tct.Trs.Data.Rewriting as R
 
 
 
@@ -66,44 +72,63 @@ data SelectorExpression f v
   | BigOr [SelectorExpression f v]
   deriving (Show, Typeable)
 
+map :: (Ord f2, Ord v2) => (Rule f1 v1 -> Rule f2 v2) -> Trs f1 v1 -> Trs f2 v2
+map k = fromList . fmap k . toList
+
 toList :: Trs f v -> [Rule f v]
 toList (TrsT rs) = S.toList rs
 
 fromList :: (Ord f, Ord v) => [Rule f v] -> Trs f v
 fromList = TrsT . S.fromList
 
-type Signature f    = M.Map f Int
-type Symbols f      = S.Set f
+newtype Signature f = Signature {runSignature :: M.Map f Int}
+  deriving (Eq, Ord, Show)
+
+type Symbols f = S.Set f
+
+arity :: (Ord f, Show f) => Signature f ->  f -> Int
+arity sig f = err `fromMaybe` M.lookup f (runSignature sig)
+  where err = error $ "Signature: not found " ++ show f
+
+symbols :: Signature f -> Symbols f
+symbols = M.keysSet . runSignature
+
+elems :: Signature f -> [(f, Int)]
+elems = M.assocs . runSignature
+
+onSignature :: (M.Map f Int -> M.Map f2 Int) -> Signature f -> Signature f2
+onSignature f = Signature . f . runSignature
 
 funs :: (Ord f, Ord v) => Trs f v -> Symbols f
 funs (TrsT rs) = S.foldl k S.empty rs
-  where k acc = S.union acc . S.fromList . R.funs 
+  where k acc = S.union acc . S.fromList . R.funs
+
 
 -- FIXME: is not safe
 signature :: Ord f => Trs f v -> Signature f
-signature rules = foldl k M.empty (toList rules)
-  where 
+signature rules = Signature $ foldl k M.empty (toList rules)
+  where
     k m (R.Rule l r) = M.unions [m, fa l, fa r]
     fa t = M.fromList (T.funs $ T.withArity t)
 
-restrictSignature :: (Ord f) => Signature f -> Symbols f -> Signature f
-restrictSignature sig fs = M.filterWithKey k sig
+restrictSignature :: Ord f => Signature f -> Symbols f -> Signature f
+restrictSignature sig fs = Signature $ M.filterWithKey k (runSignature sig)
   where k f _ = f `S.member` fs
 
 definedSymbols :: (Ord f, Ord v) => Trs f v -> Symbols f
-definedSymbols (TrsT rs) = S.foldl ofRule S.empty rs
-  where 
-   ofRule acc (R.Rule l r) = ofTerm (ofTerm acc l) r
-   ofTerm acc (T.Fun f _) = f `S.insert` acc
-   ofTerm acc _           = acc
+definedSymbols (TrsT rs) = S.foldr ofRule S.empty rs
+  where
+    ofRule (R.Rule l r) acc = ofTerm r (ofTerm l acc)
+    ofTerm (T.Fun f _)  acc = f `S.insert` acc
+    ofTerm _ acc           = acc
 
 constructorSymbols :: Ord f => Signature f -> Symbols f -> Symbols f
 constructorSymbols sig defineds = alls `S.difference` defineds
-  where alls = S.fromList (M.keys sig)
+  where alls = S.fromList (M.keys $ runSignature sig)
 
 
 lift1 :: (RuleSet f v -> a) -> Trs f v -> a
-lift1 f (TrsT rs) = f rs 
+lift1 f (TrsT rs) = f rs
 
 lift2 :: (RuleSet f v -> RuleSet f v -> a) -> Trs f v -> Trs f v -> a
 lift2 f (TrsT rs1)  (TrsT rs2) = f rs1 rs2
@@ -113,6 +138,9 @@ empty = TrsT S.empty
 
 singleton :: Rule f v -> Trs f v
 singleton = TrsT . S.singleton
+
+concat :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
+concat trs1 trs2 = TrsT $ lift2 S.union trs1 trs2
 
 union :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
 union trs1 trs2 = TrsT $ lift2 S.union trs1 trs2
@@ -126,6 +154,9 @@ intersect trs1 trs2 = TrsT $ lift2 S.intersection trs1 trs2
 
 difference :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
 difference trs1 trs2 = TrsT $ lift2 S.difference trs1 trs2
+
+filter :: (Rule f v -> Bool) -> Trs f v -> Trs f v
+filter k (TrsT rs) = TrsT (S.filter k rs)
 
 
 -- * properties
@@ -165,6 +196,8 @@ isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is dupl
 
 
 -- * pretty printing --
+instance PP.Pretty f => PP.Pretty (f, Int) where
+  pretty (f,i) = PP.tupled [PP.pretty f, PP.int i]
 
 ppTrs :: (PP.Pretty f, PP.Pretty v) => Trs f v -> PP.Doc
 ppTrs = F.foldl k PP.empty

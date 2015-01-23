@@ -19,11 +19,12 @@ import qualified Data.Rewriting.Problem     as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
+import           Tct.Trs.Data.Trs (Trs, Signature)
 import qualified Tct.Trs.Data.Trs as Trs
 import           Tct.Trs.Data.Xml           ()
 
 
-trsMode :: TctMode Problem CC
+trsMode :: TctMode TrsProblem CC
 trsMode = TctMode
   { modeId              = "trs"
   , modeParser          = parser
@@ -34,7 +35,7 @@ trsMode = TctMode
   , modeModifyer        = modifyer
   , modeAnswer          = answering }
 
-answering :: ProofTree Problem -> IO ()
+answering :: ProofTree TrsProblem -> IO ()
 answering pt = case cetaOutput pt of
   Left s    -> putStrLn s
   Right xml -> Xml.putXml xml
@@ -47,7 +48,7 @@ instance Show CC where
   show RCF = "RCF"
   show RCI = "RCI"
 
-ccProperties :: CC -> Trs -> Signature -> (StartTerms, Strategy)
+ccProperties :: CC -> Trs F V -> Signature F -> (StartTerms F, Strategy)
 ccProperties cc trs sig = case cc of
   DCF -> (AllTerms fs          , Full)
   DCI -> (AllTerms fs          , Innermost)
@@ -58,7 +59,7 @@ ccProperties cc trs sig = case cc of
     defs = Trs.definedSymbols trs
     cons = Trs.constructorSymbols sig defs
 
-parser :: String -> Either TctError Problem
+parser :: String -> Either TctError TrsProblem
 parser s = case R.fromString s of
   Left e  -> Left $ TctParseError (show e)
   Right p -> Right $ fromRewriting p
@@ -70,7 +71,7 @@ options = option $ eopt
   `withHelpDoc` PP.text "RCF - runtime complexity"
   `withDefault` RCF
 
-modifyer :: Problem -> CC -> Problem
+modifyer :: TrsProblem -> CC -> TrsProblem
 modifyer p cc = p { startTerms = ts, strategy = st }
   where (ts,st) = ccProperties cc (allComponents p) (signature p)
 

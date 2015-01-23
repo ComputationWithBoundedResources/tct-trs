@@ -18,7 +18,7 @@ import Tct.Trs.Method.DP.DependencyPairs (dependencyPairsDeclaration, dependency
 import Tct.Trs.Method.Poly.NaturalPI (polyDeclaration)
 
 
-defaultDeclarations :: [T.StrategyDeclaration Problem]
+defaultDeclarations :: [T.StrategyDeclaration TrsProblem]
 defaultDeclarations = 
   [ T.SD emptyDeclaration
   , T.SD usableRulesDeclaration
@@ -27,10 +27,10 @@ defaultDeclarations =
   , T.SD polyDeclaration
   ]
 
-empty :: T.Strategy Problem
+empty :: T.Strategy TrsProblem
 empty = E.empty isTrivial
 
-emptyDeclaration :: T.Declaration ('[] T.:-> T.Strategy Problem)
+emptyDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
 emptyDeclaration = T.declare "empty" [desc] () empty
   where desc = "Checks if the the strict components is empty."
 

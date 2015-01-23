@@ -5,6 +5,7 @@ module Tct.Trs.Data.CeTA
 
 import qualified Data.Foldable as F
 
+import           Tct.Core.Common.Xml (Xml)
 import qualified Tct.Core.Common.Xml as Xml
 import qualified Tct.Core.Data as T
 
@@ -17,7 +18,7 @@ import Tct.Trs.Data.Xml ()
 certifiable :: [String]
 certifiable = ["rIsEmpty", "ruleShifting", "dtTransformation", "usableRules"]
 
-cetaOutput :: T.ProofTree Problem -> Either String Xml.XmlDocument
+cetaOutput :: (Ord f, Ord v, Xml f, Xml v) => T.ProofTree (Problem f v) -> Either String Xml.XmlDocument
 cetaOutput pt = case T.timeUB (T.certificate pt) of
   T.Poly (Just _) -> Right . C.cetaDocument $ C.certificationProblem (cetaSubProblem pt) (cetaProof pt)
   _               -> Left "Output.The problem is not polynomial."

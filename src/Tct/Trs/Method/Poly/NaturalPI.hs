@@ -34,26 +34,28 @@ import qualified Tct.Core.Data                       as T
 import           Tct.Core.Data.Declaration.Parse     ()
 
 import Tct.Trs.Interpretation
-import qualified Tct.Trs.Data.Xml as Xml
 import qualified Tct.Trs.Data.Trs as Trs
-import Tct.Trs.Data.Problem (Problem (..), Rule, Fun, Signature, Var)
+import Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem as Prob
+
+import Debug.Trace
+
 
 --- Instances --------------------------------------------------------------------------------------------------------
 
-polyDeclaration :: T.Declaration ('[ T.Argument 'T.Required PI.Shape ] T.:-> T.Strategy Problem)
+polyDeclaration :: T.Declaration ('[ T.Argument 'T.Required PI.Shape ] T.:-> T.Strategy TrsProblem)
 polyDeclaration = T.declare "poly" ["Applies polynomial interpretation."] (T.OneTuple PI.shapeArg) poly
 
-poly :: PI.Shape -> T.Strategy Problem
+poly :: PI.Shape -> T.Strategy TrsProblem
 poly = T.Proc . PolyInterProc
 
 
-stronglyLinear, linear, quadratic :: T.Strategy Problem
+stronglyLinear, linear, quadratic :: T.Strategy TrsProblem
 stronglyLinear = T.Proc (PolyInterProc PI.StronglyLinear)
 linear         = T.Proc (PolyInterProc PI.Linear)
 quadratic      = T.Proc (PolyInterProc PI.Quadratic)
 
-mixed :: Int -> T.Strategy Problem
+mixed :: Int -> T.Strategy TrsProblem
 mixed = T.Proc . PolyInterProc . PI.Mixed
 
 
@@ -64,24 +66,24 @@ data PolyInterProcessor = PolyInterProc
 
 newtype PolyInterProof = PolyInterProof (OrientationProof PolyOrder) deriving Show
 
-type PolyInter      = PI.PolyInter Fun
-type Kind           = PI.Kind Fun
-type CoefficientVar = PI.CoefficientVar Fun
+type PolyInter      = PI.PolyInter F
+type Kind           = PI.Kind F
+type CoefficientVar = PI.CoefficientVar F
 
 data PolyOrder = PolyOrder
   { kind_      :: Kind
   , pint_      :: PolyInter Int
-  , sig_       :: Signature
-  , strictDPs_ :: [(Rule, (P.Polynomial Int Var, P.Polynomial Int Var))]
-  , strictTrs_ :: [(Rule, (P.Polynomial Int Var, P.Polynomial Int Var))]
-  , weakDPs_   :: [(Rule, (P.Polynomial Int Var, P.Polynomial Int Var))]
-  , weakTrs_   :: [(Rule, (P.Polynomial Int Var, P.Polynomial Int Var))]
+  , sig_       :: Signature F
+  , strictDPs_ :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
+  , strictTrs_ :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
+  , weakDPs_   :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
+  , weakTrs_   :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
   } deriving Show
 
 
 instance T.Processor PolyInterProcessor where
   type ProofObject PolyInterProcessor = ApplicationProof PolyInterProof
-  type Problem PolyInterProcessor     = Problem
+  type Problem PolyInterProcessor     = TrsProblem
   type Forking PolyInterProcessor     = T.Optional T.Id
   solve p prob
     {-| isTrivial prob = return . T.resultToTree p prob $-}
@@ -95,18 +97,17 @@ instance T.Processor PolyInterProcessor where
           _                         -> T.Fail (Applicable $ PolyInterProof Incompatible)
 
 
-newtype StrictVar = StrictVar Rule deriving (Eq, Ord)
+newtype StrictVar f v = StrictVar (R.Rule f v) deriving (Show, Eq, Ord)
 
-strict :: Rule -> StrictVar
+strict :: R.Rule f v -> StrictVar f v 
 strict = StrictVar
 
-newProblem :: PolyOrder -> Problem -> T.Optional T.Id Problem
+newProblem :: PolyOrder -> TrsProblem -> T.Optional T.Id TrsProblem
 newProblem order prob = T.Opt . T.Id $ prob 
-  { strictDPs = strictDPs prob `Trs.difference` sDPs
-  , strictTrs = strictTrs prob `Trs.difference` sTrs
-  , weakDPs = weakDPs prob `Trs.union` sDPs
-  , weakTrs = weakTrs prob `Trs.union` sTrs
-  }
+  { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
+  , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
+  , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs
+  , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs }
   where 
     rules = Trs.fromList . fst . unzip
     sDPs = rules (strictDPs_ order)
@@ -120,14 +121,15 @@ certification :: PolyOrder -> T.Optional T.Id T.Certificate -> T.Certificate
 certification order T.Null           = T.timeUBCert (degree order)
 certification order (T.Opt (T.Id c)) = T.updateTimeUBCert c (`add` degree order)
 
-interpret :: (SemiRing c, Eq c, Ord fun, Ord var) => PI.PolyInter fun c -> R.Term fun var -> P.Polynomial c var
+interpret :: (Show c, Show fun, SemiRing c, Eq c, Ord fun, Ord var) => PI.PolyInter fun c -> R.Term fun var -> P.Polynomial c var
+interpret ebsi | traceShow ("INTERPRET", ebsi) False = undefined
 interpret ebsi = interpretTerm interpretFun interpretVar
   where
     interpretFun f = P.substituteVariables interp . M.fromList . zip [PI.SomeIndeterminate 0..]
       where interp = PI.interpretations ebsi M.! f
     interpretVar      = P.variable
 
-entscheide :: PolyInterProcessor -> Problem -> IO (SMT.Result PolyOrder)
+entscheide :: PolyInterProcessor -> TrsProblem -> IO (SMT.Result PolyOrder)
 entscheide p prob = do
   res :: SMT.Result (M.Map CoefficientVar Int) <- SMT.solveStM SMT.minismt $ do
     SMT.setFormat "QF_NIA"
@@ -137,20 +139,20 @@ entscheide p prob = do
     (_, strictVarEncoder) <- SMT.memo $ mapM  (SMT.snvarMO . StrictVar) rules
 
     let
-      encodeStrictVar   = (strictVarEncoder M.!)
+      encodeStrictVar   = traceShow ("ENCODER", coefficientEncoder, strictVarEncoder) (strictVarEncoder M.!)
 
     let
       p1 `gte` p2 = SMT.bigAnd [ c SMT..>= SMT.zero | c <- P.coefficients $ p1 `add` neg p2 ]
-      interpreted = [ (r, interpret ebsi (R.lhs r), interpret ebsi (R.rhs r)) | r <- rules ]
-      orderConstraints     =
+      interpreted = [ (r, interpret ebsi (R.lhs r), interpret ebsi (R.rhs r)) | r <- take 1 rules ]
+      orderConstraints     = traceShow ("INTERPRETED", interpreted) $
         [ lhs `gte`  (rhs `add` P.constant (encodeStrictVar $ strict r))
         | (r,lhs,rhs) <- interpreted ]
       monotoneConstraints = [ c SMT..> SMT.zero | (v,c) <- M.assocs coefficientEncoder, isSimple (PI.argpos v)]
       rulesConstraint     = [ s SMT..> SMT.zero | r <- Trs.toList (Prob.strictComponents prob), let s = encodeStrictVar (StrictVar r) ]
 
-    SMT.assert $ SMT.bigAnd orderConstraints
-    SMT.assert $ SMT.bigAnd monotoneConstraints
-    SMT.assert $ SMT.bigOr rulesConstraint
+    SMT.assert $ SMT.bigAnd $ let r = orderConstraints in traceShow ("ORDER", r) r 
+    SMT.assert $ SMT.bigAnd $ let r = monotoneConstraints in traceShow ("MONOTNONE", r) r
+    SMT.assert $ SMT.bigOr  $ let r = rulesConstraint in traceShow ("RULES", r) r
 
     return $ SMT.decode coefficientEncoder
   return $ mkOrder `fmap` res
@@ -165,10 +167,10 @@ entscheide p prob = do
         | otherwise     = SMT.nvarMO c
     rules = Trs.toList (Prob.allComponents prob)
     sig   = Prob.signature prob
-    absi  = M.mapWithKey (curry (PI.mkInterpretation kind)) sig
+    absi  = M.mapWithKey (curry (PI.mkInterpretation kind)) (Trs.runSignature sig)
     kind  =
       if Prob.isRCProblem prob 
-        then PI.ConstructorBased (shape p) (Prob.constructorSymbols $ Prob.startTerms prob)
+        then PI.ConstructorBased (shape p) (Prob.constructors $ Prob.startTerms prob)
         else PI.Unrestricted (shape p)
 
     mkOrder inter = PolyOrder
@@ -228,10 +230,10 @@ instance Xml.Xml PolyOrder where
       xdomain = Xml.elt "domain" [Xml.elt "naturals" []]
       xinters = (map xinter . M.toList . PI.interpretations $ pint_ order)
       xinter (f,p) = Xml.elt "interpret"
-        [ Xml.fun f
-        , Xml.elt "arity" [Xml.int $ sig_ order M.! f]
+        [ Xml.toXml f
+        , Xml.elt "arity" [Xml.int $ sig_ order `Trs.arity` f]
         , Xml.elt "polynomial" [Xml.toXml p]]
-      trs = Xml.rulesL (map fst (strictTrs_ order ++ strictDPs_ order) )
+      trs = Xml.toXml (Trs.fromList $ map fst (strictTrs_ order ++ strictDPs_ order) )
 
 instance Xml.Xml PolyInterProof where
   toXml (PolyInterProof order) = Xml.toXml order

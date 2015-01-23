@@ -62,6 +62,7 @@ Library
     src
   exposed-modules:
     Tct.Trs
+    Tct.Trs.Data.ArgumentFiltering
     Tct.Trs.Data.CeTA
     Tct.Trs.Data.Mode
     Tct.Trs.Data.Problem
@@ -69,6 +70,8 @@ Library
     Tct.Trs.Data.RuleSelector
     Tct.Trs.Data.Trs
     Tct.Trs.Data.Xml
+    Tct.Trs.Encoding.UsableRules
+    Tct.Trs.Encoding.ArgumentFiltering
     Tct.Trs.Interpretation
     Tct.Trs.Processor
     Tct.Trs.Method.Compose

@@ -1,86 +1,68 @@
 module Tct.Trs.Data.Xml
   (
   -- * Translations to XML for termlib data types         
-  var
-  , fun
-  , term
-  , rule
-  , rules
-  , rulesL
-  , signature
-  , startTerms
-  , strategy
-  {-, complexityProblem-}
-  {-, proofDocument-}
   ) where
 
-import qualified Data.Map.Strict as M
 
 import qualified Data.Rewriting.Term as R
 import qualified Data.Rewriting.Rule as R
 
-import Tct.Core.Common.Pretty (Pretty, pretty)
 import Tct.Core.Common.Xml
 
 
+import           Tct.Trs.Data.Trs (Trs, Signature)
 import qualified Tct.Trs.Data.Trs as Trs
-import           Tct.Trs.Data.Problem (Problem, AFun (..), Strategy (..), Signature, Trs, Rule)
+import           Tct.Trs.Data.Problem (Problem, Strategy (..))
 import qualified Tct.Trs.Data.Problem as Prob
 
-pptext :: Pretty a => a -> XmlContent
-pptext = text . show . pretty
 
-var :: Pretty v => v -> XmlContent
-var v = elt "var" [pptext v]
+{-var :: Xml v => v -> XmlContent-}
+{-var v = elt "var" [toXml v]-}
 
-fun :: Pretty f => AFun f -> XmlContent
-fun (TrsFun f) = elt "name" [pptext  f]
-fun (DpFun f)  = elt "sharp" [elt "name" [pptext f]]
-fun (ComFun f) = elt "name" [text $ 'c':show f] -- TODO
+{-instance Xml f => Xml (AFun f) where-}
+  {-toXml (TrsFun f) = elt "name" [toXml  f]-}
+  {-toXml (DpFun f)  = elt "sharp" [elt "name" [toXml f]]-}
+  {-toXml (ComFun f) = elt "name" [text $ 'c':show f]-}
 
-term :: (Pretty f, Pretty v) => R.Term (AFun f) v -> XmlContent
-term (R.Fun f ts) = elt "funapp" $ fun f :  [ elt "arg" [term t] | t <- ts ]
-term (R.Var v)    = var v
+instance (Xml f, Xml v) => Xml (R.Term f v) where
+  toXml (R.Fun f ts) = elt "funapp" $ toXml f :  [ elt "arg" [toXml t] | t <- ts ]
+  toXml (R.Var v)    = toXml v
 
-rule :: (Pretty f, Pretty v) => R.Rule (AFun f) v -> XmlContent 
-rule r = elt "rule" 
-  [ elt "lhs" [term $ R.lhs r]
-  , elt "rhs" [term $ R.rhs r] ]
+instance (Xml f, Xml v) => Xml (R.Rule f v) where
+  toXml r = elt "rule" 
+    [ elt "lhs" [toXml $ R.lhs r]
+    , elt "rhs" [toXml $ R.rhs r] ]
 
-rules :: Trs -> XmlContent
-rules rs = elt "rules" [ rule r | r <- Trs.toList rs ]
+instance (Xml f, Xml v) => Xml (Trs f v) where
+  toXml rs = elt "rules" [ toXml r | r <- Trs.toList rs ]
 
-rulesL :: [Rule] -> XmlContent
-rulesL rs = elt "rules" [ rule r | r <- rs ]
-
-signature :: Pretty f => M.Map (AFun f) Int -> XmlContent
-signature sig = elt "signature" [ symb f i | (f,i) <- M.toList sig ]
-  where symb f i = elt "symbol" [ fun f, elt "arity" [text $ show i] ]
+instance Xml f => Xml (Signature f) where
+  toXml sig = elt "signature" [ symb f i | (f,i) <- Trs.elems sig ]
+    where symb f i = elt "symbol" [ toXml f, elt "arity" [text $ show i] ]
 
 strategy :: Strategy -> XmlContent
 strategy Innermost = elt "innermost" []
 strategy Outermost = elt "outermost" []
 strategy Full      = elt "full" []
 
-startTerms :: Prob.StartTerms -> Signature -> XmlContent
+startTerms :: (Xml f, Ord f) => Prob.StartTerms f -> Signature f -> XmlContent
 startTerms (Prob.AllTerms fs) sig =
-  elt "derivationalComplexity" [signature $ Trs.restrictSignature sig fs]
+  elt "derivationalComplexity" [toXml $ Trs.restrictSignature sig fs]
 startTerms (Prob.BasicTerms ds cs) sig =
-  elt "runtimeComplexity" $ map signature [Trs.restrictSignature sig cs, Trs.restrictSignature sig ds]
+  elt "runtimeComplexity" $ map toXml [Trs.restrictSignature sig cs, Trs.restrictSignature sig ds]
 
-xmlProblem :: Problem -> XmlContent
+xmlProblem :: (Ord f, Ord v, Xml f, Xml v) => Problem f v -> XmlContent
 xmlProblem prob = elt "problem"
-  [ elt "strictTrs"         [rules (Prob.strictTrs prob)]
-  , elt "weakTrs"           [rules (Prob.strictTrs prob)]
-  , elt "strictDPs"         [rules (Prob.strictTrs prob)]
-  , elt "weakDPs"           [rules (Prob.strictTrs prob)]
+  [ elt "strictTrs"         [toXml (Prob.strictTrs prob)]
+  , elt "weakTrs"           [toXml (Prob.strictTrs prob)]
+  , elt "strictDPs"         [toXml (Prob.strictTrs prob)]
+  , elt "weakDPs"           [toXml (Prob.strictTrs prob)]
   -- ceta compatible
-  , elt "trs"               [rules (Prob.strictComponents prob)]
+  , elt "trs"               [toXml (Prob.strictComponents prob)]
   , elt "strategy"          [strategy (Prob.strategy prob)]
-  , elt "relativeRules"     [rules (Prob.weakComponents prob)]
+  , elt "relativetoXml"     [toXml (Prob.weakComponents prob)]
   , elt "complexityMeasure" [startTerms (Prob.startTerms prob) (Prob.signature prob)] ]
 
-instance Xml Prob.Problem where
+instance (Ord f, Ord v, Xml f, Xml v) => Xml (Prob.Problem f v) where
   toXml = xmlProblem
-
 
