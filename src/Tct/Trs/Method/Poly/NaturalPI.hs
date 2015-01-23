@@ -38,8 +38,6 @@ import qualified Tct.Trs.Data.Trs as Trs
 import Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem as Prob
 
-import Debug.Trace
-
 
 --- Instances --------------------------------------------------------------------------------------------------------
 
@@ -122,7 +120,6 @@ certification order T.Null           = T.timeUBCert (degree order)
 certification order (T.Opt (T.Id c)) = T.updateTimeUBCert c (`add` degree order)
 
 interpret :: (Show c, Show fun, SemiRing c, Eq c, Ord fun, Ord var) => PI.PolyInter fun c -> R.Term fun var -> P.Polynomial c var
-interpret ebsi | traceShow ("INTERPRET", ebsi) False = undefined
 interpret ebsi = interpretTerm interpretFun interpretVar
   where
     interpretFun f = P.substituteVariables interp . M.fromList . zip [PI.SomeIndeterminate 0..]
@@ -139,20 +136,20 @@ entscheide p prob = do
     (_, strictVarEncoder) <- SMT.memo $ mapM  (SMT.snvarMO . StrictVar) rules
 
     let
-      encodeStrictVar   = traceShow ("ENCODER", coefficientEncoder, strictVarEncoder) (strictVarEncoder M.!)
+      encodeStrictVar   = (strictVarEncoder M.!)
 
     let
       p1 `gte` p2 = SMT.bigAnd [ c SMT..>= SMT.zero | c <- P.coefficients $ p1 `add` neg p2 ]
-      interpreted = [ (r, interpret ebsi (R.lhs r), interpret ebsi (R.rhs r)) | r <- take 1 rules ]
-      orderConstraints     = traceShow ("INTERPRETED", interpreted) $
+      interpreted = [ (r, interpret ebsi (R.lhs r), interpret ebsi (R.rhs r)) | r <- rules ]
+      orderConstraints = 
         [ lhs `gte`  (rhs `add` P.constant (encodeStrictVar $ strict r))
         | (r,lhs,rhs) <- interpreted ]
       monotoneConstraints = [ c SMT..> SMT.zero | (v,c) <- M.assocs coefficientEncoder, isSimple (PI.argpos v)]
       rulesConstraint     = [ s SMT..> SMT.zero | r <- Trs.toList (Prob.strictComponents prob), let s = encodeStrictVar (StrictVar r) ]
 
-    SMT.assert $ SMT.bigAnd $ let r = orderConstraints in traceShow ("ORDER", r) r 
-    SMT.assert $ SMT.bigAnd $ let r = monotoneConstraints in traceShow ("MONOTNONE", r) r
-    SMT.assert $ SMT.bigOr  $ let r = rulesConstraint in traceShow ("RULES", r) r
+    SMT.assert . SMT.bigAnd $ orderConstraints
+    SMT.assert . SMT.bigAnd $ monotoneConstraints
+    SMT.assert . SMT.bigOr  $ rulesConstraint
 
     return $ SMT.decode coefficientEncoder
   return $ mkOrder `fmap` res

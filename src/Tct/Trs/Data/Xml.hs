@@ -60,7 +60,7 @@ xmlProblem prob = elt "problem"
   -- ceta compatible
   , elt "trs"               [toXml (Prob.strictComponents prob)]
   , elt "strategy"          [strategy (Prob.strategy prob)]
-  , elt "relativetoXml"     [toXml (Prob.weakComponents prob)]
+  , elt "relativeRules"     [toXml (Prob.weakComponents prob)]
   , elt "complexityMeasure" [startTerms (Prob.startTerms prob) (Prob.signature prob)] ]
 
 instance (Ord f, Ord v, Xml f, Xml v) => Xml (Prob.Problem f v) where
