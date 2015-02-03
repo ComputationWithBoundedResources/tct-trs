@@ -14,6 +14,7 @@ import qualified Data.Rewriting.Rule           as R (Rule)
 import qualified Tct.Core.Common.Parser        as P
 import qualified Tct.Core.Common.Pretty        as PP
 import qualified Tct.Core.Common.Xml           as Xml
+import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Data                 as T
 
 import           Tct.Common.ProofCombinators
@@ -91,7 +92,12 @@ mkProbs prob compfn dps trs = (rProb, sProb)
         { Prob.strictTrs  = sTrs
         , Prob.strictDPs  = sDps }
 
--- * ProofData
+
+
+--- * processor ------------------------------------------------------------------------------------------------------
+
+data DecomposeStaticProcessor = DecomposeStaticProc (ExpressionSelector F V) DecomposeBound
+  deriving Show
 
 data DecomposeProof
   = DecomposeStaticProof
@@ -100,6 +106,41 @@ data DecomposeProof
     , proofSelectedDPs :: Trs F V
     , proofSubProblems :: (TrsProblem, TrsProblem) }
     deriving Show
+
+progress :: DecomposeProof -> Bool
+progress DecomposeStaticProof{..} =
+  case proofBound of
+    Add -> not $ Trs.null (Prob.allComponents rProb) || Trs.null (Prob.allComponents sProb)
+    _   -> not $ Prob.isTrivial rProb || Prob.isTrivial sProb
+    where  (rProb, sProb) = proofSubProblems
+
+instance T.Processor DecomposeStaticProcessor where
+  type ProofObject DecomposeStaticProcessor = ApplicationProof DecomposeProof
+  type Problem DecomposeStaticProcessor = TrsProblem
+  type Forking DecomposeStaticProcessor = T.Pair
+  solve p@(DecomposeStaticProc rs compfn) prob = return . T.resultToTree p prob $
+    maybe decomposition (T.Fail . Inapplicable) maybeApplicable
+    where
+      decomposition
+        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) (cert (fromBound compfn))
+        | otherwise      = T.Fail (Applicable proof)
+      maybeApplicable = isApplicableRandS prob compfn <|> isApplicableRModuloS rProb sProb compfn
+
+      (dps,trs) = rules $ BigAnd [ rsSelect rs prob, selectForcedRules prob compfn]
+      (rProb, sProb) = mkProbs prob compfn dps trs
+      proof = DecomposeStaticProof
+        { proofBound       = compfn
+        , proofSelectedTrs = trs
+        , proofSelectedDPs = dps
+        , proofSubProblems = (rProb, sProb) }
+      fromBound Add          = add
+      fromBound RelativeAdd  = add
+      fromBound RelativeMul  = mul
+      fromBound RelativeComp = T.compose
+      cert f (T.Pair (c1,c2)) = T.timeUBCert (T.timeUB c1 `f` T.timeUB c2)
+
+
+--- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty DecomposeProof where
   pretty proof@DecomposeStaticProof{..}
@@ -131,40 +172,8 @@ instance PP.Pretty DecomposeProof where
 instance Xml.Xml DecomposeProof where
   toXml _ = Xml.elt "decompose" []
 
-progress :: DecomposeProof -> Bool
-progress DecomposeStaticProof{..} =
-  case proofBound of
-    Add -> not $ Trs.null (Prob.allComponents rProb) || Trs.null (Prob.allComponents sProb)
-    _   -> not $ Prob.isTrivial rProb || Prob.isTrivial sProb
-    where  (rProb, sProb) = proofSubProblems
 
-
--- * Decompose Static
-
-data DecomposeStaticProcessor = DecomposeStaticProc (ExpressionSelector F V) DecomposeBound
-  deriving Show
-
-instance T.Processor DecomposeStaticProcessor where
-  type ProofObject DecomposeStaticProcessor = ApplicationProof DecomposeProof
-  type Problem DecomposeStaticProcessor = TrsProblem
-  type Forking DecomposeStaticProcessor = T.Pair
-  solve p@(DecomposeStaticProc rs compfn) prob = return . T.resultToTree p prob $
-    maybe decomposition (T.Fail . Inapplicable) maybeApplicable
-    where
-      decomposition
-        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) undefined -- FIXME
-        | otherwise      = T.Fail (Applicable proof)
-      maybeApplicable = isApplicableRandS prob compfn <|> isApplicableRModuloS rProb sProb compfn
-      (dps,trs) = rules $ BigAnd [ rsSelect rs prob, selectForcedRules prob compfn]
-      (rProb, sProb) = mkProbs prob compfn dps trs
-      proof = DecomposeStaticProof
-        { proofBound       = compfn
-        , proofSelectedTrs = trs
-        , proofSelectedDPs = dps
-        , proofSubProblems = (rProb, sProb) }
-
-
---- * Instances ------------------------------------------------------------------------------------------------------
+--- * instances ------------------------------------------------------------------------------------------------------
 
 decompose :: ExpressionSelector F V -> DecomposeBound -> T.Strategy TrsProblem
 decompose rs = T.Proc . DecomposeStaticProc rs

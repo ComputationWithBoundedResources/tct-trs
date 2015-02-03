@@ -7,6 +7,7 @@ module Tct.Trs.Method.DP.DependencyPairs
   , dependencyTuplesDeclaration
   ) where
 
+import           Control.Applicative         ((<|>))
 import           Control.Monad.State.Strict
 import qualified Data.Traversable            as F
 
@@ -24,9 +25,10 @@ import           Tct.Common.ProofCombinators
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.Trs            as Trs
+import qualified Tct.Trs.Data.Signature      as Sig
 
 
--- FIXME: 
+-- FIXME:
 -- MS Compound Symbols should have identifier component
 -- it is necessary to compute a fresh symbol
 
@@ -88,18 +90,15 @@ data DPProof = DPProof
 instance T.Processor DPProcessor where
   type ProofObject DPProcessor = ApplicationProof DPProof
   type Problem DPProcessor     = TrsProblem
-  solve p prob                 = return . T.resultToTree p prob $ solveDP p prob
-
-solveDP :: (T.Forking p ~ T.Id, T.Problem p ~ TrsProblem, T.ProofObject p ~ ApplicationProof DPProof) 
-  => DPProcessor -> TrsProblem -> T.Result p
-solveDP p prob
-  | not (Trs.null $ Prob.dpComponents prob)                 = T.Fail (Inapplicable "already contains dependency pairs")
-  | useTuples_ p && (Prob.strategy prob /= Prob.Innermost) = T.Fail (Inapplicable "not an innermost problem")
-solveDP p prob = case Prob.startTerms prob of
-  (Prob.AllTerms _)       -> T.Fail (Inapplicable "not an rc problem")
-  (Prob.BasicTerms ds cs) -> T.Success (T.toId nprob) (Applicable nproof) T.fromId
+  solve p prob                 = return . T.resultToTree p prob $
+    maybe dp (T.Fail . Inapplicable) maybeApplicable
     where
-      useTuples = useTuples_ p
+      dp = T.Success (T.toId nprob) (Applicable nproof) T.fromId
+      maybeApplicable =
+        Prob.isRCProblem' prob
+        <|> Prob.note (not . Trs.null $ Prob.dpComponents prob) " already containts dependency paris"
+        <|> if useTuples then Prob.isInnermostProblem' prob else Nothing
+
       (stricts, weaks) = flip evalState 0 $ do
         ss <- dependencyPairsOf useTuples (Prob.strategy prob) (Prob.strictTrs prob)
         ws <- dependencyPairsOf useTuples (Prob.strategy prob) (Prob.weakTrs prob)
@@ -107,9 +106,9 @@ solveDP p prob = case Prob.startTerms prob of
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks
       nsig = unite [Prob.signature prob, Trs.signature sDPs, Trs.signature wDPs]
-        where unite = Signature . M.unions . map runSignature
+        where unite = Sig.fromMap . M.unions . map Sig.toMap
       nprob = prob
-        { Prob.startTerms = Prob.BasicTerms (Prob.markFun `S.map` ds) cs
+        { Prob.startTerms = Prob.BasicTerms (Prob.markFun `S.map` Prob.defineds starts) (Prob.constructors starts)
         , Prob.signature  = nsig
 
         , Prob.strictDPs = sDPs
@@ -122,12 +121,14 @@ solveDP p prob = case Prob.startTerms prob of
         , tuplesUsed   = useTuples
         , newSignature = nsig }
 
+      useTuples = useTuples_ p
+      starts = Prob.startTerms prob
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty DPProof where
-  pretty proof 
+  pretty proof
     = PP.vcat
       [ PP.text $ "We add the following "
         ++ (if tuplesUsed proof then "dependency tuples" else "weak dependency pairs") ++ ":"
@@ -147,13 +148,13 @@ instance Xml.Xml DPProof where
       , Xml.elt "weakDPs" [Xml.toXml (fromTransformation $ weakTransformation proof)] ]
   toCeTA proof
     | not (tuplesUsed proof) = Xml.elt "unknown" []
-    | otherwise = 
+    | otherwise =
       Xml.elt "dtTransformation"
-        [ Xml.toXml (M.filterWithKey (\k _ -> Prob.isCompoundf k) `Trs.onSignature` newSignature proof)
+        [ Xml.toXml $ Sig.filter Prob.isCompoundf (newSignature proof)
         , Xml.elt "strictDTs" (map ruleWith $ strictTransformation proof)
         , Xml.elt "weakDTs" (map ruleWith $ weakTransformation proof)
         , Xml.elt "innermostLhss" (map lhss $ strictTransformation proof ++ weakTransformation proof) ] --TODO: MS left hand sides of all components?
-      where 
+      where
         ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.toXml old, Xml.toXml new ]
         lhss (_, new)      = Xml.toXml (R.lhs new)
 

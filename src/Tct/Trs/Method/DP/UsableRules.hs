@@ -8,44 +8,39 @@ module Tct.Trs.Method.DP.UsableRules
   ) where
 
 
-import           Control.Applicative               ((<$>))
+import           Control.Applicative         ((<$>))
 import           Control.Monad.State.Strict
-import           Data.List                         (partition)
-import           Data.Maybe                        (isJust)
-import qualified Data.Rewriting.Rule               as R
-import qualified Data.Rewriting.Rules              as RS
-import           Data.Rewriting.Substitution.Unify (unify)
-import qualified Data.Rewriting.Term               as T
+import           Data.List                   (partition)
+import qualified Data.Rewriting.Rule         as R
+import qualified Data.Rewriting.Rules        as RS
+import qualified Data.Rewriting.Term         as T
 
 
-import qualified Tct.Core.Common.Pretty            as PP
-import qualified Tct.Core.Common.Xml               as Xml
-import qualified Tct.Core.Data                     as T
+import qualified Tct.Core.Common.Pretty      as PP
+import qualified Tct.Core.Common.Xml         as Xml
+import qualified Tct.Core.Data               as T
 
 import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.Problem              as Prob
-import qualified Tct.Trs.Data.Trs                  as Trs
+import qualified Tct.Trs.Data.Problem        as Prob
+import           Tct.Trs.Data.Rewriting      (isUnifiableWith)
+import qualified Tct.Trs.Data.Trs            as Trs
 
 
 -- MS: stolen from mzini/hoca
-
--- assumes that variables are disjoint
-isUnifiableWith :: (Ord v1, Ord v2, Eq f) => T.Term f v1 -> T.Term f v2 -> Bool
-isUnifiableWith t1 t2 = isJust (unify (T.rename Left t1) (T.rename Right t2))
 
 -- cap f(t1,...,tn) == f(tcap(t1),...,tcap(tn))
 cap :: (Show v2, Show f, Eq f, Ord v1, Ord v2) => [R.Rule f v1] -> T.Term f v2 -> T.Term f Int
 cap rs t = evalState (capM t) 0
   where
     freshVar = T.Var <$> (modify succ >> get)
-    lhss = RS.lhss rs
+    lhss     = RS.lhss rs
 
-    capM (T.Var _) = freshVar
+    capM (T.Var _)    = freshVar
     capM (T.Fun f ts) = T.Fun f <$> mapM tcapM ts
 
-    tcapM (T.Var _) = freshVar
+    tcapM (T.Var _)    = freshVar
     tcapM (T.Fun f ts) = do
       s <- T.Fun f <$> mapM tcapM ts
       if any (isUnifiableWith s) lhss then freshVar else return s

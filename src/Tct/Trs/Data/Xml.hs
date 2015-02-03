@@ -10,7 +10,9 @@ import qualified Data.Rewriting.Rule as R
 import Tct.Core.Common.Xml
 
 
-import           Tct.Trs.Data.Trs (Trs, Signature)
+import           Tct.Trs.Data.Signature (Signature)
+import qualified Tct.Trs.Data.Signature as Sig
+import           Tct.Trs.Data.Trs (Trs)
 import qualified Tct.Trs.Data.Trs as Trs
 import           Tct.Trs.Data.Problem (Problem, Strategy (..))
 import qualified Tct.Trs.Data.Problem as Prob
@@ -37,7 +39,7 @@ instance (Xml f, Xml v) => Xml (Trs f v) where
   toXml rs = elt "rules" [ toXml r | r <- Trs.toList rs ]
 
 instance Xml f => Xml (Signature f) where
-  toXml sig = elt "signature" [ symb f i | (f,i) <- Trs.elems sig ]
+  toXml sig = elt "signature" [ symb f i | (f,i) <- Sig.elems sig ]
     where symb f i = elt "symbol" [ toXml f, elt "arity" [text $ show i] ]
 
 strategy :: Strategy -> XmlContent
@@ -47,9 +49,9 @@ strategy Full      = elt "full" []
 
 startTerms :: (Xml f, Ord f) => Prob.StartTerms f -> Signature f -> XmlContent
 startTerms (Prob.AllTerms fs) sig =
-  elt "derivationalComplexity" [toXml $ Trs.restrictSignature sig fs]
+  elt "derivationalComplexity" [toXml $ Sig.restrictSignature sig fs]
 startTerms (Prob.BasicTerms ds cs) sig =
-  elt "runtimeComplexity" $ map toXml [Trs.restrictSignature sig cs, Trs.restrictSignature sig ds]
+  elt "runtimeComplexity" $ map toXml [Sig.restrictSignature sig cs, Sig.restrictSignature sig ds]
 
 xmlProblem :: (Ord f, Ord v, Xml f, Xml v) => Problem f v -> XmlContent
 xmlProblem prob = elt "problem"

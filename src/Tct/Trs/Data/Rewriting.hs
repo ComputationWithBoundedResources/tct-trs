@@ -1,6 +1,7 @@
 -- This module contains some useful functions (yet) not available in rewriting library
 module Tct.Trs.Data.Rewriting where
 
+import Data.Maybe (isJust)
 import           Control.Arrow               ((&&&))
 import qualified Data.Set                    as S
 
@@ -11,10 +12,15 @@ import qualified Data.Rewriting.Rule         as R
 import qualified Data.Rewriting.Rules        as R (fullRewrite, result)
 import           Data.Rewriting.Term         (Term (..))
 import qualified Data.Rewriting.Term         as T
+import qualified Data.Rewriting.Substitution as S
 
 -- | Returns the size of the term.
 size :: Term f v -> Int
 size = T.fold (const 1) (\_ xs -> 1 + sum xs)
+
+-- | Checks wether the given terms are unifable.
+isUnifiableWith :: (Ord v1, Ord v2, Eq f) => T.Term f v1 -> T.Term f v2 -> Bool
+isUnifiableWith t1 t2 = isJust (S.unify (T.rename Left t1) (T.rename Right t2))
 
 -- | Checks wether the given rule is non-erasing, ie. all variables occuring in the left hand side also occur in the
 -- right hand side.

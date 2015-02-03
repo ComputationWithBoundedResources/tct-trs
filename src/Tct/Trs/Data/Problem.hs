@@ -11,8 +11,11 @@ import qualified Data.Rewriting.Term as R
 import qualified Tct.Core.Common.Pretty  as PP
 import qualified Tct.Core.Common.Xml     as Xml
 
-import Tct.Trs.Data.Trs (Trs, Signature, Symbols)
+import Tct.Trs.Data.Trs (Trs)
 import qualified Tct.Trs.Data.Trs as Trs
+
+import Tct.Trs.Data.Signature (Signature, Symbols)
+import qualified Tct.Trs.Data.Signature as Sig
 
 
 data StartTerms f
@@ -90,8 +93,8 @@ sanitise prob = prob
   { startTerms = restrictST (startTerms prob)
   , signature  = sig }
   where 
-    sig   = Trs.restrictSignature (signature prob) (Trs.funs $ allComponents prob)
-    allfs = Trs.symbols sig
+    sig   = Sig.restrictSignature (signature prob) (Trs.funs $ allComponents prob)
+    allfs = Sig.symbols sig
     restrictST (AllTerms fs)      = AllTerms (fs `S.intersection` allfs)
     restrictST (BasicTerms ds cs) = BasicTerms (ds `S.intersection` allfs) (cs `S.intersection` allfs)
 
@@ -133,6 +136,10 @@ trsComponents prob = strictTrs prob `Trs.concat` weakTrs prob
 isDPProblem :: Problem f v -> Bool
 isDPProblem prob = not $ Trs.null (strictDPs prob) && Trs.null (weakDPs prob)
 
+-- TODO MS: is there a better name for this
+isDTProblem :: Problem f v -> Bool
+isDTProblem prob = isDPProblem prob && Trs.null (strictTrs prob)
+
 isRCProblem, isDCProblem :: Problem f v -> Bool
 isRCProblem prob = case startTerms prob of
   BasicTerms{} -> True
@@ -151,6 +158,12 @@ isDPProblem' prob = note (not $ isDPProblem  prob) " not a DP problem"
 isRCProblem', isDCProblem' :: Problem f v -> Maybe String
 isRCProblem' prob = note (not $ isRCProblem  prob) " not a RC problem"
 isDCProblem' prob = note (not $ isDCProblem  prob) " not a DC problem"
+
+isInnermostProblem :: Problem f v -> Bool
+isInnermostProblem prob = strategy prob == Innermost
+
+isInnermostProblem' :: Problem f v -> Maybe String
+isInnermostProblem' prob = note (not $ isInnermostProblem prob) "not an innermost problem"
 
 isTrivial :: (Ord f, Ord v) => Problem f v -> Bool
 isTrivial prob = Trs.null (strictDPs prob) && Trs.null (strictComponents prob)

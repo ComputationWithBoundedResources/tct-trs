@@ -19,8 +19,9 @@ import qualified Data.Rewriting.Problem     as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Data.Trs (Trs, Signature)
-import qualified Tct.Trs.Data.Trs as Trs
+import           Tct.Trs.Data.Signature     (Signature)
+import           Tct.Trs.Data.Trs           (Trs)
+import qualified Tct.Trs.Data.Trs           as Trs
 import           Tct.Trs.Data.Xml           ()
 
 

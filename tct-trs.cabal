@@ -50,6 +50,7 @@ Executable trs
     DataKinds,
     DeriveDataTypeable,
     FlexibleInstances,
+    MultiParamTypeClasses, 
     TypeFamilies,
     TypeOperators
 
@@ -71,7 +72,7 @@ Library
     Tct.Trs.Data.Trs
     Tct.Trs.Data.Xml
     Tct.Trs.Encoding.UsableRules
-    Tct.Trs.Encoding.ArgumentFiltering
+    Tct.Trs.Encoding.UsablePositions
     Tct.Trs.Interpretation
     Tct.Trs.Processor
     Tct.Trs.Method.Compose

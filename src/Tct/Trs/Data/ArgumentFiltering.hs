@@ -1,6 +1,7 @@
 {- This module provides \Argument Filtering\. -}
 module Tct.Trs.Data.ArgumentFiltering 
-  ( ArgumentFiltering
+  ( Filtering (..)
+  , ArgumentFiltering
   , empty
   , alter
   , apply 
