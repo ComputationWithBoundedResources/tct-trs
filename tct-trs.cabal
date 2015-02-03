@@ -69,6 +69,7 @@ Library
     Tct.Trs.Data.Problem
     Tct.Trs.Data.Rewriting
     Tct.Trs.Data.RuleSelector
+    Tct.Trs.Data.Signature
     Tct.Trs.Data.Trs
     Tct.Trs.Data.Xml
     Tct.Trs.Encoding.UsableRules
