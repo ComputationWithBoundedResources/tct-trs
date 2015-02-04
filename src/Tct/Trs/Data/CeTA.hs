@@ -1,9 +1,14 @@
 module Tct.Trs.Data.CeTA 
-  ( cetaOutput
+  (
+  CertFail (..)
+  , Result
+  , totalProof
+  , partialProof
   ) where
 
 
 import qualified Data.Foldable as F
+import Control.Applicative
 
 import           Tct.Core.Common.Xml (Xml)
 import qualified Tct.Core.Common.Xml as Xml
@@ -15,53 +20,78 @@ import Tct.Trs.Data.Problem
 import Tct.Trs.Data.Xml ()
 
 
-certifiable :: [String]
-certifiable = ["rIsEmpty", "ruleShifting", "dtTransformation", "usableRules"]
+-- MS:
+-- Assumption: CeTA 2.2
+-- toCeTA proof constructs valid xml elements, and </unsupported> otherwise
+-- toCeTA problem constructs a valid xml problem element, with the complextiyClass tag missing
+-- 
 
-cetaOutput :: (Ord f, Ord v, Xml f, Xml v) => T.ProofTree (Problem f v) -> Either String Xml.XmlDocument
-cetaOutput pt = case T.timeUB (T.certificate pt) of
-  T.Poly (Just _) -> Right . C.cetaDocument $ C.certificationProblem (cetaSubProblem pt) (cetaProof pt)
-  _               -> Left "Output.The problem is not polynomial."
+data CertFail
+  = Infeasible 
+  | Unsupported String
+  deriving Show
 
-cetaAnswer :: T.ProofTree l -> Xml.XmlContent
-cetaAnswer pt = case T.timeUB (T.certificate pt) of
-  T.Poly (Just k) -> Xml.elt "polynomial" [Xml.int k]
-  _               -> Xml.text ""
+type Result r = Either CertFail r
 
-cetaProblem :: Xml.Xml prob => prob -> T.ProofTree t -> Xml.XmlContent
-cetaProblem prob pt = C.complexityInput trsInput complexityMeasure complexityClassE
-  where
-    xmlProb = Xml.toXml prob
-    fd s = Xml.find s xmlProb
+isFeasible :: Bool -> T.ProofTree l -> Result Xml.XmlContent
+isFeasible allowPartial pt
+  | allowPartial = k $ T.timeUB (T.certificateWith pt $ T.timeUBCert T.constant)
+  | otherwise    = k $ T.timeUB (T.certificate pt)
+  where 
+    k (T.Poly (Just n)) = Right $ Xml.elt "polynomial" [Xml.int n]
+    k _                 = Left Infeasible
 
-    trsInput          = Xml.elt "trsInput" [fd "trs", nonfull, fd "relativeRules"]
-    strat             = fd "strategy"
-    nonfull           = case Xml.search "full" strat of
-      Just _  -> Xml.text ""
-      Nothing -> strat
-    complexityMeasure = Xml.child $ fd "complexityMeasure"
-    complexityClassE  = cetaAnswer pt
-   
-cetaSubProblem :: Xml.Xml t => T.ProofTree t -> Xml.XmlContent
-cetaSubProblem pt@(T.Open prob)       = cetaProblem prob pt
-cetaSubProblem pt@(T.NoProgress pn _) = cetaProblem (T.problem pn) pt
-cetaSubProblem pt@(T.Progress pn _ _) = cetaProblem (T.problem pn) pt
+cetaProblem :: Xml.Xml prob => Bool -> prob -> T.ProofTree t -> Result Xml.XmlContent
+cetaProblem allowPartial prob pt = do
+  c <- isFeasible allowPartial pt
+  return $ Xml.addChildren (Xml.toXml prob) [Xml.elt "complexityClass" [c]]
 
+cetaSubProblem :: Xml.Xml t => Bool -> T.ProofTree t -> Result Xml.XmlContent
+cetaSubProblem allowPartial pt@(T.Open prob)       = cetaProblem allowPartial prob pt
+cetaSubProblem allowPartial pt@(T.NoProgress pn _) = cetaProblem allowPartial (T.problem pn) pt
+cetaSubProblem allowPartial pt@(T.Progress pn _ _) = cetaProblem allowPartial (T.problem pn) pt
 
 isCertifiable :: Xml.XmlContent -> Bool
-isCertifiable c = Xml.rootTag c `elem` certifiable
+isCertifiable c = Xml.rootTag c /= "unsupported"
 
-cetaProof :: Xml.Xml t => T.ProofTree t -> Xml.XmlContent
-cetaProof = C.complexityProof . cetaProof'
+-- | @partialProof pt@ translates unsupported techniques using `CeTA.unknownProof` and `CeTA.complextityAssumption` for open
+-- problems. Here we assume a constant bound for open problems. Returns
+-- 
+--   * @Left 'CertFail'@ if the sub-problem is not feasible, and * @Right xml@ otherwise.
+partialProof :: (Ord f, Ord v, Xml f, Xml v) => T.ProofTree (Problem f v) -> Result Xml.XmlDocument
+partialProof pt = isFeasible True pt *> (toDoc <$> subProblem pt <*> partialProofM1 pt)
+  where
+    toDoc a b = C.cetaDocument (C.certificationProblem a b)
+    subProblem = cetaSubProblem True
+    mkAssumption n = Xml.elt "complexityAssumption" . (:[]) <$> subProblem n
 
-cetaProof' :: Xml.Xml t => T.ProofTree t -> Xml.XmlContent
-cetaProof' (T.Open _)                = Xml.text ""
-cetaProof' (T.NoProgress _ spt)      = cetaProof' spt
-cetaProof' pt@(T.Progress pn _ spts) = case F.toList spts of
-  []  | isCertifiable xmlpn -> xmlpn
-  [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn [cetaProof t]
-  ts                        -> C.unknownProof "description" (cetaSubProblem pt) (map mkSubProofs ts)
-  where 
-    xmlpn   = Xml.toCeTA (T.proof pn)
-    mkSubProofs spt = C.subProof (cetaSubProblem spt) (cetaProof spt)
+    partialProofM1 r = C.complexityProof <$> partialProofM2 r
+    partialProofM2 n@(T.Open _)           = mkAssumption n
+    partialProofM2 (T.NoProgress _ spt)   = partialProofM1 spt
+    partialProofM2 (T.Progress pn _ spts) = case F.toList spts of
+      []  | isCertifiable xmlpn -> return xmlpn
+      [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn . (:[]) <$> partialProofM1 t
+      ts                        -> C.unknownProof "description" <$> subProblem pt  <*> (mapM mkSubProofs ts)
+      where
+        xmlpn   = Xml.toCeTA (T.proof pn)
+        mkSubProofs spt = C.subProof <$> subProblem spt <*> partialProofM1 spt
 
+
+-- | @totalProof pt@ returns
+--   * @Left 'CertFail'@ if the problem is not feasible, or an unsupported technique has been used,
+--   * @Right xml@ otherwise.
+totalProof :: (Ord f, Ord v, Xml f, Xml v) => T.ProofTree (Problem f v) -> Result Xml.XmlDocument
+totalProof pt = isFeasible False pt *> (toDoc <$> subProblem pt <*> totalProofM1 pt)
+  where
+    toDoc a b = C.cetaDocument (C.certificationProblem a b)
+    subProblem = cetaSubProblem False
+
+    totalProofM1 r = C.complexityProof <$> totalProofM2 r
+    totalProofM2 (T.Open _)             = Left $ Unsupported "open problem"
+    totalProofM2 (T.NoProgress _ spt)   = totalProofM1 spt
+    totalProofM2 (T.Progress pn _ spts) = case F.toList spts of
+      []  | isCertifiable xmlpn -> return xmlpn
+      [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn . (:[]) <$> totalProofM1 t
+      _   -> Left $ Unsupported (show $ T.processor pn)
+      where xmlpn = Xml.toCeTA (T.proof pn)
+  

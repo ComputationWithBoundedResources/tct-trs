@@ -37,8 +37,8 @@ trsMode = TctMode
   , modeAnswer          = answering }
 
 answering :: ProofTree TrsProblem -> IO ()
-answering pt = case cetaOutput pt of
-  Left s    -> putStrLn s
+answering pt = case totalProof pt of
+  Left s    -> print s
   Right xml -> Xml.putXml xml
 
 data CC = DCF | DCI | RCF | RCI deriving (Eq, Read)
