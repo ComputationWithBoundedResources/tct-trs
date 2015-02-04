@@ -282,7 +282,9 @@ instance Xml.Xml PolyOrder where
         , Xml.elt "arity" [Xml.int $ sig_ order `Sig.arity` f]
         , Xml.elt "polynomial" [Xml.toXml p]]
       trs = Xml.toXml (Trs.fromList $ map fst (strictTrs_ order ++ strictDPs_ order) )
+  toCeTA = toXml
 
 instance Xml.Xml PolyInterProof where
   toXml (PolyInterProof order) = Xml.toXml order
+  toCeTA                       = toXml
 

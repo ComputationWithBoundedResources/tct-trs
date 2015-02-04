@@ -76,6 +76,7 @@ instance Xml.Xml F where
   toXml (F (TrsFun f)) = Xml.elt "name" [Xml.text $ BS.unpack  f]
   toXml (F (DpFun f))  = Xml.elt "sharp" [Xml.elt "name" [Xml.text $ BS.unpack f]]
   toXml (F (ComFun f)) = Xml.elt "name" [Xml.text $ 'c':show f]
+  toCeta = toXml
 
 newtype V = V BS.ByteString
   deriving (Eq, Ord, Show)
@@ -85,6 +86,7 @@ instance PP.Pretty V where
 
 instance Xml.Xml V where
   toXml (V v) = Xml.elt "var" [Xml.text (BS.unpack v)]
+  toCeTA      = toXml
 
 type TrsProblem = Problem F V
 
@@ -192,7 +194,8 @@ instance PP.Pretty BS.ByteString where
   pretty = PP.text . BS.unpack
 
 instance Xml.Xml BS.ByteString where
-  toXml = Xml.text . BS.unpack
+  toXml  = Xml.text . BS.unpack
+  toCeTA = Xml.text . BS.unpack
 
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
   pretty prob = PP.vcat

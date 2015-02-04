@@ -150,13 +150,13 @@ instance Xml.Xml DPProof where
     | not (tuplesUsed proof) = Xml.elt "unknown" []
     | otherwise =
       Xml.elt "dtTransformation"
-        [ Xml.toXml $ Sig.filter Prob.isCompoundf (newSignature proof)
+        [ Xml.toCeTA $ Sig.filter Prob.isCompoundf (newSignature proof)
         , Xml.elt "strictDTs" (map ruleWith $ strictTransformation proof)
         , Xml.elt "weakDTs" (map ruleWith $ weakTransformation proof)
         , Xml.elt "innermostLhss" (map lhss $ strictTransformation proof ++ weakTransformation proof) ] --TODO: MS left hand sides of all components?
       where
-        ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.toXml old, Xml.toXml new ]
-        lhss (_, new)      = Xml.toXml (R.lhs new)
+        ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.toCeTA old, Xml.toCeTA new ]
+        lhss (_, new)      = Xml.toCeTA (R.lhs new)
 
 
 --- * instances ------------------------------------------------------------------------------------------------------

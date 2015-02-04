@@ -44,7 +44,7 @@ isFeasible allowPartial pt
 cetaProblem :: Xml.Xml prob => Bool -> prob -> T.ProofTree t -> Result Xml.XmlContent
 cetaProblem allowPartial prob pt = do
   c <- isFeasible allowPartial pt
-  return $ Xml.addChildren (Xml.toXml prob) [Xml.elt "complexityClass" [c]]
+  return $ Xml.addChildren (Xml.toCeTA prob) [Xml.elt "complexityClass" [c]]
 
 cetaSubProblem :: Xml.Xml t => Bool -> T.ProofTree t -> Result Xml.XmlContent
 cetaSubProblem allowPartial pt@(T.Open prob)       = cetaProblem allowPartial prob pt
