@@ -9,6 +9,7 @@ module Tct.Trs.Encoding.UsablePositions
   UsablePositions
   , usableArgsWhereApplicable
   , usablePositions
+  , fullWithSignature
   ) where
 
 
@@ -131,7 +132,7 @@ usableReplacementMap trs up = unions [ snd $ uArgs l r | R.Rule l r <- rules]
 
 -- | Returns an approximation of the usable positions of @prob@.
 usableArgsWhereApplicable :: Ord v => Problem F v 
-  -> Bool  -- ^ map non-compound symbols are to the empty set
+  -> Bool  -- ^ map non-compound symbols to the empty set
   -> Bool  -- ^ approximate usable positions using CAP variant
   -> UsablePositions F
 usableArgsWhereApplicable prob onlyCompound useUA = case (onlyCompound, useUA, Prob.startTerms prob) of
@@ -149,5 +150,4 @@ usableArgsWhereApplicable prob onlyCompound useUA = case (onlyCompound, useUA, P
 -- | Returns the usable positions as list.
 usablePositions :: UsablePositions f -> [(f, [Int])]
 usablePositions (UP m) = M.toList (M.map IS.toList m)
-
 

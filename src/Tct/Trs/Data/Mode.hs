@@ -51,10 +51,10 @@ instance Show CC where
 
 ccProperties :: CC -> Trs F V -> Signature F -> (StartTerms F, Strategy)
 ccProperties cc trs sig = case cc of
-  DCF -> (AllTerms fs          , Full)
-  DCI -> (AllTerms fs          , Innermost)
-  RCF -> (BasicTerms defs cons , Full)
-  RCI -> (BasicTerms defs cons , Innermost)
+  DCF -> (AllTerms fs,          Full)
+  DCI -> (AllTerms fs,          Innermost)
+  RCF -> (BasicTerms defs cons, Full)
+  RCI -> (BasicTerms defs cons, Innermost)
   where
     fs   = defs `S.union` cons
     defs = Trs.definedSymbols trs

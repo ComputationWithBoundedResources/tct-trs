@@ -70,5 +70,5 @@ instance (Ord f, Ord v, Xml f, Xml v) => Xml (Prob.Problem f v) where
           [ elt "trs" [toXml (Prob.strictComponents prob)]
           , toXml (Prob.strategy prob)
           , elt "relativeRules"     [toXml (Prob.weakComponents prob)] ]
-      , elt "complexityMeasure" [startTerms (Prob.startTerms prob) (Prob.signature prob)] ]
+      , startTerms (Prob.startTerms prob) (Prob.signature prob) ]
 

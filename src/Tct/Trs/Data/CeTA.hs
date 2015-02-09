@@ -44,7 +44,7 @@ isFeasible allowPartial pt
 cetaProblem :: Xml.Xml prob => Bool -> prob -> T.ProofTree t -> Result Xml.XmlContent
 cetaProblem allowPartial prob pt = do
   c <- isFeasible allowPartial pt
-  return $ Xml.addChildren (Xml.toCeTA prob) [Xml.elt "complexityClass" [c]]
+  return $ Xml.addChildren (Xml.toCeTA prob) [c]
 
 cetaSubProblem :: Xml.Xml t => Bool -> T.ProofTree t -> Result Xml.XmlContent
 cetaSubProblem allowPartial pt@(T.Open prob)       = cetaProblem allowPartial prob pt
@@ -67,11 +67,11 @@ partialProof pt = isFeasible True pt *> (toDoc <$> subProblem pt <*> partialProo
 
     partialProofM1 r = C.complexityProof <$> partialProofM2 r
     partialProofM2 n@(T.Open _)           = mkAssumption n
-    partialProofM2 (T.NoProgress _ spt)   = partialProofM1 spt
+    partialProofM2 (T.NoProgress _ spt)   = partialProofM2 spt
     partialProofM2 (T.Progress pn _ spts) = case F.toList spts of
       []  | isCertifiable xmlpn -> return xmlpn
       [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn . (:[]) <$> partialProofM1 t
-      ts                        -> C.unknownProof "description" <$> subProblem pt  <*> (mapM mkSubProofs ts)
+      ts                        -> C.unknownProof "description" <$> subProblem pt  <*> mapM mkSubProofs ts
       where
         xmlpn   = Xml.toCeTA (T.proof pn)
         mkSubProofs spt = C.subProof <$> subProblem spt <*> partialProofM1 spt
@@ -88,7 +88,7 @@ totalProof pt = isFeasible False pt *> (toDoc <$> subProblem pt <*> totalProofM1
 
     totalProofM1 r = C.complexityProof <$> totalProofM2 r
     totalProofM2 (T.Open _)             = Left $ Unsupported "open problem"
-    totalProofM2 (T.NoProgress _ spt)   = totalProofM1 spt
+    totalProofM2 (T.NoProgress _ spt)   = totalProofM2 spt
     totalProofM2 (T.Progress pn _ spts) = case F.toList spts of
       []  | isCertifiable xmlpn -> return xmlpn
       [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn . (:[]) <$> totalProofM1 t

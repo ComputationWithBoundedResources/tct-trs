@@ -1,6 +1,7 @@
 module Tct.Trs.Data.Problem
   where
 
+import Data.Typeable
 import qualified Data.Set as S
 import qualified Data.ByteString.Char8 as BS
 
@@ -38,7 +39,7 @@ data AFun f
   = TrsFun f
   | DpFun f
   | ComFun Int
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Typeable)
 
 
 
@@ -54,7 +55,7 @@ data Problem f v = Problem
   } deriving (Show, Eq)
 
 newtype F = F (AFun BS.ByteString)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Typeable)
 
 markFun :: F -> F 
 markFun (F (TrsFun f)) = F (DpFun f)
@@ -76,17 +77,17 @@ instance Xml.Xml F where
   toXml (F (TrsFun f)) = Xml.elt "name" [Xml.text $ BS.unpack  f]
   toXml (F (DpFun f))  = Xml.elt "sharp" [Xml.elt "name" [Xml.text $ BS.unpack f]]
   toXml (F (ComFun f)) = Xml.elt "name" [Xml.text $ 'c':show f]
-  toCeta = toXml
+  toCeTA = Xml.toXml
 
 newtype V = V BS.ByteString
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Typeable)
 
 instance PP.Pretty V where
   pretty (V v) = PP.text (BS.unpack v)
 
 instance Xml.Xml V where
   toXml (V v) = Xml.elt "var" [Xml.text (BS.unpack v)]
-  toCeTA      = toXml
+  toCeTA      = Xml.toXml
 
 type TrsProblem = Problem F V
 
