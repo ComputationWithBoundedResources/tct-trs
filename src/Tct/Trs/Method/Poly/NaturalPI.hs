@@ -64,7 +64,6 @@ data PolyOrder = PolyOrder
   , pint_      :: PolyInter Int
   , sig_       :: Signature F
   , uargs_     :: UPEnc.UsablePositions F
-  , nurules_   :: Trs F V
   , strictDPs_ :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
   , strictTrs_ :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
   , weakDPs_   :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
@@ -190,7 +189,6 @@ entscheide p prob = do
       , pint_      = pint
       , sig_       = sig
       , uargs_     = uposs
-      , nurules_   = nurules
 
       , strictDPs_ = sDPs
       , strictTrs_ = sTrs
@@ -200,7 +198,6 @@ entscheide p prob = do
         pint        = PI.PolyInter $ M.map (P.fromViewWith (inter M.!)) absi
         (sDPs,wDPs) = L.partition (isStrict . snd) (rs $ Prob.dpComponents prob)
         (sTrs,wTrs) = L.partition (isStrict . snd) (rs $ Prob.trsComponents prob)
-        nurules = Trs.filter (not . isUsable ufuns) (Prob.allComponents prob)
         isStrict (lpoly,rpoly) = P.constantValue (lpoly `sub` rpoly) > 0
         rs trs =
           [ (r, (interpret pint lhs, interpret pint rhs))
@@ -244,10 +241,8 @@ instance PP.Pretty PolyInterProof where
 instance Xml.Xml PolyOrder where
   toXml order = Xml.elt "ruleShifting" $
     [ orderingConstraintProof
-    , Xml.elt "trs" [trs] ]
-    ++ if (Trs.null $ nurules_ order)
-      then []
-      else [Xml.elt "usableRules" [Xml.elt "nonUsableRules" [Xml.toXml (nurules_ order)] ]]
+    , Xml.elt "trs" [Xml.toXml $ Trs.fromList trs] 
+    , Xml.elt "usableRules" [Xml.toXml $ Trs.fromList usr]]
     where 
       orderingConstraintProof =
         Xml.elt "orderingConstraintProof" 
@@ -260,7 +255,8 @@ instance Xml.Xml PolyOrder where
         [ Xml.toXml f
         , Xml.elt "arity" [Xml.int $ sig_ order `Sig.arity` f]
         , Xml.elt "polynomial" [Xml.toXml p]]
-      trs = Xml.toXml . Trs.fromList . map fst $ strictTrs_ order ++ strictDPs_ order
+      trs = map fst $ strictTrs_ order ++ strictDPs_ order
+      usr = (trs ++) . map fst $ weakTrs_ order ++ weakDPs_ order
   toCeTA = Xml.toXml
 
 instance Xml.Xml PolyInterProof where
