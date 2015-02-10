@@ -17,13 +17,13 @@ import qualified Data.Traversable               as F
 import qualified Data.Rewriting.Rule            as R
 import qualified Data.Rewriting.Term            as R
 
-import qualified Tct.Common.SMT                 as SMT
 
 import           Tct.Trs.Data
 import           Tct.Trs.Data.ArgumentFiltering
 import qualified Tct.Trs.Data.Problem           as Prob
 import qualified Tct.Trs.Data.Trs               as Trs
 import qualified Tct.Trs.Data.Signature         as Sig
+import qualified Tct.Trs.Data.SMT               as SMT
 
 
 -- | @usableRulesEncoding prob allowUR allowAF@ returns @ m (usable, inFilter, usableEncoding, inFilterEncoding, validEncoding)@, where

@@ -10,12 +10,13 @@ module Tct.Trs.Processor
   ) where
 
 
+import qualified Control.Exception                 as E (bracket)
 import           Control.Monad.Error               (throwError)
 import           Control.Monad.Trans               (liftIO)
 import           System.Exit
 import           System.IO                         (hClose, hFlush)
-import           System.IO.Temp
-import           System.Process
+import           System.IO.Temp                    (openTempFile)
+import           System.Process                    (readProcessWithExitCode)
 
 import           Tct.Core.Common.Xml               as Xml
 import qualified Tct.Core.Data                     as T
@@ -24,7 +25,7 @@ import qualified Tct.Core.Processor.Empty          as E
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.CeTA                 as CeTA
-import           Tct.Trs.Data.Problem
+import           Tct.Trs.Data.Problem              (isTrivial)
 
 import           Tct.Trs.Method.DP.DependencyPairs (dependencyPairsDeclaration, dependencyTuplesDeclaration)
 import           Tct.Trs.Method.DP.UsableRules     (usableRulesDeclaration)
@@ -56,19 +57,20 @@ data WithCertificationProcessor =
 
 -- TODO:
 -- MS: the only way to stop a computation currently is using throwError;
--- we could extend the Continue with Stop ?
+-- we could extend the Continue type with Stop ?
 instance T.Processor WithCertificationProcessor where
   type ProofObject WithCertificationProcessor = ()
   type Problem WithCertificationProcessor     = TrsProblem
 
   solve p prob = do
     ret <- T.evaluate (onStrategy p) prob
+    tmp <- T.tempDirectory `fmap` T.askState
     let prover = if allowPartial p then CeTA.partialProof else CeTA.totalProof
     errM <- case prover (T.fromReturn ret) of
       Left CeTA.Infeasible -> return $ Right ret
       Left err             -> return $ Left (show err)
       Right xml            ->
-        liftIO $ withSystemTempFile "ceta" $ \file hfile -> do
+        liftIO $ withFile tmp $ \file hfile -> do
           Xml.putXmlHandle xml hfile
           hFlush hfile
           hClose hfile
@@ -79,6 +81,7 @@ instance T.Processor WithCertificationProcessor where
               "CERTIFIED <complexityProof>" :_ -> Right ret
               _                                -> Left stdout
     either (throwError . userError) (return . id) errM
+    where withFile tmp = E.bracket (openTempFile tmp "ceta") (hClose . snd) . uncurry
 
 withCertification :: Bool -> T.Strategy TrsProblem -> T.Strategy TrsProblem
 withCertification b = T.Proc . WithCertificationProc b
