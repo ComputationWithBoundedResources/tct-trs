@@ -13,6 +13,7 @@ module Tct.Trs.Method.Poly.NaturalPI
   ) where
 
 
+import Control.Monad.Trans                           (liftIO)
 import qualified Data.List                           as L
 import qualified Data.Map.Strict                     as M
 import           Data.Monoid
@@ -22,22 +23,22 @@ import qualified Data.Traversable                    as F
 import qualified Data.Rewriting.Rule                 as R (Rule (..))
 import qualified Data.Rewriting.Term                 as R
 
-import qualified Tct.Common.Polynomial               as P
-import qualified Tct.Common.PolynomialInterpretation as PI
-import           Tct.Common.ProofCombinators
-import           Tct.Common.Ring
-
 import qualified Tct.Core.Common.Pretty              as PP
 import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Data                       as T
 import           Tct.Core.Data.Declaration.Parse     ()
 
+import qualified Tct.Common.Polynomial               as P
+import qualified Tct.Common.PolynomialInterpretation as PI
+import           Tct.Common.ProofCombinators
+import           Tct.Common.Ring
+import           Tct.Common.SMT                     ((.&&), (.==>), (.>), (.>=))
+import qualified Tct.Common.SMT                     as SMT
+
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem                as Prob
 import qualified Tct.Trs.Data.RuleSelector           as Trs
 import qualified Tct.Trs.Data.Signature              as Sig
-import           Tct.Trs.Data.SMT                      ((.&&), (.==>), (.>), (.>=))
-import qualified Tct.Trs.Data.SMT                      as SMT
 import qualified Tct.Trs.Data.Trs                    as Trs
 import qualified Tct.Trs.Encoding.UsablePositions    as UPEnc
 import qualified Tct.Trs.Encoding.UsableRules        as UREnc
@@ -77,7 +78,7 @@ instance T.Processor PolyInterProcessor where
   solve p prob
     | Prob.isTrivial prob = return . T.resultToTree p prob $ T.Fail Closed
     | otherwise  = do
-        res <- entscheide p prob
+        res <- liftIO $ entscheide p prob
         return . T.resultToTree p prob $ case res of
           SMT.Sat order ->
             T.Success (newProblem order prob) (Applicable . PolyInterProof $ Order order) (certification order)
@@ -107,9 +108,9 @@ interpret ebsi = interpretTerm interpretFun interpretVar
 
 newtype StrictVar f v = StrictVar (R.Rule f v) deriving (Show, Eq, Ord)
 
-entscheide :: PolyInterProcessor -> TrsProblem -> T.TctM (SMT.Result PolyOrder)
+entscheide :: PolyInterProcessor -> TrsProblem -> IO (SMT.Result PolyOrder)
 entscheide p prob = do
-  res :: SMT.Result (M.Map CoefficientVar Int, UPEnc.UsablePositions F, Maybe (Symbols F)) <- SMT.minismt $ do
+  res :: SMT.Result (M.Map CoefficientVar Int, UPEnc.UsablePositions F, Maybe (Symbols F)) <- SMT.solveStM SMT.minismt $ do
     SMT.setFormat "QF_NIA"
     -- encode abstract interpretation
     (ebsi,coefficientEncoder) <- SMT.memo $ PI.PolyInter `fmap` F.mapM encode absi

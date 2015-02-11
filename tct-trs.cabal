@@ -72,7 +72,6 @@ Library
     Tct.Trs.Data.Rewriting
     Tct.Trs.Data.RuleSelector
     Tct.Trs.Data.Signature
-    Tct.Trs.Data.SMT
     Tct.Trs.Data.Trs
     Tct.Trs.Data.Xml
     Tct.Trs.Encoding.UsableRules
