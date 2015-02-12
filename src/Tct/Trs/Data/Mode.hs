@@ -11,7 +11,6 @@ import qualified Data.Set                   as S
 import           Tct.Core.Common.Error      (TctError (..))
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml (putXml)
-import           Tct.Core.Data              (ProofTree)
 import           Tct.Core.Main
 import           Tct.Core.Processor.Trivial (failing)
 
@@ -37,7 +36,7 @@ trsMode = TctMode
   , modeAnswer          = answering }
 
 answering :: ProofTree TrsProblem -> IO ()
-answering pt = case totalProof pt of
+answering pt = PP.putPretty (answer pt) >> case totalProof pt of
   Left s    -> print s
   Right xml -> Xml.putXml xml
 
