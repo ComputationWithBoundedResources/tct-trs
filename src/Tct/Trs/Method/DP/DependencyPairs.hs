@@ -41,7 +41,7 @@ subtermsWDP _ v = [v]
 subtermsWIDP :: Ord f => S.Set f -> R.Term f v -> [R.Term f v]
 subtermsWIDP defineds s@(R.Fun f ss)
   | f `S.member` defineds = [s]
-  | otherwise             = concatMap (subtermsWDP defineds) ss
+  | otherwise             = concatMap (subtermsWIDP defineds) ss
 subtermsWIDP _ _ = []
 
 subtermsWDT :: Ord f => S.Set f -> R.Term f v -> [R.Term f v]
