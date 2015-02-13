@@ -32,19 +32,19 @@ import qualified Tct.Trs.Data.Signature      as Sig
 -- MS Compound Symbols should have identifier component
 -- it is necessary to compute a fresh symbol
 
-subtermsWDP :: Ord f => S.Set f -> R.Term f v -> [R.Term f v]
+subtermsWDP :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
 subtermsWDP defineds s@(R.Fun f ss)
   | f `S.member` defineds = [s]
   | otherwise             = concatMap (subtermsWDP defineds) ss
 subtermsWDP _ v = [v]
 
-subtermsWIDP :: Ord f => S.Set f -> R.Term f v -> [R.Term f v]
+subtermsWIDP :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
 subtermsWIDP defineds s@(R.Fun f ss)
   | f `S.member` defineds = [s]
   | otherwise             = concatMap (subtermsWIDP defineds) ss
 subtermsWIDP _ _ = []
 
-subtermsWDT :: Ord f => S.Set f -> R.Term f v -> [R.Term f v]
+subtermsWDT :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
 subtermsWDT defineds s@(R.Fun f ss)
   | f `S.member` defineds = s :subs
   | otherwise             = subs
@@ -68,12 +68,11 @@ fromTransformation = Trs.fromList . snd . unzip
 markRules :: (R.Term F V -> [R.Term F V]) -> Trs F V -> State Int [Transformation F V]
 markRules subtermsOf trs = F.mapM (\r -> markRule subtermsOf r >>= \r' -> return (r,r')) (Trs.toList trs)
 
-dependencyPairsOf :: Bool -> Prob.Strategy -> Trs F V -> State Int [Transformation F V]
-dependencyPairsOf useTuples strat trs
+dependencyPairsOf :: Bool -> Prob.Strategy -> Symbols F -> Trs F V -> State Int [Transformation F V]
+dependencyPairsOf useTuples strat defineds trs
   | useTuples               = markRules (subtermsWDT defineds) trs
   | strat == Prob.Innermost = markRules (subtermsWIDP defineds) trs
   | otherwise               = markRules (subtermsWDP defineds) trs
-  where defineds = Trs.definedSymbols trs
 
 
 --- * processor ------------------------------------------------------------------------------------------------------
@@ -100,8 +99,9 @@ instance T.Processor DPProcessor where
         <|> if useTuples then Prob.isInnermostProblem' prob else Nothing
 
       (stricts, weaks) = flip evalState 0 $ do
-        ss <- dependencyPairsOf useTuples (Prob.strategy prob) (Prob.strictTrs prob)
-        ws <- dependencyPairsOf useTuples (Prob.strategy prob) (Prob.weakTrs prob)
+        let defineds = Trs.definedSymbols (Prob.allComponents prob)
+        ss <- dependencyPairsOf useTuples (Prob.strategy prob) defineds (Prob.strictTrs prob)
+        ws <- dependencyPairsOf useTuples (Prob.strategy prob) defineds (Prob.weakTrs prob)
         return (ss,ws)
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks

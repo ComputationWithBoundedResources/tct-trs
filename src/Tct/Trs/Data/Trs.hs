@@ -88,9 +88,9 @@ fromList = TrsT . S.fromList
 definedSymbols :: (Ord f, Ord v) => Trs f v -> Sig.Symbols f
 definedSymbols (TrsT rs) = S.foldr ofRule S.empty rs
   where
-    ofRule (R.Rule l r) acc = ofTerm l acc
-    ofTerm (T.Fun f _)  acc = f `S.insert` acc
-    ofTerm _ acc            = acc
+    ofRule (R.Rule l _) = ofTerm l
+    ofTerm (T.Fun f _)  = (f `S.insert`)
+    ofTerm _            = id
 
 constructorSymbols :: Ord f => Sig.Signature f -> Sig.Symbols f -> Sig.Symbols f
 constructorSymbols sig defineds = Sig.symbols sig `S.difference` defineds

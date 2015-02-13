@@ -22,13 +22,14 @@ import           Tct.Trs.Data.Signature     (Signature)
 import           Tct.Trs.Data.Trs           (Trs)
 import qualified Tct.Trs.Data.Trs           as Trs
 import           Tct.Trs.Data.Xml           ()
+import           Tct.Trs.Processor          (defaultDeclarations)
 
 
 trsMode :: TctMode TrsProblem CC
 trsMode = TctMode
   { modeId              = "trs"
   , modeParser          = parser
-  , modeStrategies      = []
+  , modeStrategies      = defaultDeclarations
 
   , modeDefaultStrategy = failing
   , modeOptions         = options

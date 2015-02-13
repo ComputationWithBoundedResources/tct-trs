@@ -7,6 +7,7 @@ module Tct.Trs.Method.Poly.NaturalPI
   , urArg
   , uaArg
   -- * Strategies
+  , stronglyLinear
   , linear
   , quadratic
   , mixed
@@ -43,6 +44,10 @@ import qualified Tct.Trs.Data.Trs                    as Trs
 import qualified Tct.Trs.Encoding.UsablePositions    as UPEnc
 import qualified Tct.Trs.Encoding.UsableRules        as UREnc
 import           Tct.Trs.Interpretation
+
+-- MS: TODO
+-- implement a greedy interface reusing the encoding
+-- should abstract polynomials for compound symbols be restricted to SLI ?
 
 
 data PolyInterProcessor = PolyInterProc
@@ -305,6 +310,12 @@ poly sh ua ur sl = T.Proc $ PolyInterProc
 
 -- TODO: MS: better interface
 -- can we do without exposing the processor type a builder a -> Strategy with modifyers f a -> a?
+stronglyLinear :: Bool -> Bool -> Maybe (ExpressionSelector F V) -> T.Strategy TrsProblem
+stronglyLinear ua ur sl = T.Proc $ PolyInterProc
+  { shape    = PI.Linear
+  , uargs    = ua
+  , urules   = ur
+  , selector = sl }
 
 linear :: Bool -> Bool -> Maybe (ExpressionSelector F V) -> T.Strategy TrsProblem
 linear ua ur sl = T.Proc $ PolyInterProc
