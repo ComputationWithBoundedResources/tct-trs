@@ -167,8 +167,6 @@ estimatedDependencyGraph' ICapStar prob = Gr.mkGraph ns es
         else return False
 
 
-
--- see: R. Thiemann, Dissertation
 icap :: (Ord f, Ord v) => [R.Term f (Fresh v)] -> [R.Term f (Fresh v)] -> [R.Term f (Fresh v)] -> R.Term f (Fresh v) -> State Int (R.Term f (Fresh v))          
 icap rs qs ss u = icap' u where
   icap' t@(R.Var v)

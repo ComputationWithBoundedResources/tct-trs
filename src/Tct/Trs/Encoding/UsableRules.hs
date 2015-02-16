@@ -1,7 +1,8 @@
 {- | This module provides the encoding for \usable rules modulo argument filtering\. -}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Tct.Trs.Encoding.UsableRules
-  ( usableRulesEncoding
+  ( UsableSymbols (..)
+  , usableRulesEncoding
   , validUsableRulesEncoding
   ) where
 
@@ -16,6 +17,8 @@ import qualified Data.Traversable               as F
 
 import qualified Data.Rewriting.Rule            as R
 import qualified Data.Rewriting.Term            as R
+
+import qualified Tct.Core.Common.Pretty         as PP
 
 import qualified Tct.Common.SMT                 as SMT
 
@@ -41,11 +44,11 @@ usableRulesEncoding prob allowUR allowAF = do
   afenc <- argfilEncoder prob
   let
     usable'
-      | allowUR && allowAF = usable prob usenc
-      | otherwise          = const SMT.top
+      | allowUR   = usable prob usenc
+      | otherwise = const SMT.top
     inFilter' f i
-      | allowAF   = inFilter afenc f i
-      | otherwise = SMT.top
+      | allowUR && allowAF = inFilter afenc f i
+      | otherwise          = SMT.top
     validEncoding
       | allowUR   = validUsableRulesEncoding prob usable' inFilter'
       | otherwise = SMT.top
@@ -108,11 +111,16 @@ data UsableEncoder f = UsableEncoder
   (Symbols f)         -- ^ containts initial symbols
   (M.Map f SMT.Expr)  -- ^ maps functions symbol to variables
 
+newtype UsableSymbols f = UsableSymbols { runUsableSymbols :: Symbols f }
+
 -- | Returns set of usable symbols.
-instance Ord f => SMT.Decode SMT.Environment (UsableEncoder f) (Symbols f) where
+instance Ord f => SMT.Decode SMT.Environment (UsableEncoder f) (UsableSymbols f) where
   decode (UsableEncoder fs m) = do
     m1 :: S.Set f <- SMT.decode (SMT.Property (fromMaybe False) m)
-    return $ fs `S.union` m1
+    return . UsableSymbols $ fs `S.union` m1
+
+instance PP.Pretty f => PP.Pretty (UsableSymbols f) where
+  pretty = PP.set . map PP.pretty . S.toList . runUsableSymbols
 
 
 -- | Lifts usable symbols to usable rules.

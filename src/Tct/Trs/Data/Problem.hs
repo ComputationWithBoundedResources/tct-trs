@@ -125,7 +125,12 @@ fromRewriting prob = Problem
     defs = Trs.definedSymbols trs
     cons = Trs.constructorSymbols sig defs
 
-
+progressUsingSize :: Problem f v -> Problem f v -> Bool
+progressUsingSize p1 p2 = 
+  Trs.size (strictDPs p1) /= Trs.size (strictDPs p2)
+  || Trs.size (strictTrs p1) /= Trs.size (strictTrs p2)
+  || Trs.size (weakDPs p1) /= Trs.size (weakDPs p2)
+  || Trs.size (weakTrs p1) /= Trs.size (weakTrs p2)
 
 strictComponents, weakComponents, allComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
 strictComponents prob = strictDPs prob `Trs.concat` strictTrs prob
@@ -170,6 +175,7 @@ isInnermostProblem' prob = note (not $ isInnermostProblem prob) "not an innermos
 
 isTrivial :: (Ord f, Ord v) => Problem f v -> Bool
 isTrivial prob = Trs.null (strictDPs prob) && Trs.null (strictComponents prob)
+
 
 -- * ruleset
 data Ruleset f v = Ruleset

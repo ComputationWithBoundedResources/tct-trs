@@ -8,5 +8,5 @@ import Tct.Trs.Processor (defaultDeclarations)
 
 
 main :: IO ()
-main = apply defaultTctConfig $ trsMode `withStrategies` defaultDeclarations
+main = setMode $ trsMode `withStrategies` defaultDeclarations
 

@@ -25,6 +25,7 @@ module Tct.Trs.Data.Trs
 
   , empty, singleton, concat, union, unions, difference, intersect, filter
 
+  , size
   , null
   , isDuplicating, isLinear
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
@@ -134,6 +135,9 @@ any' f (TrsT rs) = S.foldr ((||) . f) False rs
 
 all' :: (Rule f v -> Bool) -> Trs f v -> Bool
 all' f (TrsT rs) = S.foldr ((&&) . f) True rs
+
+size :: Trs f v -> Int
+size = lift1 S.size
 
 null :: Trs f v -> Bool
 null = lift1 S.null

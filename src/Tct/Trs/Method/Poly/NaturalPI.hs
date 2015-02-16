@@ -14,7 +14,8 @@ module Tct.Trs.Method.Poly.NaturalPI
   ) where
 
 
-import Control.Monad.Trans                           (liftIO)
+import Control.Monad.Error                           (throwError, MonadError)
+import Control.Monad.Trans                           (liftIO, MonadIO)
 import qualified Data.List                           as L
 import qualified Data.Map.Strict                     as M
 import           Data.Monoid
@@ -33,7 +34,7 @@ import qualified Tct.Common.Polynomial               as P
 import qualified Tct.Common.PolynomialInterpretation as PI
 import           Tct.Common.ProofCombinators
 import           Tct.Common.Ring
-import           Tct.Common.SMT                     ((.&&), (.==>), (.>), (.>=))
+import           Tct.Common.SMT                     ((.&&), (.==>), (.>), (.>=), (.==))
 import qualified Tct.Common.SMT                     as SMT
 
 import           Tct.Trs.Data
@@ -45,9 +46,14 @@ import qualified Tct.Trs.Encoding.UsablePositions    as UPEnc
 import qualified Tct.Trs.Encoding.UsableRules        as UREnc
 import           Tct.Trs.Interpretation
 
--- MS: TODO
--- implement a greedy interface reusing the encoding
--- should abstract polynomials for compound symbols be restricted to SLI ?
+-- MS: 
+-- TODO
+-- * implement a greedy interface reusing the encoding
+-- * should abstract polynomials for compound symbols be restricted to SLI ?
+-- * check special cases with usable rules, ie when no rule is usable and the strict dps are empty
+-- * is there a difference between applying usableRules processer vs  inter+uargs+urules
+-- FIXME
+-- * edge cases with usable
 
 
 data PolyInterProcessor = PolyInterProc
@@ -69,6 +75,7 @@ data PolyOrder = PolyOrder
   , pint_      :: PolyInter Int
   , sig_       :: Signature F
   , uargs_     :: UPEnc.UsablePositions F
+  , ufuns_     :: Symbols F
   , strictDPs_ :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
   , strictTrs_ :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
   , weakDPs_   :: [(R.Rule F V, (P.Polynomial Int V, P.Polynomial Int V))]
@@ -79,18 +86,21 @@ data PolyOrder = PolyOrder
 instance T.Processor PolyInterProcessor where
   type ProofObject PolyInterProcessor = ApplicationProof PolyInterProof
   type Problem PolyInterProcessor     = TrsProblem
-  type Forking PolyInterProcessor     = T.Id
   solve p prob
     | Prob.isTrivial prob = return . T.resultToTree p prob $ T.Fail Closed
     | otherwise  = do
-        res <- liftIO $ entscheide p prob
-        return . T.resultToTree p prob $ case res of
-          SMT.Sat order ->
-            T.Success (newProblem order prob) (Applicable . PolyInterProof $ Order order) (certification order)
-          _             -> T.Fail (Applicable $ PolyInterProof Incompatible)
+        res <- entscheide p prob
+        case res of
+          SMT.Sat order
+            | Prob.progressUsingSize prob prob' ->
+                toProof $ T.Success (T.Id prob') (Applicable . PolyInterProof $ Order order) (certification order)
+            | otherwise -> throwError $ userError "naturalpi: satisfiable but no progress"
+            where prob' = newProblem order prob
+          _             -> toProof $ T.Fail (Applicable $ PolyInterProof Incompatible)
+        where toProof = return . T.resultToTree p prob
 
-newProblem :: PolyOrder -> TrsProblem -> T.Id TrsProblem
-newProblem order prob = T.Id $ prob
+newProblem :: PolyOrder -> TrsProblem -> TrsProblem
+newProblem order prob = prob
   { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
   , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
   , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs
@@ -113,9 +123,9 @@ interpret ebsi = interpretTerm interpretFun interpretVar
 
 newtype StrictVar f v = StrictVar (R.Rule f v) deriving (Show, Eq, Ord)
 
-entscheide :: PolyInterProcessor -> TrsProblem -> IO (SMT.Result PolyOrder)
+entscheide :: (MonadError e m, MonadIO m) => PolyInterProcessor -> TrsProblem -> m (SMT.Result PolyOrder)
 entscheide p prob = do
-  res :: SMT.Result (M.Map CoefficientVar Int, UPEnc.UsablePositions F, Maybe (Symbols F)) <- SMT.solveStM SMT.minismt $ do
+  res :: SMT.Result (M.Map CoefficientVar Int, UPEnc.UsablePositions F, Maybe (UREnc.UsableSymbols F)) <- liftIO $ SMT.solveStM SMT.minismt $ do
     SMT.setFormat "QF_NIA"
     -- encode abstract interpretation
     (ebsi,coefficientEncoder) <- SMT.memo $ PI.PolyInter `fmap` F.mapM encode absi
@@ -127,8 +137,8 @@ entscheide p prob = do
     let
       strict = (strictEncoder M.!) . StrictVar
 
-      orientSelected (Trs.SelectDP r)  = strict r SMT..> zero
-      orientSelected (Trs.SelectTrs r) = strict r SMT..> zero
+      orientSelected (Trs.SelectDP r)  = strict r .> zero
+      orientSelected (Trs.SelectTrs r) = strict r .> zero
       orientSelected (Trs.BigAnd es)   = SMT.bigAnd [ orientSelected e | e <- es]
       orientSelected (Trs.BigOr es)    = SMT.bigOr [ orientSelected e | e <- es]
 
@@ -137,13 +147,17 @@ entscheide p prob = do
 
     let
       orderConstraints = SMT.bigAnd $
-        [ usable r .==> ordered r | r <- Trs.toList $ Prob.trsComponents prob]
-        ++ [ ordered r | r <- Trs.toList $ Prob.dpComponents prob]
+        if not allowUR || Trs.null (Prob.strictDPs prob) 
+          then [ ordered r | r <- Trs.toList $ Prob.allComponents prob ]
+          else 
+            [ usable r .==> ordered r | r <- Trs.toList $ Prob.trsComponents prob]
+            ++ [ ordered r | r <- Trs.toList $ Prob.dpComponents prob]
 
-      rulesConstraint = forceAny .&& forceSel
+      rulesConstraint = forceAny .&& forceSel .&& forceUsable
         where
-          forceAny = SMT.bigOr [ s .> zero | r <- Trs.toList (Prob.strictComponents prob), let s = strict r]
+          forceAny = SMT.bigOr $ [ strict r .> zero | r <- Trs.toList (Prob.strictComponents prob)]
           forceSel = maybe SMT.top (\sel -> orientSelected (Trs.rsSelect sel prob)) (selector p)
+          forceUsable = SMT.bigAnd [ SMT.bnot (usable r) .==> strict r .== zero | r <- Trs.toList $ Prob.trsComponents prob]
 
       usablePositions = UPEnc.usableArgsWhereApplicable prob (Prob.isDTProblem prob) (uargs p)
 
@@ -194,6 +208,7 @@ entscheide p prob = do
       , pint_      = pint
       , sig_       = sig
       , uargs_     = uposs
+      , ufuns_     = maybe S.empty UREnc.runUsableSymbols ufuns
 
       , strictDPs_ = sDPs
       , strictTrs_ = sTrs
@@ -209,7 +224,7 @@ entscheide p prob = do
           | r@(R.Rule lhs rhs) <- Trs.toList trs
           , isUsable ufuns r ]
         isUsable Nothing _                = True
-        isUsable (Just fs) (R.Rule lhs _) = either (const False) (`S.member` fs) (R.root lhs)
+        isUsable (Just fs) (R.Rule lhs _) = either (const False) (`S.member` UREnc.runUsableSymbols fs) (R.root lhs)
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
@@ -222,6 +237,8 @@ instance PP.Pretty PolyOrder where
           , PP.indent 2 $ PP.pretty (uargs_ order) 
           , PP.empty ]
         else PP.empty
+    , PP.text "Following symbols are considered usable:"
+    , PP.indent 2 $ PP.set (map PP.pretty . S.toList $ ufuns_ order)
     , PP.text "TcT has computed the following interpretation:"
     , PP.indent 2 (PP.pretty (pint_ order))
     , PP.empty
