@@ -2,6 +2,7 @@ module Tct.Trs.Data.Problem
   where
 
 import Data.Typeable
+import Control.Applicative ((<|>))
 import qualified Data.Set as S
 import qualified Data.ByteString.Char8 as BS
 
@@ -12,7 +13,7 @@ import qualified Data.Rewriting.Term as R
 import qualified Tct.Core.Common.Pretty  as PP
 import qualified Tct.Core.Common.Xml     as Xml
 
-import Tct.Trs.Data.DependencyGraph (DependencyGraph)
+import Tct.Trs.Data.DependencyGraph (DependencyGraph, DG, CDG)
 import qualified Tct.Trs.Data.DependencyGraph as DPG
 import Tct.Trs.Data.ProblemKind
 import Tct.Trs.Data.RuleSet
@@ -36,6 +37,12 @@ data Problem f v = Problem
 
   , dpGraph    :: DependencyGraph f v 
   } deriving (Show, Eq)
+
+dependencyGraph :: Problem f v -> DG f v
+dependencyGraph = DPG.dependencyGraph . dpGraph
+
+congruenceGraph :: Problem f v -> CDG f v
+congruenceGraph = DPG.congruenceGraph . dpGraph
 
 -- | Annotated function symbol.
 data AFun f
@@ -161,6 +168,9 @@ note b st = if b then Just st else Nothing
 
 isDPProblem' :: Problem f v -> Maybe String
 isDPProblem' prob = note (not $ isDPProblem  prob) " not a DP problem"
+
+isDTProblem' :: Problem f v -> Maybe String
+isDTProblem' prob = isDPProblem' prob <|> note (not $ Trs.null (strictTrs prob)) " contains strict rules"
 
 isRCProblem', isDCProblem' :: Problem f v -> Maybe String
 isRCProblem' prob = note (not $ isRCProblem  prob) " not a RC problem"

@@ -85,6 +85,7 @@ Library
     Tct.Trs.Method.Compose
     Tct.Trs.Method.DP.DependencyPairs
     Tct.Trs.Method.DP.UsableRules
+    Tct.Trs.Method.DP.DPGraph.Trivial
     Tct.Trs.Method.Poly.NaturalPI
   build-depends:
     base           == 4.*,

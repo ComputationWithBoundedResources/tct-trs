@@ -1,25 +1,35 @@
 module Tct.Trs.Data.DependencyGraph 
   ( 
-  DependencyGraph (..)
-  , empty
-  , DG 
-  , CDG
+  nodes
+  
   , estimatedDependencyGraph 
+  -- * dependency graph
+  , DependencyGraph (..)
+  , empty
+  , DG, DGNode
+
+  -- * congruence graph
+  , CDG, CDGNode (..)
+  , isCyclicNode
   ) where
 
+import Data.Function (on)
+import Data.Monoid
 import           Control.Monad.State.Strict
 import Data.Maybe (catMaybes, isNothing, fromMaybe)
-import qualified Data.List as L ((\\))
+import qualified Data.List as L
 
 import qualified Data.Graph.Inductive as Gr
-import Data.Graph.Inductive.Basic (undir)
-import Data.Graph.Inductive.Query.DFS (dfs)
+{-import Data.Graph.Inductive.Basic (undir)-}
+{-import Data.Graph.Inductive.Query.DFS (dfs)-}
 import qualified Data.Graph.Inductive.Query.DFS as DFS
-import Data.Graph.Inductive.Query.BFS (bfsn)
+{-import Data.Graph.Inductive.Query.BFS (bfsn)-}
 
 import qualified Data.Rewriting.Term         as R
 import qualified Data.Rewriting.Rule         as R (Rule (..))
 import qualified Data.Rewriting.Substitution as R
+
+import qualified Tct.Core.Common.Pretty as PP
 
 import qualified Tct.Trs.Data.RuleSet as Rs
 import qualified Tct.Trs.Data.Trs as Trs
@@ -57,14 +67,14 @@ empty = DependencyGraph Gr.empty Gr.empty
 nodes :: Graph n e -> [NodeId]
 nodes = Gr.nodes
 
-lnodes :: Graph n e -> [(NodeId,n)]
-lnodes = Gr.labNodes
+{-lnodes :: Graph n e -> [(NodeId,n)]-}
+{-lnodes = Gr.labNodes-}
 
-roots :: Graph n e -> [NodeId]
-roots gr = [n | n <- Gr.nodes gr, Gr.indeg gr n == 0]
+{-roots :: Graph n e -> [NodeId]-}
+{-roots gr = [n | n <- Gr.nodes gr, Gr.indeg gr n == 0]-}
 
-leafs :: Graph n e -> [NodeId]
-leafs gr = [n | n <- Gr.nodes gr, Gr.outdeg gr n == 0]
+{-leafs :: Graph n e -> [NodeId]-}
+{-leafs gr = [n | n <- Gr.nodes gr, Gr.outdeg gr n == 0]-}
 
 lookupNodeLabel :: Graph n e -> NodeId -> Maybe n
 lookupNodeLabel = Gr.lab
@@ -73,59 +83,59 @@ lookupNodeLabel' :: Graph n e -> NodeId -> n
 lookupNodeLabel' gr n = err `fromMaybe` lookupNodeLabel gr n
   where err = error $ "DependencyGraph.lookupNodelabel': node not found " ++ show n
 
-withNodeLabels :: Graph n e -> [NodeId] -> [(NodeId, Maybe n)]
-withNodeLabels gr ns = [(n, lookupNodeLabel gr n) | n <- ns]
+{-withNodeLabels :: Graph n e -> [NodeId] -> [(NodeId, Maybe n)]-}
+{-withNodeLabels gr ns = [(n, lookupNodeLabel gr n) | n <- ns]-}
 
-withNodeLabels' :: Graph n e -> [NodeId] -> [(NodeId, n)]
-withNodeLabels' gr ns = [(n, lookupNodeLabel' gr n) | n <- ns]
+{-withNodeLabels' :: Graph n e -> [NodeId] -> [(NodeId, n)]-}
+{-withNodeLabels' gr ns = [(n, lookupNodeLabel' gr n) | n <- ns]-}
 
-lookupNode :: Eq n => Graph n e -> n -> Maybe NodeId
-lookupNode gr n = lookup n [(n',i) | (i,n') <- Gr.labNodes gr]
+{-lookupNode :: Eq n => Graph n e -> n -> Maybe NodeId-}
+{-lookupNode gr n = lookup n [(n',i) | (i,n') <- Gr.labNodes gr]-}
 
-lookupNode' :: Eq n => Graph n e -> n -> NodeId
-lookupNode' gr n = err `fromMaybe` lookupNode gr n
-  where err = error $ "DependencyGraph.lookupNode': node not found."
+{-lookupNode' :: Eq n => Graph n e -> n -> NodeId-}
+{-lookupNode' gr n = err `fromMaybe` lookupNode gr n-}
+  {-where err = error $ "DependencyGraph.lookupNode': node not found."-}
 
-inverse :: Graph n e -> Graph n e
-inverse gr = Gr.mkGraph ns es
-  where ns = Gr.labNodes gr
-        es = [ (n2, n1, i) | (n1,n2,i) <- Gr.labEdges gr ]
+{-inverse :: Graph n e -> Graph n e-}
+{-inverse gr = Gr.mkGraph ns es-}
+  {-where ns = Gr.labNodes gr-}
+        {-es = [ (n2, n1, i) | (n1,n2,i) <- Gr.labEdges gr ]-}
 
-topsort :: Graph n e -> [NodeId]
-topsort = DFS.topsort
+{-topsort :: Graph n e -> [NodeId]-}
+{-topsort = DFS.topsort-}
 
-sccs :: Graph n e -> [[NodeId]]
-sccs = DFS.scc
+{-sccs :: Graph n e -> [[NodeId]]-}
+{-sccs = DFS.scc-}
 
-undirect :: Eq e => Graph n e -> Graph n e
-undirect = undir
+{-undirect :: Eq e => Graph n e -> Graph n e-}
+{-undirect = undir-}
 
 successors :: Graph n e -> NodeId -> [NodeId]
 successors = Gr.suc
 
-reachablesBfs :: Graph n e -> [NodeId] -> [NodeId]
-reachablesBfs = flip bfsn
+{-reachablesBfs :: Graph n e -> [NodeId] -> [NodeId]-}
+{-reachablesBfs = flip bfsn-}
 
-reachablesDfs :: Graph n e -> [NodeId] -> [NodeId]
-reachablesDfs = flip dfs
+{-reachablesDfs :: Graph n e -> [NodeId] -> [NodeId]-}
+{-reachablesDfs = flip dfs-}
 
-predecessors :: Graph n e -> NodeId -> [NodeId]
-predecessors = Gr.pre
+{-predecessors :: Graph n e -> NodeId -> [NodeId]-}
+{-predecessors = Gr.pre-}
 
 lsuccessors :: Graph n e -> NodeId -> [(NodeId, n, e)]
 lsuccessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lsuc gr nde]
 
-lpredecessors :: Graph n e -> NodeId -> [(NodeId, n, e)]
-lpredecessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lpre gr nde]
+{-lpredecessors :: Graph n e -> NodeId -> [(NodeId, n, e)]-}
+{-lpredecessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lpre gr nde]-}
 
-isEdgeTo :: Graph n e -> NodeId -> NodeId -> Bool
-isEdgeTo g n1 n2 = n2 `elem` successors g n1 
+{-isEdgeTo :: Graph n e -> NodeId -> NodeId -> Bool-}
+{-isEdgeTo g n1 n2 = n2 `elem` successors g n1 -}
 
-isLEdgeTo :: Eq e => Graph n e -> NodeId -> e -> NodeId -> Bool
-isLEdgeTo g n1 e n2 = n2 `elem` [n | (n, _, e2) <- lsuccessors g n1, e == e2]
+{-isLEdgeTo :: Eq e => Graph n e -> NodeId -> e -> NodeId -> Bool-}
+{-isLEdgeTo g n1 e n2 = n2 `elem` [n | (n, _, e2) <- lsuccessors g n1, e == e2]-}
 
-subGraph :: Graph n e -> [NodeId] -> Graph n e
-subGraph g ns = Gr.delNodes (nodes g L.\\ ns) g
+{-subGraph :: Graph n e -> [NodeId] -> Graph n e-}
+{-subGraph g ns = Gr.delNodes (nodes g L.\\ ns) g-}
 
 
 --- * estimated dependency graph -------------------------------------------------------------------------------------
@@ -176,15 +186,17 @@ estimatedDependencyGraph' rs strat = Gr.mkGraph ns es
         else return False
 
 
-icap :: (Ord f, Ord v) => [R.Term f (Fresh v)] -> [R.Term f (Fresh v)] -> [R.Term f (Fresh v)] -> R.Term f (Fresh v) -> State Int (R.Term f (Fresh v))          
-icap rs qs ss u = icap' u where
+icap :: (Ord f, Ord v) 
+  => [R.Term f (Fresh v)] -> [R.Term f (Fresh v)] 
+  -> [R.Term f (Fresh v)] -> R.Term f (Fresh v) -> State Int (R.Term f (Fresh v))          
+icap rs qs ss = icap' where
   icap' t@(R.Var v)
     | all (`elem` qs) rs && or [v `elem` R.vars s | s <- ss] = return t
     | otherwise                                               = freshVar
   icap' (R.Fun f ts) = do
     t' <- R.Fun f `fmap` mapM icap' ts
     let matches = catMaybes [ (,) l `liftM` R.unify t' l | l <- rs ]
-    if and [ any (not . isQNF) [ s | s <- [R.apply delta s | s <- ss] ++ directSubterms (R.apply delta l) ] | (l,delta) <- matches]
+    if and [ any (not . isQNF) [ R.apply delta s | s <- ss ++ directSubterms l ] | (l,delta) <- matches ]
       then return t'
       else freshVar                                                                                                                                       
   
@@ -211,26 +223,36 @@ toCongruenceGraph gr = Gr.mkGraph ns es
     cn1 `edgesTo` cn2 = 
       [ (r1, i) | (n1,(_,r1)) <- theSCC cn1, (n, _, i) <- lsuccessors gr n1, n `elem` map fst (theSCC cn2)]
 
+{-allRulesFromNode :: CDG f v -> NodeId -> [(Strictness, R.Rule f v)]-}
+{-allRulesFromNode gr n = case lookupNodeLabel gr n of -}
+  {-Nothing -> []-}
+  {-Just cn -> [ sr | (_, sr) <- theSCC cn]-}
+
+{-allRulesFromNodes :: CDG f v -> [NodeId] -> [(Strictness, R.Rule f v)]-}
+{-allRulesFromNodes gr ns = concatMap (allRulesFromNode gr) ns-}
+
+{-congruence :: CDG f v -> NodeId -> [NodeId]-}
+{-congruence cdg n = fromMaybe [] ((map fst . theSCC) `liftM` lookupNodeLabel cdg n)-}
+
+isCyclicNode :: CDG f v -> NodeId -> Bool
+isCyclicNode cdg n = isCyclic $ lookupNodeLabel' cdg n
 
 
-{-icap :: (Ord f, Ord v, Enum v) => S.Set (R.Term f v) -> S.Set (R.Term f v) -> S.Set (R.Term f v) -> R.Term f v -> State v (R.Term f v)-}
-{-icap lhss qnfs snfs u = icap' u-}
-  {-where-}
-    {-icap' t@(R.Var _)-}
-      {-| qnfs `S.isSubsetOf` rnfs && anyS ((t `elem`) . R.subterms) snfs = return t-}
-      {-| otherwise                                                       = freshVar-}
-    {-icap' (R.Fun f ts) = do-}
-      {-t1 <- R.Fun f `liftM` mapM icap' ts-}
-      {-let mgus = catMaybes $ do-}
-        {-let-}
-          {-t2 = T.rename Left t1-}
 
+--- * proofdata ------------------------------------------------------------------------------------------------------
 
-{-isUnifiableWith :: (Ord v1, Ord v2, Eq f) => T.Term f v1 -> T.Term f v2 -> Bool-}
-{-isUnifiableWith t1 t2 = isJust (S.unify (T.rename Left t1) (T.rename Right t2))-}
-
-
-    {-anyS f = S.foldl' (\acc -> (acc ||) . f) False-}
+instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (DependencyGraph f v) where 
+  pretty dg 
+    | null rs   = PP.text "empty" 
+    | otherwise = PP.vcat [ ppnode n rule PP.<$> PP.empty | (n, rule) <- rs]
+    where 
+      wdg = dependencyGraph dg
+      
+      rs = L.sortBy (compare `on` fst) [ (n, rule) | (n, (_, rule)) <- Gr.labNodes wdg]
+      ppnode n rule =
+        PP.int n <> PP.colon <> PP.pretty rule PP.<$$> PP.indent 3
+        (PP.vcat [ arr i <> PP.pretty rule_m  <> PP.colon <> PP.int m | (m,(_, rule_m),i) <- lsuccessors wdg n ])
+      arr i = PP.text "-->_" <> PP.int i
 
 
 

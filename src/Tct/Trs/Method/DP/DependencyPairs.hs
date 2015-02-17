@@ -23,6 +23,7 @@ import qualified Tct.Core.Data               as T
 import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
+import           Tct.Trs.Data.DependencyGraph (estimatedDependencyGraph)
 import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Trs            as Trs
@@ -108,7 +109,7 @@ instance T.Processor DPProcessor where
       wDPs = fromTransformation weaks
       nsig = unite [Prob.signature prob, Trs.signature sDPs, Trs.signature wDPs]
         where unite = Sig.fromMap . M.unions . map Sig.toMap
-      nprob = prob
+      nprob = Prob.sanitiseDPGraph $ prob
         { Prob.startTerms = Prob.BasicTerms (Prob.markFun `S.map` Prob.defineds starts) (Prob.constructors starts)
         , Prob.signature  = nsig
 
