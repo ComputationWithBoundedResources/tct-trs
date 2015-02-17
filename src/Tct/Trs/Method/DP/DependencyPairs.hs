@@ -24,6 +24,7 @@ import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem        as Prob
+import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Trs            as Trs
 import qualified Tct.Trs.Data.Signature      as Sig
 

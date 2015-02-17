@@ -26,6 +26,7 @@ import           Data.Typeable
 import qualified Tct.Core.Common.Parser as P
 import qualified Tct.Core.Data          as T
 
+import qualified Tct.Trs.Data.RuleSet   as Rs
 import qualified Tct.Trs.Data.Problem   as Prob
 import           Tct.Trs.Data.Trs       (SelectorExpression (..), Trs)
 import qualified Tct.Trs.Data.Trs       as Trs
@@ -40,7 +41,7 @@ data RuleSelector f v a = RuleSelector
 
 instance Show (RuleSelector f v a) where show = rsName
 
-type RuleSetSelector f v    = RuleSelector f v (Prob.Ruleset f v)
+type RuleSetSelector f v    = RuleSelector f v (Rs.RuleSet f v)
 type ExpressionSelector f v = RuleSelector f v (SelectorExpression f v)
 
 selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
@@ -82,10 +83,10 @@ selInverse s = RuleSelector { rsName = "inverse of " ++ rsName s
 selCombine :: (String -> String -> String) -> (Trs.Trs f v -> Trs.Trs f v -> Trs.Trs f v) -> RuleSetSelector f v -> RuleSetSelector f v -> RuleSetSelector f v
 selCombine cn ctrs s1 s2 = RuleSelector { rsName = cn (rsName s1) (rsName s2)
                                         , rsSelect = fn }
-        where fn prob = Prob.Ruleset { Prob.sdp  = un Prob.sdp
-                                     , Prob.wdp  = un Prob.wdp
-                                     , Prob.strs = un Prob.strs
-                                     , Prob.wtrs = un Prob.wtrs }
+        where fn prob = Rs.RuleSet { Rs.sdps = un Rs.sdps
+                                   , Rs.wdps = un Rs.wdps
+                                   , Rs.strs = un Rs.strs
+                                   , Rs.wtrs = un Rs.wtrs }
                 where rs1 = rsSelect s1 prob
                       rs2 = rsSelect s2 prob
                       un rfn = rfn rs1 `ctrs` rfn rs2
@@ -103,38 +104,38 @@ selInter= selCombine (\ n1 n2 -> "intersect of " ++ n1 ++ " and " ++ n2) Trs.int
 -- | Select rewrite rules, i.e., non dependency pair rules.
 selRules :: RuleSetSelector f v
 selRules = RuleSelector { rsName   = "rewrite-rules" , rsSelect = fn } where
-  fn prob = Prob.Ruleset
-    { Prob.sdp  = Trs.empty
-    , Prob.wdp  = Trs.empty
-    , Prob.strs = Prob.strictTrs prob
-    , Prob.wtrs = Prob.weakTrs prob }
+  fn prob = Rs.RuleSet
+    { Rs.sdps = Trs.empty
+    , Rs.wdps = Trs.empty
+    , Rs.strs = Prob.strictTrs prob
+    , Rs.wtrs = Prob.weakTrs prob }
 
 -- | Select dependency pairs.
 selDPs :: RuleSetSelector f v
 selDPs = RuleSelector { rsName = "DPs" , rsSelect = fn } where
-  fn prob = Prob.Ruleset
-    { Prob.sdp  = Prob.strictDPs prob
-    , Prob.wdp  = Prob.weakDPs prob
-    , Prob.strs = Trs.empty
-    , Prob.wtrs = Trs.empty }
+  fn prob = Rs.RuleSet
+    { Rs.sdps = Prob.strictDPs prob
+    , Rs.wdps = Prob.weakDPs prob
+    , Rs.strs = Trs.empty
+    , Rs.wtrs = Trs.empty }
 
 -- | Select strict rules.
 selStricts :: RuleSetSelector f v
 selStricts = RuleSelector { rsName = "strict-rules" , rsSelect = fn } where
-  fn prob = Prob.Ruleset
-    { Prob.sdp  = Prob.strictDPs prob
-    , Prob.wdp  = Trs.empty
-    , Prob.strs = Prob.strictTrs prob
-    , Prob.wtrs = Trs.empty }
+  fn prob = Rs.RuleSet
+    { Rs.sdps = Prob.strictDPs prob
+    , Rs.wdps = Trs.empty
+    , Rs.strs = Prob.strictTrs prob
+    , Rs.wtrs = Trs.empty }
 
 -- | Select strict rules.
 selWeaks :: RuleSetSelector f v
 selWeaks = RuleSelector { rsName = "weak-rules" , rsSelect = fn } where
-  fn prob = Prob.Ruleset
-    { Prob.sdp  = Trs.empty
-    , Prob.wdp  = Prob.weakDPs prob
-    , Prob.strs = Trs.empty
-    , Prob.wtrs = Prob.weakTrs prob }
+  fn prob = Rs.RuleSet
+    { Rs.sdps = Trs.empty
+    , Rs.wdps = Prob.weakDPs prob
+    , Rs.strs = Trs.empty
+    , Rs.wtrs = Prob.weakTrs prob }
 
 {-
 -- | Select from the dependency graph, using the given function.
@@ -241,14 +242,14 @@ selCloseBackward = selCloseWith mkWdg (\n -> n ++ ", backward closed")
 
 selAnyOf :: (Ord f, Ord v) => RuleSetSelector f v -> ExpressionSelector f v
 selAnyOf s = RuleSelector { rsName = "any " ++ rsName s, rsSelect = f }
-  where f prob = BigOr $ [ SelectDP d | d <- Trs.toList $ Prob.sdp rs `Trs.union` Prob.wdp rs]
-                         ++ [ SelectTrs r | r <- Trs.toList $ Prob.strs rs `Trs.union` Prob.wtrs rs]
+  where f prob = BigOr $ [ SelectDP d | d <- Trs.toList $ Rs.sdps rs `Trs.union` Rs.wdps rs]
+                         ++ [ SelectTrs r | r <- Trs.toList $ Rs.strs rs `Trs.union` Rs.wtrs rs]
           where rs = rsSelect s prob
 
 selAllOf :: (Ord f, Ord v) => RuleSetSelector f v -> ExpressionSelector f v
 selAllOf s = RuleSelector { rsName = "any " ++ rsName s, rsSelect = f }
-  where f prob = BigAnd $ [ SelectDP d | d <- Trs.toList $ Prob.sdp rs `Trs.union` Prob.wdp rs]
-                         ++ [ SelectTrs r | r <- Trs.toList $ Prob.strs rs `Trs.union` Prob.wtrs rs]
+  where f prob = BigAnd $ [ SelectDP d | d <- Trs.toList $ Rs.sdps rs `Trs.union` Rs.wdps rs]
+                         ++ [ SelectTrs r | r <- Trs.toList $ Rs.strs rs `Trs.union` Rs.wtrs rs]
           where rs = rsSelect s prob
 
 {-

@@ -27,6 +27,7 @@ import qualified Tct.Core.Common.Xml    as Xml
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem   as Prob
+import qualified Tct.Trs.Data.ProblemKind as Prob
 import           Tct.Trs.Data.Rewriting (isUnifiableWith)
 import qualified Tct.Trs.Data.Signature as Sig
 import qualified Tct.Trs.Data.Trs       as Trs

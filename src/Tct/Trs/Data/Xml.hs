@@ -14,7 +14,7 @@ import           Tct.Trs.Data.Signature (Signature)
 import qualified Tct.Trs.Data.Signature as Sig
 import           Tct.Trs.Data.Trs (Trs)
 import qualified Tct.Trs.Data.Trs as Trs
-import           Tct.Trs.Data.Problem (Strategy (..))
+import qualified Tct.Trs.Data.ProblemKind as Prob
 import qualified Tct.Trs.Data.Problem as Prob
 
 
@@ -38,15 +38,15 @@ instance Xml f => Xml (Signature f) where
     where symb f i = elt "symbol" [ toXml f, elt "arity" [text $ show i] ]
   toCeTA = toXml
 
-instance Xml Strategy where
+instance Xml Prob.Strategy where
   toXml s = elt "strategy" $ (:[]) $ case s of
-    Innermost -> elt "innermost" []
-    Outermost -> elt "outermost" []
-    Full      -> elt "full" []
+    Prob.Innermost -> elt "innermost" []
+    Prob.Outermost -> elt "outermost" []
+    Prob.Full      -> elt "full" []
   toCeTA s = elt "strategy" $ case s of
-    Innermost -> [elt "innermost" []]
-    Outermost -> [elt "outermost" []]
-    Full      -> []
+    Prob.Innermost -> [elt "innermost" []]
+    Prob.Outermost -> [elt "outermost" []]
+    Prob.Full      -> []
 
 
 startTerms :: (Xml f, Ord f) => Prob.StartTerms f -> Signature f -> XmlContent

@@ -39,6 +39,7 @@ import qualified Tct.Common.SMT                     as SMT
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem                as Prob
+import qualified Tct.Trs.Data.ProblemKind            as Prob
 import qualified Tct.Trs.Data.RuleSelector           as Trs
 import qualified Tct.Trs.Data.Signature              as Sig
 import qualified Tct.Trs.Data.Trs                    as Trs

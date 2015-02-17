@@ -1,7 +1,13 @@
-module Tct.Trs.Method.DP.DependencyGraph where
+module Tct.Trs.Data.DependencyGraph 
+  ( 
+  DependencyGraph (..)
+  , empty
+  , DG 
+  , CDG
+  , estimatedDependencyGraph 
+  ) where
 
 import           Control.Monad.State.Strict
-import qualified Data.Set as S
 import Data.Maybe (catMaybes, isNothing, fromMaybe)
 import qualified Data.List as L ((\\))
 
@@ -11,14 +17,13 @@ import Data.Graph.Inductive.Query.DFS (dfs)
 import qualified Data.Graph.Inductive.Query.DFS as DFS
 import Data.Graph.Inductive.Query.BFS (bfsn)
 
-import qualified Data.Rewriting.Rules        as RS
 import qualified Data.Rewriting.Term         as R
 import qualified Data.Rewriting.Rule         as R (Rule (..))
 import qualified Data.Rewriting.Substitution as R
 
-import Tct.Trs.Data
+import qualified Tct.Trs.Data.RuleSet as Rs
 import qualified Tct.Trs.Data.Trs as Trs
-import qualified Tct.Trs.Data.Problem as Prob
+import qualified Tct.Trs.Data.ProblemKind as Prob
 
 
 --- * dependency graph -----------------------------------------------------------------------------------------------
@@ -27,22 +32,25 @@ type NodeId = Gr.Node
 
 data Strictness = StrictDP | WeakDP deriving (Ord, Eq, Show)
 
-type DGNode = (Strictness, R.Rule F V)
-type DG = Graph DGNode Int
+type DGNode f v = (Strictness, R.Rule f v)
+type DG f v = Graph (DGNode f v) Int
 
-data CDGNode = CongrNode 
-  { theSCC   :: [(NodeId, DGNode)]
+data CDGNode f v = CDGNode 
+  { theSCC   :: [(NodeId, DGNode f v)]
   , isCyclic :: Bool } 
-  deriving (Show)
+  deriving (Eq, Show)
 
-type CDG = Graph CDGNode (R.Rule F V, Int)
+type CDG f v = Graph (CDGNode f v) (R.Rule f v, Int)
 
 type Graph n e = Gr.Gr n e
 
-data DependencyGraph = DependencyGraph
-  { dependencyGraph :: DG 
-  , congruenceGraph :: CDG }
+data DependencyGraph f v = DependencyGraph
+  { dependencyGraph :: DG f v
+  , congruenceGraph :: CDG f v
+  } deriving (Eq, Show)
 
+empty :: DependencyGraph f v
+empty = DependencyGraph Gr.empty Gr.empty
 
 --- * inspection -----------------------------------------------------------------------------------------------------
 
@@ -123,23 +131,22 @@ subGraph g ns = Gr.delNodes (nodes g L.\\ ns) g
 --- * estimated dependency graph -------------------------------------------------------------------------------------
 
 
-data Approximation = ICapStar
-
-data Unique v = S v | U v | T v | V v deriving (Eq, Ord, Show)
+data Unique v = S v | U v | T v | Some v deriving (Eq, Ord, Show)
 data Fresh v = Old v | Fresh Int deriving (Eq, Ord, Show)
 
 freshVar :: State Int (R.Term f (Fresh v))
 freshVar = (R.Var . Fresh) `liftM` (modify succ >> get)
 
-estimatedDependencyGraph :: Approximation -> Problem F V -> DependencyGraph
-estimatedDependencyGraph approx prob = DependencyGraph dg cdg where
-  dg = estimatedDependencyGraph' approx prob
-  cdg = undefined
+estimatedDependencyGraph :: (Ord f, Ord v) => Rs.RuleSet f v -> Prob.Strategy -> DependencyGraph f v
+estimatedDependencyGraph rs strat  = DependencyGraph dg cdg where
+  dg  = estimatedDependencyGraph' rs strat
+  cdg = toCongruenceGraph dg
 
-estimatedDependencyGraph' :: (Gr.Graph gr, Ord v, Ord f, Num b, Enum b) => Approximation -> Problem f v -> gr (Strictness, R.Rule f v) b
-estimatedDependencyGraph' ICapStar prob = Gr.mkGraph ns es
+estimatedDependencyGraph' :: (Gr.Graph gr, Ord v, Ord f, Num b, Enum b) 
+  => Rs.RuleSet f v -> Prob.Strategy -> gr (Strictness, R.Rule f v) b
+estimatedDependencyGraph' rs strat = Gr.mkGraph ns es
   where
-    (strictDPs, weakDPs) = (Trs.toList $ Prob.strictDPs prob, Trs.toList $ Prob.weakDPs prob)
+    (strictDPs, weakDPs) = (Trs.toList $ Rs.sdps rs, Trs.toList $ Rs.wdps rs)
     ns = zip [1..] $ [ (StrictDP, r) | r <- strictDPs ] ++ [ (WeakDP, r) | r <- weakDPs ]
     es = [ (n1, n2, i) | (n1,(_,r1)) <- ns, (n2,(_,r2)) <- ns, i <- r1 `edgesTo` r2 ]
     
@@ -151,14 +158,16 @@ estimatedDependencyGraph' ICapStar prob = Gr.mkGraph ns es
     (s,t) `edgeTo` (u,_) = flip evalState 0 $ do
       let 
         (s',t',u') = (R.rename (Old . S) s, R.rename (Old . T) t, R.rename (Old . U) u)
-        trsComponents = Trs.toList $ Prob.trsComponents prob
-        lhss = map (R.rename (Old . V) . R.lhs) trsComponents
-        rhss = map (R.rename (Old . V) . R.rhs) trsComponents
+        trsComponents = Trs.toList (Rs.strs rs) ++ Trs.toList (Rs.wtrs rs)
+        lhss = map (R.rename (Old . Some) . R.lhs) trsComponents
+        rhss = map (R.rename (Old . Some) . R.rhs) trsComponents
         
         unifyNF t1 t2 = case R.unify t1 t2 of
           Just delta -> isQNF (R.apply delta s') && isQNF (R.apply delta u')
           Nothing    -> False
-        qs = if Prob.isInnermostProblem prob then lhss else []
+        qs = case strat of
+          Prob.Innermost -> lhss
+          _ -> []
         isQNF v = all isNothing [ vi `R.match` l | l <- qs, vi <- R.properSubterms v ]
 
       tcap <- icap lhss qs [s', u'] t'
@@ -182,6 +191,25 @@ icap rs qs ss u = icap' u where
   directSubterms (R.Var _)    = []
   directSubterms (R.Fun _ ts) = ts
   isQNF t = all isNothing [t `R.match` q | q <- qs]
+
+
+
+--- * congruence graph -----------------------------------------------------------------------------------------------
+
+toCongruenceGraph :: DG f v -> CDG f v
+toCongruenceGraph gr = Gr.mkGraph ns es
+  where 
+    ns    = zip [1..] [sccNode scc | scc <- DFS.scc gr]
+    sccNode scc = CDGNode 
+      { theSCC   = [ (n, lookupNodeLabel' gr n) | n <- scc]
+      , isCyclic = checkCyclic scc}
+    checkCyclic [n] = n `elem` successors gr n
+    checkCyclic _   = True
+
+    es    = [ (n1, n2, i) | (n1, cn1) <- ns, (n2, cn2) <- ns,  n1 /= n2, i <- cn1 `edgesTo` cn2 ]
+
+    cn1 `edgesTo` cn2 = 
+      [ (r1, i) | (n1,(_,r1)) <- theSCC cn1, (n, _, i) <- lsuccessors gr n1, n `elem` map fst (theSCC cn2)]
 
 
 

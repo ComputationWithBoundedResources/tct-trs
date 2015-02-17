@@ -12,37 +12,18 @@ import qualified Data.Rewriting.Term as R
 import qualified Tct.Core.Common.Pretty  as PP
 import qualified Tct.Core.Common.Xml     as Xml
 
+import Tct.Trs.Data.DependencyGraph (DependencyGraph)
+import qualified Tct.Trs.Data.DependencyGraph as DPG
+import Tct.Trs.Data.ProblemKind
+import Tct.Trs.Data.RuleSet
 import Tct.Trs.Data.Trs (Trs)
 import qualified Tct.Trs.Data.Trs as Trs
 
-import Tct.Trs.Data.Signature (Signature, Symbols)
+import Tct.Trs.Data.Signature (Signature)
 import qualified Tct.Trs.Data.Signature as Sig
 
 
-data StartTerms f
-  = AllTerms 
-    { alls         :: Symbols f }
-  | BasicTerms 
-    { defineds     :: Symbols f
-    , constructors :: Symbols f }
-  deriving (Show, Eq)
-
-data Strategy
-  = Innermost
-  | Outermost
-  | Full
-  deriving (Show, Eq)
-
-
--- | Annotated function symbol.
-data AFun f
-  = TrsFun f
-  | DpFun f
-  | ComFun Int
-  deriving (Eq, Ord, Show, Typeable)
-
-
-
+-- | The problem type.
 data Problem f v = Problem
   { startTerms :: StartTerms f
   , strategy   :: Strategy
@@ -52,7 +33,16 @@ data Problem f v = Problem
   , strictTrs  :: Trs f v
   , weakDPs    :: Trs f v
   , weakTrs    :: Trs f v
+
+  , dpGraph    :: DependencyGraph f v 
   } deriving (Show, Eq)
+
+-- | Annotated function symbol.
+data AFun f
+  = TrsFun f
+  | DpFun f
+  | ComFun Int
+  deriving (Eq, Ord, Show, Typeable)
 
 newtype F = F (AFun BS.ByteString)
   deriving (Eq, Ord, Show, Typeable)
@@ -92,7 +82,14 @@ instance Xml.Xml V where
 type TrsProblem = Problem F V
 
 sanitise :: (Ord f, Ord v) => Problem f v -> Problem f v
-sanitise prob = prob 
+sanitise = sanitiseDPGraph . sanitiseDPGraph
+
+sanitiseDPGraph :: (Ord f, Ord v) => Problem f v -> Problem f v
+sanitiseDPGraph prob = prob
+  { dpGraph = DPG.estimatedDependencyGraph (ruleSet prob) (strategy prob) }
+
+sanitiseSignature :: (Ord f, Ord v) => Problem f v -> Problem f v
+sanitiseSignature prob = prob 
   { startTerms = restrictST (startTerms prob)
   , signature  = sig }
   where 
@@ -115,7 +112,9 @@ fromRewriting prob = Problem
   , strictDPs  = Trs.empty
   , strictTrs  = sTrs
   , weakDPs    = Trs.empty
-  , weakTrs    = wTrs }
+  , weakTrs    = wTrs 
+  
+  , dpGraph = DPG.empty }
   where 
     toFun (R.Rule l r) = let k = R.map (F . TrsFun . BS.pack) (V . BS.pack) in R.Rule (k l) (k r)
     sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)
@@ -178,22 +177,12 @@ isTrivial prob = Trs.null (strictDPs prob) && Trs.null (strictComponents prob)
 
 
 -- * ruleset
-data Ruleset f v = Ruleset
-  { sdp  :: Trs.Trs f v -- ^ strict dependency pairs                          
-  , wdp  :: Trs.Trs f v -- ^ weak dependency pairs
-  , strs :: Trs.Trs f v -- ^ strict rules
-  , wtrs :: Trs.Trs f v -- ^ weak rules
-  }
-
-ruleset :: Problem f v -> Ruleset f v
-ruleset prob = Ruleset 
-  { sdp  = strictDPs prob
-  , wdp  = weakDPs prob
+ruleSet :: Problem f v -> RuleSet f v
+ruleSet prob = RuleSet 
+  { sdps = strictDPs prob
+  , wdps = weakDPs prob
   , strs = strictTrs prob
   , wtrs = weakTrs prob }
-
-emptyRuleset :: Ruleset f v
-emptyRuleset = Ruleset Trs.empty Trs.empty Trs.empty Trs.empty
 
 
 -- * pretty printing
