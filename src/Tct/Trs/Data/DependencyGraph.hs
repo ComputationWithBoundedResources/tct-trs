@@ -1,15 +1,25 @@
 module Tct.Trs.Data.DependencyGraph 
   ( 
   nodes
-  
+  , lnodes
+  , roots
+  , leafs
+  , lookupNodeLabel
+  , lookupNodeLabel'
+  , withNodeLabels'
+  , removeNodes
+  , reachablesDfs
+
   , estimatedDependencyGraph 
   -- * dependency graph
   , DependencyGraph (..)
+  , NodeId
   , empty
-  , DG, DGNode
+  , DG, DGNode (..)
 
   -- * congruence graph
   , CDG, CDGNode (..)
+  , toCongruenceGraph
   , isCyclicNode
   ) where
 
@@ -21,7 +31,7 @@ import qualified Data.List as L
 
 import qualified Data.Graph.Inductive as Gr
 {-import Data.Graph.Inductive.Basic (undir)-}
-{-import Data.Graph.Inductive.Query.DFS (dfs)-}
+import Data.Graph.Inductive.Query.DFS (dfs)
 import qualified Data.Graph.Inductive.Query.DFS as DFS
 {-import Data.Graph.Inductive.Query.BFS (bfsn)-}
 
@@ -30,6 +40,7 @@ import qualified Data.Rewriting.Rule         as R (Rule (..))
 import qualified Data.Rewriting.Substitution as R
 
 import qualified Tct.Core.Common.Pretty as PP
+import qualified Tct.Core.Common.Xml as Xml
 
 import qualified Tct.Trs.Data.RuleSet as Rs
 import qualified Tct.Trs.Data.Trs as Trs
@@ -40,9 +51,10 @@ import qualified Tct.Trs.Data.ProblemKind as Prob
 
 type NodeId = Gr.Node
 
-data Strictness = StrictDP | WeakDP deriving (Ord, Eq, Show)
-
-type DGNode f v = (Strictness, R.Rule f v)
+data DGNode f v = DGNode
+  { theRule  :: R.Rule f v
+  , isStrict :: Bool }
+  deriving (Eq, Show)
 type DG f v = Graph (DGNode f v) Int
 
 data CDGNode f v = CDGNode 
@@ -67,14 +79,14 @@ empty = DependencyGraph Gr.empty Gr.empty
 nodes :: Graph n e -> [NodeId]
 nodes = Gr.nodes
 
-{-lnodes :: Graph n e -> [(NodeId,n)]-}
-{-lnodes = Gr.labNodes-}
+lnodes :: Graph n e -> [(NodeId,n)]
+lnodes = Gr.labNodes
 
-{-roots :: Graph n e -> [NodeId]-}
-{-roots gr = [n | n <- Gr.nodes gr, Gr.indeg gr n == 0]-}
+roots :: Graph n e -> [NodeId]
+roots gr = [n | n <- Gr.nodes gr, Gr.indeg gr n == 0]
 
-{-leafs :: Graph n e -> [NodeId]-}
-{-leafs gr = [n | n <- Gr.nodes gr, Gr.outdeg gr n == 0]-}
+leafs :: Graph n e -> [NodeId]
+leafs gr = [n | n <- Gr.nodes gr, Gr.outdeg gr n == 0]
 
 lookupNodeLabel :: Graph n e -> NodeId -> Maybe n
 lookupNodeLabel = Gr.lab
@@ -86,8 +98,8 @@ lookupNodeLabel' gr n = err `fromMaybe` lookupNodeLabel gr n
 {-withNodeLabels :: Graph n e -> [NodeId] -> [(NodeId, Maybe n)]-}
 {-withNodeLabels gr ns = [(n, lookupNodeLabel gr n) | n <- ns]-}
 
-{-withNodeLabels' :: Graph n e -> [NodeId] -> [(NodeId, n)]-}
-{-withNodeLabels' gr ns = [(n, lookupNodeLabel' gr n) | n <- ns]-}
+withNodeLabels' :: Graph n e -> [NodeId] -> [(NodeId, n)]
+withNodeLabels' gr ns = [(n, lookupNodeLabel' gr n) | n <- ns]
 
 {-lookupNode :: Eq n => Graph n e -> n -> Maybe NodeId-}
 {-lookupNode gr n = lookup n [(n',i) | (i,n') <- Gr.labNodes gr]-}
@@ -116,8 +128,8 @@ successors = Gr.suc
 {-reachablesBfs :: Graph n e -> [NodeId] -> [NodeId]-}
 {-reachablesBfs = flip bfsn-}
 
-{-reachablesDfs :: Graph n e -> [NodeId] -> [NodeId]-}
-{-reachablesDfs = flip dfs-}
+reachablesDfs :: Graph n e -> [NodeId] -> [NodeId]
+reachablesDfs = flip dfs
 
 {-predecessors :: Graph n e -> NodeId -> [NodeId]-}
 {-predecessors = Gr.pre-}
@@ -137,6 +149,18 @@ lsuccessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lsuc gr nde]
 {-subGraph :: Graph n e -> [NodeId] -> Graph n e-}
 {-subGraph g ns = Gr.delNodes (nodes g L.\\ ns) g-}
 
+removeNodes :: Graph n e -> [NodeId] -> Graph n e
+removeNodes g ns = Gr.delNodes ns g
+
+
+{-dpsFromNodeLabels :: (Ord f, Ord v) => [(NodeId, DGNode f v)] -> Trs.Trs f v-}
+{-dpsFromNodeLabels = Trs.fromList . map theRule .  snd . unzip-}
+
+{-sdpsFromNodeLabels :: (Ord f, Ord v) => [(NodeId, DGNode f v)] -> Trs.Trs f v-}
+{-sdpsFromNodeLabels = Trs.fromList . map theRule . filter isStrict.  snd . unzip-}
+
+{-wdpsFromNodeLables :: (Ord f, Ord v) => [(NodeId, DGNode f v)] -> Trs.Trs f v-}
+{-wdpsFromNodeLables = Trs.fromList . map theRule . filter isStrict.  snd . unzip-}
 
 --- * estimated dependency graph -------------------------------------------------------------------------------------
 
@@ -152,13 +176,13 @@ estimatedDependencyGraph rs strat  = DependencyGraph dg cdg where
   dg  = estimatedDependencyGraph' rs strat
   cdg = toCongruenceGraph dg
 
-estimatedDependencyGraph' :: (Gr.Graph gr, Ord v, Ord f, Num b, Enum b) 
-  => Rs.RuleSet f v -> Prob.Strategy -> gr (Strictness, R.Rule f v) b
+estimatedDependencyGraph' :: 
+  (Gr.Graph gr, Ord v, Ord f, Num b, Enum b) => Rs.RuleSet f v -> Prob.Strategy -> gr (DGNode f v) b   
 estimatedDependencyGraph' rs strat = Gr.mkGraph ns es
   where
     (strictDPs, weakDPs) = (Trs.toList $ Rs.sdps rs, Trs.toList $ Rs.wdps rs)
-    ns = zip [1..] $ [ (StrictDP, r) | r <- strictDPs ] ++ [ (WeakDP, r) | r <- weakDPs ]
-    es = [ (n1, n2, i) | (n1,(_,r1)) <- ns, (n2,(_,r2)) <- ns, i <- r1 `edgesTo` r2 ]
+    ns = zip [1..] $ [ DGNode r True | r <- strictDPs ] ++ [ DGNode r False | r <- weakDPs ]
+    es = [ (n1, n2, i) | (n1,r1) <- ns, (n2,r2) <- ns, i <- theRule r1 `edgesTo` theRule r2 ]
     
     (R.Rule s _) `edgesTo` (R.Rule u v)=
       case v of
@@ -221,7 +245,7 @@ toCongruenceGraph gr = Gr.mkGraph ns es
     es    = [ (n1, n2, i) | (n1, cn1) <- ns, (n2, cn2) <- ns,  n1 /= n2, i <- cn1 `edgesTo` cn2 ]
 
     cn1 `edgesTo` cn2 = 
-      [ (r1, i) | (n1,(_,r1)) <- theSCC cn1, (n, _, i) <- lsuccessors gr n1, n `elem` map fst (theSCC cn2)]
+      [ (theRule r1, i) | (n1,r1) <- theSCC cn1, (n, _, i) <- lsuccessors gr n1, n `elem` map fst (theSCC cn2)]
 
 {-allRulesFromNode :: CDG f v -> NodeId -> [(Strictness, R.Rule f v)]-}
 {-allRulesFromNode gr n = case lookupNodeLabel gr n of -}
@@ -241,18 +265,26 @@ isCyclicNode cdg n = isCyclic $ lookupNodeLabel' cdg n
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
-instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (DependencyGraph f v) where 
-  pretty dg 
+instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (DG f v) where 
+  pretty wdg 
     | null rs   = PP.text "empty" 
     | otherwise = PP.vcat [ ppnode n rule PP.<$> PP.empty | (n, rule) <- rs]
     where 
-      wdg = dependencyGraph dg
-      
-      rs = L.sortBy (compare `on` fst) [ (n, rule) | (n, (_, rule)) <- Gr.labNodes wdg]
+      rs = L.sortBy (compare `on` fst) [ (n, theRule r) | (n, r) <- Gr.labNodes wdg]
       ppnode n rule =
         PP.int n <> PP.colon <> PP.pretty rule PP.<$$> PP.indent 3
-        (PP.vcat [ arr i <> PP.pretty rule_m  <> PP.colon <> PP.int m | (m,(_, rule_m),i) <- lsuccessors wdg n ])
+        (PP.vcat [ arr i <> PP.pretty (theRule r_m)  <> PP.colon <> PP.int m | (m,r_m,i) <- lsuccessors wdg n ])
       arr i = PP.text "-->_" <> PP.int i
+
+
+instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (DG f v) where
+  toXml wdg  = 
+    Xml.elt "dependencygraph" [xmlnodes, xmledges]
+    where
+      xmlnodes = Xml.elt "nodes" [ Xml.toXml (n, theRule cn)| (n,cn) <- lnodes wdg ]
+      xmledges = Xml.elt "edges" 
+        [  Xml.elt "edge" $ xmlnode "source" n :[ xmlnode "target" m | m <- successors wdg n] | n <- nodes wdg ]
+      xmlnode s n = Xml.elt s [Xml.int n]
 
 
 

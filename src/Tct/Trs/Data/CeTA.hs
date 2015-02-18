@@ -32,7 +32,6 @@ import qualified Tct.Core.Data        as T
 import qualified Tct.Common.CeTA      as C
 
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Data.Xml     ()
 
 
 -- MS:

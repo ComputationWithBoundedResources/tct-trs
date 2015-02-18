@@ -11,11 +11,14 @@ module Tct.Trs.Data.Signature
   , restrictSignature
   ) where
 
+import qualified Tct.Core.Common.Pretty as PP
+import qualified Tct.Core.Common.Xml    as Xml
 
-import qualified Data.Map.Strict as M
-import           Data.Maybe      (fromMaybe)
-import qualified Data.Set        as S
-import           Prelude         hiding (filter)
+
+import qualified Data.Map.Strict        as M
+import           Data.Maybe             (fromMaybe)
+import qualified Data.Set               as S
+import           Prelude                hiding (filter)
 
 
 newtype Signature f = Signature (M.Map f Int)
@@ -43,7 +46,7 @@ arity sig f = err `fromMaybe` M.lookup f (toMap sig)
 symbols :: Signature f -> Symbols f
 symbols = M.keysSet . toMap
 
--- | Returns function symbols together with their arity. 
+-- | Returns function symbols together with their arity.
 elems :: Signature f -> [(f, Int)]
 elems = M.assocs . toMap
 
@@ -56,4 +59,15 @@ filter g = onSignature (M.filterWithKey k)
 restrictSignature :: Ord f => Signature f -> Symbols f -> Signature f
 restrictSignature sig fs = onSignature (M.filterWithKey k) sig
   where k f _ = f `S.member` fs
+
+
+--- * proofdata ------------------------------------------------------------------------------------------------------
+
+instance PP.Pretty f => PP.Pretty (f, Int) where
+  pretty (f,i) = PP.tupled [PP.pretty f, PP.int i]
+
+instance Xml.Xml f => Xml.Xml (Signature f) where
+  toXml sig = Xml.elt "signature" [ symb f i | (f,i) <- elems sig ]
+    where symb f i = Xml.elt "symbol" [ Xml.toXml f, Xml.elt "arity" [Xml.int i] ]
+  toCeTA = Xml.toXml
 

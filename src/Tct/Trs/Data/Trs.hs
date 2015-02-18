@@ -40,6 +40,7 @@ import qualified Data.Set               as S
 import           Data.Typeable
 import           Prelude                hiding (filter, concat, map, null)
 
+import qualified Tct.Core.Common.Xml as Xml
 import qualified Tct.Core.Common.Pretty as PP
 
 import           Data.Rewriting.Rule    (Rule)
@@ -169,13 +170,35 @@ isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is dupl
 
 
 -- * pretty printing --
-instance PP.Pretty f => PP.Pretty (f, Int) where
-  pretty (f,i) = PP.tupled [PP.pretty f, PP.int i]
-
 ppTrs :: (PP.Pretty f, PP.Pretty v) => Trs f v -> PP.Doc
 ppTrs = F.foldl k PP.empty
   where k doc rs = doc PP.<$$> PP.pretty rs
 
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
   pretty = ppTrs
+
+instance (Ord f, Ord v, PP.Pretty f, PP.Pretty v) => PP.Pretty [R.Rule f v] where
+  pretty = ppTrs . fromList
+
+instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Term f v) where
+  toXml (R.Fun f ts) = Xml.elt "funapp" $ Xml.toXml f :  [ Xml.elt "arg" [Xml.toXml t] | t <- ts ]
+  toXml (R.Var v)    = Xml.toXml v
+  toCeTA = Xml.toXml
+
+instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Rule f v) where
+  toXml r = Xml.elt "rule" 
+    [ Xml.elt "lhs" [Xml.toXml $ R.lhs r]
+    , Xml.elt "rhs" [Xml.toXml $ R.rhs r] ]
+  toCeTA = Xml.toXml
+
+instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Int, R.Rule f v) where
+  toXml (i,r) = Xml.toXml r `Xml.setAtts` [Xml.att "rid" (show i)]
+
+instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Trs f v) where
+  toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- toList rs ]
+  toCeTA = Xml.toXml
+
+instance (Xml.Xml f, Xml.Xml v) => Xml.Xml [R.Rule f v] where
+  toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- rs ]
+  toCeTA   = Xml.toXml
 

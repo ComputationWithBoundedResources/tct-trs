@@ -1,27 +1,27 @@
 module Tct.Trs.Data.Problem
   where
 
-import Data.Typeable
-import Control.Applicative ((<|>))
-import qualified Data.Set as S
-import qualified Data.ByteString.Char8 as BS
+import           Control.Applicative          ((<|>))
+import qualified Data.ByteString.Char8        as BS
+import qualified Data.Set                     as S
+import           Data.Typeable
 
-import qualified Data.Rewriting.Problem as R
-import qualified Data.Rewriting.Rule as R (Rule (..))
-import qualified Data.Rewriting.Term as R
+import qualified Data.Rewriting.Problem       as R
+import qualified Data.Rewriting.Rule          as R (Rule (..))
+import qualified Data.Rewriting.Term          as R
 
-import qualified Tct.Core.Common.Pretty  as PP
-import qualified Tct.Core.Common.Xml     as Xml
+import qualified Tct.Core.Common.Pretty       as PP
+import qualified Tct.Core.Common.Xml          as Xml
 
-import Tct.Trs.Data.DependencyGraph (DependencyGraph, DG, CDG)
+import           Tct.Trs.Data.DependencyGraph (CDG, DG, DependencyGraph)
 import qualified Tct.Trs.Data.DependencyGraph as DPG
-import Tct.Trs.Data.ProblemKind
-import Tct.Trs.Data.RuleSet
-import Tct.Trs.Data.Trs (Trs)
-import qualified Tct.Trs.Data.Trs as Trs
+import           Tct.Trs.Data.ProblemKind
+import           Tct.Trs.Data.RuleSet
+import           Tct.Trs.Data.Trs             (Trs)
+import qualified Tct.Trs.Data.Trs             as Trs
 
-import Tct.Trs.Data.Signature (Signature)
-import qualified Tct.Trs.Data.Signature as Sig
+import           Tct.Trs.Data.Signature       (Signature)
+import qualified Tct.Trs.Data.Signature       as Sig
 
 
 -- | The problem type.
@@ -35,7 +35,7 @@ data Problem f v = Problem
   , weakDPs    :: Trs f v
   , weakTrs    :: Trs f v
 
-  , dpGraph    :: DependencyGraph f v 
+  , dpGraph    :: DependencyGraph f v
   } deriving (Show, Eq)
 
 dependencyGraph :: Problem f v -> DG f v
@@ -54,7 +54,7 @@ data AFun f
 newtype F = F (AFun BS.ByteString)
   deriving (Eq, Ord, Show, Typeable)
 
-markFun :: F -> F 
+markFun :: F -> F
 markFun (F (TrsFun f)) = F (DpFun f)
 markFun _              = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
 
@@ -95,11 +95,14 @@ sanitiseDPGraph :: (Ord f, Ord v) => Problem f v -> Problem f v
 sanitiseDPGraph prob = prob
   { dpGraph = DPG.estimatedDependencyGraph (ruleSet prob) (strategy prob) }
 
+-- MS: TODO should startterms be restricted in subproblems?
+-- check and comment; I think it is necessary for ceta unknwon proofs to work
+-- should we restrict this to ceta output
 sanitiseSignature :: (Ord f, Ord v) => Problem f v -> Problem f v
-sanitiseSignature prob = prob 
+sanitiseSignature prob = prob
   { startTerms = restrictST (startTerms prob)
   , signature  = sig }
-  where 
+  where
     sig   = Sig.restrictSignature (signature prob) (Trs.funs $ allComponents prob)
     allfs = Sig.symbols sig
     restrictST (AllTerms fs)      = AllTerms (fs `S.intersection` allfs)
@@ -119,10 +122,10 @@ fromRewriting prob = Problem
   , strictDPs  = Trs.empty
   , strictTrs  = sTrs
   , weakDPs    = Trs.empty
-  , weakTrs    = wTrs 
-  
+  , weakTrs    = wTrs
+
   , dpGraph = DPG.empty }
-  where 
+  where
     toFun (R.Rule l r) = let k = R.map (F . TrsFun . BS.pack) (V . BS.pack) in R.Rule (k l) (k r)
     sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)
     wTrs = Trs.fromList . map toFun $ R.weakRules (R.rules prob)
@@ -132,7 +135,7 @@ fromRewriting prob = Problem
     cons = Trs.constructorSymbols sig defs
 
 progressUsingSize :: Problem f v -> Problem f v -> Bool
-progressUsingSize p1 p2 = 
+progressUsingSize p1 p2 =
   Trs.size (strictDPs p1) /= Trs.size (strictDPs p2)
   || Trs.size (strictTrs p1) /= Trs.size (strictTrs p2)
   || Trs.size (weakDPs p1) /= Trs.size (weakDPs p2)
@@ -188,14 +191,16 @@ isTrivial prob = Trs.null (strictDPs prob) && Trs.null (strictComponents prob)
 
 -- * ruleset
 ruleSet :: Problem f v -> RuleSet f v
-ruleSet prob = RuleSet 
+ruleSet prob = RuleSet
   { sdps = strictDPs prob
   , wdps = weakDPs prob
   , strs = strictTrs prob
   , wtrs = weakTrs prob }
 
 
--- * pretty printing
+
+--- * proofdata ------------------------------------------------------------------------------------------------------
+
 instance PP.Pretty BS.ByteString where
   pretty = PP.text . BS.unpack
 
@@ -211,4 +216,22 @@ instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
     , PP.text "Weak Rules:"
     , PP.indent 2 $ PP.pretty (weakDPs prob)
     , PP.indent 2 $ PP.pretty (weakTrs prob) ]
+
+
+-- MS: the ceta instance is not complete as it contains a tag <complexityClass> which depends on ProofTree
+-- furthermore CeTA (2.2) only supports polynomial bounds; so we add the tag manually in the output
+instance (Ord f, Ord v, Xml.Xml f, Xml.Xml v) => Xml.Xml (Problem f v) where
+  toXml prob =
+    Xml.elt "problem"
+      [ Xml.elt "strictTrs"         [Xml.toXml (strictTrs prob)]
+      , Xml.elt "weakTrs"           [Xml.toXml (strictTrs prob)]
+      , Xml.elt "strictDPs"         [Xml.toXml (strictTrs prob)]
+      , Xml.elt "weakDPs"           [Xml.toXml (strictTrs prob)] ]
+  toCeTA prob =
+    Xml.elt "complexityInput"
+      [ Xml.elt "trsInput"
+          [ Xml.elt "trs" [Xml.toXml (strictComponents prob)]
+          , Xml.toCeTA (strategy prob)
+          , Xml.elt "relativeRules"     [Xml.toCeTA (weakComponents prob)] ]
+      , Xml.toCeTA (startTerms prob, signature prob) ]
 
