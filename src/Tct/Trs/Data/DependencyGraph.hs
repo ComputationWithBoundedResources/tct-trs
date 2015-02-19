@@ -2,7 +2,6 @@ module Tct.Trs.Data.DependencyGraph
   ( 
   nodes
   , lnodes
-  , rnodes
   , roots
   , leafs
   , lookupNodeLabel
@@ -12,7 +11,9 @@ module Tct.Trs.Data.DependencyGraph
   , reachablesDfs
   , context
   , successors
+  , lsuccessors
   , predecessors
+
 
   , estimatedDependencyGraph 
   -- * dependency graph
@@ -86,12 +87,12 @@ nodes = Gr.nodes
 lnodes :: Graph n e -> [(NodeId,n)]
 lnodes = Gr.labNodes
 
-rnodes :: Graph (DGNode f v) e -> ([(NodeId, R.Rule f v)], [(NodeId, R.Rule f v)])
-rnodes = foldr k ([],[]) . lnodes where
-  k (n,cn) (sr,wr) 
-    | isStrict cn = (e:sr,wr)
-    | otherwise   = (sr,e:wr)
-    where e = (n, theRule cn)
+{-rnodes :: Graph (DGNode f v) e -> ([(NodeId, R.Rule f v)], [(NodeId, R.Rule f v)])-}
+{-rnodes = foldr k ([],[]) . lnodes where-}
+  {-k (n,cn) (sr,wr) -}
+    {-| isStrict cn = (e:sr,wr)-}
+    {-| otherwise   = (sr,e:wr)-}
+    {-where e = (n, theRule cn)-}
 
 roots :: Graph n e -> [NodeId]
 roots gr = [n | n <- Gr.nodes gr, Gr.indeg gr n == 0]

@@ -71,7 +71,8 @@ funs :: (Ord f, Ord v) => Trs f v -> Sig.Symbols f
 funs (TrsT rs) = S.foldl k S.empty rs
   where k acc = S.union acc . S.fromList . R.funs
 
--- FIXME: is not safe
+-- FIXME:
+-- does not check if symbols occur with different arrities ie f/2, f/1
 signature :: Ord f => Trs f v -> Sig.Signature f
 signature rules = Sig.fromMap $ foldl k M.empty (toList rules)
   where

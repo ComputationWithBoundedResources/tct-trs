@@ -2,11 +2,12 @@ module Tct.Trs.Data.Signature
   ( Signature
   , toMap
   , fromMap
+  , onSignature
+  , alter
   , Symbols
   , arity
   , symbols
   , elems
-  , onSignature
   , filter
   , restrictSignature
   ) where
@@ -34,6 +35,9 @@ fromMap = Signature
 
 onSignature :: (M.Map f Int -> M.Map f2 Int) -> Signature f -> Signature f2
 onSignature f = fromMap . f . toMap
+
+alter :: Ord f => (Maybe Int -> Maybe Int) -> f -> Signature f -> Signature f
+alter f k = onSignature (M.alter f k)
 
 type Symbols f = S.Set f
 
