@@ -1,6 +1,6 @@
-module Tct.Trs.Method.DP.DPGraph.RemoveHead
-  ( removeHead
-  , removeHeadDeclaration
+module Tct.Trs.Method.DP.DPGraph.RemoveHeads
+  ( removeHeads
+  , removeHeadsDeclaration
   ) where
 
 
@@ -20,25 +20,31 @@ import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
 
 
-data RemoveHeadProcessor = RemoveHeadProc deriving Show
+{-
 
-data RemoveHeadProof
-  = RemoveHeadProof
-    { wdg_       :: DG F V
-    , removable_ :: [(NodeId, R.Rule F V)] }
-  | RemoveHeadFail
+remove dp rules l#->com(r1#,...,rn#) where all ri# only have starting terms
+
+-}
+
+
+data RemoveHeads = RemoveHeads deriving Show
+
+data RemoveHeadsProof
+  = RemoveHeadsProof
+    { wdg_     :: DG F V
+    , removed_ :: [(NodeId, R.Rule F V)] }
+  | RemoveHeadsFail
   deriving Show
 
-instance T.Processor RemoveHeadProcessor where
-  type ProofObject RemoveHeadProcessor = ApplicationProof RemoveHeadProof
-  type Problem RemoveHeadProcessor     = TrsProblem
+instance T.Processor RemoveHeads where
+  type ProofObject RemoveHeads = ApplicationProof RemoveHeadsProof
+  type Problem RemoveHeads     = TrsProblem
 
-  -- remove dp rules, where right hand sides only have starting terms
   solve p prob =  return . T.resultToTree p prob $
     maybe remhead (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
     where
       remhead
-        | null heads = T.Fail (Applicable RemoveHeadFail)
+        | null heads = T.Fail (Applicable RemoveHeadsFail)
         | otherwise  = T.Success (T.toId nprob) (Applicable proof) T.fromId
         where
           wdg = Prob.dependencyGraph prob
@@ -49,7 +55,7 @@ instance T.Processor RemoveHeadProcessor where
           isBasicC (R.Var _) = True
           isBasicC (R.Fun f ts)
             | Prob.isCompoundf f = all (Prob.isStartTerm st) ts
-            | otherwise          = error "Tct.Trs.Method.DP.DPGraph.RemoveHead: not a compound symbol."
+            | otherwise          = error "Tct.Trs.Method.DP.DPGraph.RemoveHeads: not a compound symbol."
 
           (ns,rs) = Trs.fromList `fmap` unzip heads
           nprob = Prob.sanitiseSignature $ prob
@@ -58,24 +64,24 @@ instance T.Processor RemoveHeadProcessor where
             , Prob.dpGraph   = let ndgraph = wdg `removeNodes` ns in DependencyGraph
               { dependencyGraph = ndgraph
               , congruenceGraph = toCongruenceGraph ndgraph }}
-          proof = RemoveHeadProof { wdg_ = wdg, removable_ = heads }
+          proof = RemoveHeadsProof { wdg_ = wdg, removed_ = heads }
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-removeHead :: T.Strategy TrsProblem
-removeHead = T.Proc RemoveHeadProc
+removeHeads :: T.Strategy TrsProblem
+removeHeads = T.Proc RemoveHeads
 
-removeHeadDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-removeHeadDeclaration = T.declare "removeHead" desc () removeHead
+removeHeadsDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+removeHeadsDeclaration = T.declare "removeHeads" desc () removeHeads
   where desc = ["Removes roots from the dependency graph that lead to starting terms only."]
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
-instance PP.Pretty RemoveHeadProof where
-  pretty RemoveHeadFail      = PP.text "No dependcy pair could be removed."
-  pretty p@RemoveHeadProof{} = PP.vcat
+instance PP.Pretty RemoveHeadsProof where
+  pretty RemoveHeadsFail      = PP.text "No dependcy pair could be removed."
+  pretty p@RemoveHeadsProof{} = PP.vcat
     [ PP.text "Consider the dependency graph"
     , PP.empty
     , PP.pretty (wdg_ p)
@@ -84,11 +90,11 @@ instance PP.Pretty RemoveHeadProof where
         [ "Following roots of the dependency graph are removed, as the considered set of starting terms is"
         , "closed under reduction with respect to these rules (modulo compound contexts)." ]
     , PP.empty
-    , PP.pretty (removable_ p) ]
+    , PP.pretty (removed_ p) ]
 
-instance Xml.Xml RemoveHeadProof where
-  toXml RemoveHeadFail      = Xml.elt "removeHead" []
-  toXml p@RemoveHeadProof{} = Xml.elt "removeHead"
+instance Xml.Xml RemoveHeadsProof where
+  toXml RemoveHeadsFail      = Xml.elt "removeHeads" []
+  toXml p@RemoveHeadsProof{} = Xml.elt "removeHeads"
     [ Xml.toXml (wdg_ p)
-    , Xml.elt "removeHeads" $ map Xml.toXml (removable_ p) ]
+    , Xml.elt "removeHead" $ map Xml.toXml (removed_ p) ]
 

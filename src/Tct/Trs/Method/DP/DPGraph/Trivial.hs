@@ -16,16 +16,16 @@ import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Trs             as Trs (empty)
 
 
-data TrivialProcessor = TrivialProc deriving Show
+data Trivial = Trivial deriving Show
 
 data TrivialProof
   = TrivialProof { wdg_ :: DG F V }
   | TrivialFail
   deriving Show
 
-instance T.Processor TrivialProcessor where
-  type ProofObject TrivialProcessor = ApplicationProof TrivialProof
-  type Problem TrivialProcessor     = TrsProblem
+instance T.Processor Trivial where
+  type ProofObject Trivial = ApplicationProof TrivialProof
+  type Problem Trivial     = TrsProblem
 
   solve p prob = return . T.resultToTree p prob $
     maybe cyclic (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
@@ -56,7 +56,7 @@ trivialDeclaration = T.declare "trivial" desc () trivial where
     , "Only applicable if the strict component is empty."]
 
 trivial :: T.Strategy TrsProblem
-trivial = T.Proc TrivialProc
+trivial = T.Proc Trivial
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

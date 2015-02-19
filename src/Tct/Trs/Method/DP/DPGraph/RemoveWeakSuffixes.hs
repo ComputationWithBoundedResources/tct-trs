@@ -1,11 +1,10 @@
-module Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffix
+module Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes
   ( removeWeakSuffix
   , removeWeakSuffixDeclaration
   ) where
 
 
 import qualified Data.Set as S
-import qualified Data.Graph.Inductive as Gr
 
 import qualified Data.Rewriting.Rule as R (Rule)
 
@@ -21,27 +20,37 @@ import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 
 
-data RemoveWeakSuffixProcessor = RemoveWeakSuffixProc deriving Show
+{-
 
-data RemoveWeakSuffixProof
-  = RemoveWeakSuffixProof
+Remove Weak Suffixes:
+
+let Wl# be forward closed then
+
+<S#/W# + W, Q, T@> : f
+<S#/W# + Wl# + W, Q, T@> : f
+
+-}
+
+data RemoveWeakSuffixes = RemoveWeakSuffixes deriving Show
+
+data RemoveWeakSuffixesProof
+  = RemoveWeakSuffixesProof
     { wdg_       :: DG F V
     , removable_ :: [(NodeId, R.Rule F V)] }
-  | RemoveWeakSuffixFail
+  | RemoveWeakSuffixesFail
   deriving Show
 
-instance T.Processor RemoveWeakSuffixProcessor where
-  type ProofObject RemoveWeakSuffixProcessor = ApplicationProof RemoveWeakSuffixProof
-  type Problem RemoveWeakSuffixProcessor     = TrsProblem
+instance T.Processor RemoveWeakSuffixes where
+  type ProofObject RemoveWeakSuffixes = ApplicationProof RemoveWeakSuffixesProof
+  type Problem RemoveWeakSuffixes     = TrsProblem
 
-  -- strict trs rules have to be empty
   -- an scc in the congruence graph is considered weak if all rules in the scc are weak
   -- compute maximal weak suffix bottom-up
   solve p prob =  return . T.resultToTree p prob $
     maybe remtail (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
     where
       remtail
-        | null initials = T.Fail (Applicable RemoveWeakSuffixFail)
+        | null initials = T.Fail (Applicable RemoveWeakSuffixesFail)
         | otherwise     = T.Success (T.toId nprob) (Applicable proof) T.fromId
         where
           onlyWeaks = not . any (isStrict . snd) . theSCC
@@ -51,7 +60,7 @@ instance T.Processor RemoveWeakSuffixProcessor where
             | n `S.member` lfs = computeTails ns lfs
             | otherwise        = computeTails (ns++preds) lfs'
               where
-                (lpreds, _, cn, lsucs) = Gr.context cdg n
+                (lpreds, _, cn, lsucs) = context cdg n
                 sucs  = map snd lsucs
                 preds = map snd lpreds
                 lfs'  = if S.fromList sucs `S.isSubsetOf` lfs && onlyWeaks cn
@@ -73,13 +82,13 @@ instance T.Processor RemoveWeakSuffixProcessor where
             , Prob.dpGraph   = DependencyGraph
               { dependencyGraph = wdg `removeNodes` wdgTail
               , congruenceGraph = cdg `removeNodes` cdgTail }}
-          proof = RemoveWeakSuffixProof { wdg_ = wdg, removable_ = wdgLabTail }
+          proof = RemoveWeakSuffixesProof { wdg_ = wdg, removable_ = wdgLabTail }
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
 removeWeakSuffixDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-removeWeakSuffixDeclaration = T.declare "removeWeakSuffix" desc () removeWeakSuffix where
+removeWeakSuffixDeclaration = T.declare "removeWeakSuffixes" desc () removeWeakSuffix where
   desc =
     [ "Removes trailing paths that do not need to be oriented."
     , "Only applicable if the strict component is empty."]
@@ -91,14 +100,14 @@ removeWeakSuffixDeclaration = T.declare "removeWeakSuffix" desc () removeWeakSuf
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
 removeWeakSuffix :: T.Strategy TrsProblem
-removeWeakSuffix = T.Proc RemoveWeakSuffixProc
+removeWeakSuffix = T.Proc RemoveWeakSuffixes
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
-instance PP.Pretty RemoveWeakSuffixProof where
-  pretty RemoveWeakSuffixFail      = PP.text "The dependency graph contains no sub-graph of weak DPs closed under successors."
-  pretty p@RemoveWeakSuffixProof{} = PP.vcat
+instance PP.Pretty RemoveWeakSuffixesProof where
+  pretty RemoveWeakSuffixesFail      = PP.text "The dependency graph contains no sub-graph of weak DPs closed under successors."
+  pretty p@RemoveWeakSuffixesProof{} = PP.vcat
     [ PP.text "Consider the dependency graph"
     , PP.empty
     , PP.pretty (wdg_ p)
@@ -109,10 +118,9 @@ instance PP.Pretty RemoveWeakSuffixProof where
     , PP.empty
     , PP.pretty (removable_ p) ]
 
-instance Xml.Xml RemoveWeakSuffixProof where
-  toXml RemoveWeakSuffixFail      = Xml.elt "removeWeakSuffix" []
-  toXml p@RemoveWeakSuffixProof{} = Xml.elt "removeWeakSuffix"
+instance Xml.Xml RemoveWeakSuffixesProof where
+  toXml RemoveWeakSuffixesFail      = Xml.elt "removeWeakSuffixes" []
+  toXml p@RemoveWeakSuffixesProof{} = Xml.elt "removeWeakSuffixes"
     [ Xml.toXml (wdg_ p)
     , Xml.elt "removeWeakSuffix" $ map Xml.toXml (removable_ p) ]
-
 

@@ -21,22 +21,31 @@ import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
 
 
-data RemoveInapplicableProcessor = RemoveInapplicableProc deriving Show
+{-
+
+removes dependencys pair than can not occur in a derivation wrt to the starting terms
+
+MS: TODO check; for some reason the defined symbols of BasicTerms was not integrated in tct2
+
+-}
+
+data RemoveInapplicable = RemoveInapplicable deriving Show
 
 data RemoveInapplicableProof
   = RemoveInapplicableProof
-  { wdg_         :: DG F V
-  , initials_    :: [(NodeId, R.Rule F V)]
-  , reachable_   :: [(NodeId, R.Rule F V)]
-  , unreachable_ :: [(NodeId, R.Rule F V)] }
+    { wdg_         :: DG F V
+    , initials_    :: [(NodeId, R.Rule F V)]
+    , reachable_   :: [(NodeId, R.Rule F V)]
+    , unreachable_ :: [(NodeId, R.Rule F V)] }
   | RemoveInapplicableFail
   deriving Show
 
-instance T.Processor RemoveInapplicableProcessor where
-  type ProofObject RemoveInapplicableProcessor = ApplicationProof RemoveInapplicableProof
-  type Problem RemoveInapplicableProcessor     = TrsProblem
+instance T.Processor RemoveInapplicable where
+  type ProofObject RemoveInapplicable = ApplicationProof RemoveInapplicableProof
+  type Problem RemoveInapplicable     = TrsProblem
 
-  -- ceck which lhss are startterms; wich rules can be reached
+  -- check lhss of the root nodes in the dependency graph
+  -- compute the forward closure of it
   solve p prob =  return . T.resultToTree p prob $
     maybe reminapp (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
     where
@@ -47,8 +56,6 @@ instance T.Processor RemoveInapplicableProcessor where
           wdg = Prob.dependencyGraph prob
           st  = Prob.startTerms prob
 
-          -- MS: TODO check; for some reason the defined symbols fo BasicTerms was not integrated in tct2
-          -- is this sound for path analysis; dgcompose
           linitials   = [ (n,r) | (n,cn) <- withNodeLabels' wdg (roots wdg), let r = theRule cn, Prob.isStartTerm st (R.lhs r) ]
           reachable   = reachablesDfs wdg $ fst (unzip linitials)
           unreachable = filter (`S.notMember` reachableS) (nodes wdg)
@@ -73,7 +80,7 @@ instance T.Processor RemoveInapplicableProcessor where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 removeInapplicable :: T.Strategy TrsProblem
-removeInapplicable = T.Proc RemoveInapplicableProc
+removeInapplicable = T.Proc RemoveInapplicable
 
 -- | Removes inapplicable rules in DP deriviations.
 --

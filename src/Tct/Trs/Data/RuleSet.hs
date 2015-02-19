@@ -10,6 +10,6 @@ data RuleSet f v = RuleSet
   , wtrs :: Trs f v -- ^ weak rules
   }
 
-emptyRuleset :: RuleSet f v
-emptyRuleset = RuleSet empty empty empty empty
+emptyRuleSet :: RuleSet f v
+emptyRuleSet = RuleSet empty empty empty empty
 

@@ -77,16 +77,18 @@ Library
     Tct.Trs.Data.RuleSet
     Tct.Trs.Data.Signature
     Tct.Trs.Data.Trs
-    Tct.Trs.Data.Xml
-    Tct.Trs.Encoding.UsableRules
     Tct.Trs.Encoding.UsablePositions
+    Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interpretation
-    Tct.Trs.Processor
     Tct.Trs.Method.Compose
     Tct.Trs.Method.DP.DependencyPairs
-    Tct.Trs.Method.DP.UsableRules
+    Tct.Trs.Method.DP.DPGraph.RemoveHeads
+    Tct.Trs.Method.DP.DPGraph.RemoveInapplicable
+    Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes
     Tct.Trs.Method.DP.DPGraph.Trivial
+    Tct.Trs.Method.DP.UsableRules
     Tct.Trs.Method.Poly.NaturalPI
+    Tct.Trs.Processor
   build-depends:
     base           == 4.*,
     bytestring     == 0.10.4.*,

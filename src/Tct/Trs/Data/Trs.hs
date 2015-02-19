@@ -177,8 +177,8 @@ ppTrs = F.foldl k PP.empty
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
   pretty = ppTrs
 
-instance (Ord f, Ord v, PP.Pretty f, PP.Pretty v) => PP.Pretty [R.Rule f v] where
-  pretty = ppTrs . fromList
+{-instance (Ord f, Ord v, PP.Pretty f, PP.Pretty v) => PP.Pretty [R.Rule f v] where-}
+  {-pretty = ppTrs . fromList-}
 
 instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Term f v) where
   toXml (R.Fun f ts) = Xml.elt "funapp" $ Xml.toXml f :  [ Xml.elt "arg" [Xml.toXml t] | t <- ts ]
@@ -198,7 +198,7 @@ instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Trs f v) where
   toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- toList rs ]
   toCeTA = Xml.toXml
 
-instance (Xml.Xml f, Xml.Xml v) => Xml.Xml [R.Rule f v] where
-  toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- rs ]
-  toCeTA   = Xml.toXml
+{-instance (Xml.Xml f, Xml.Xml v) => Xml.Xml [R.Rule f v] where-}
+  {-toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- rs ]-}
+  {-toCeTA   = Xml.toXml-}
 

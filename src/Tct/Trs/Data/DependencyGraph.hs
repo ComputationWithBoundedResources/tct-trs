@@ -2,6 +2,7 @@ module Tct.Trs.Data.DependencyGraph
   ( 
   nodes
   , lnodes
+  , rnodes
   , roots
   , leafs
   , lookupNodeLabel
@@ -9,6 +10,9 @@ module Tct.Trs.Data.DependencyGraph
   , withNodeLabels'
   , removeNodes
   , reachablesDfs
+  , context
+  , successors
+  , predecessors
 
   , estimatedDependencyGraph 
   -- * dependency graph
@@ -82,6 +86,13 @@ nodes = Gr.nodes
 lnodes :: Graph n e -> [(NodeId,n)]
 lnodes = Gr.labNodes
 
+rnodes :: Graph (DGNode f v) e -> ([(NodeId, R.Rule f v)], [(NodeId, R.Rule f v)])
+rnodes = foldr k ([],[]) . lnodes where
+  k (n,cn) (sr,wr) 
+    | isStrict cn = (e:sr,wr)
+    | otherwise   = (sr,e:wr)
+    where e = (n, theRule cn)
+
 roots :: Graph n e -> [NodeId]
 roots gr = [n | n <- Gr.nodes gr, Gr.indeg gr n == 0]
 
@@ -131,11 +142,17 @@ successors = Gr.suc
 reachablesDfs :: Graph n e -> [NodeId] -> [NodeId]
 reachablesDfs = flip dfs
 
-{-predecessors :: Graph n e -> NodeId -> [NodeId]-}
-{-predecessors = Gr.pre-}
+predecessors :: Graph n e -> NodeId -> [NodeId]
+predecessors = Gr.pre
 
 lsuccessors :: Graph n e -> NodeId -> [(NodeId, n, e)]
 lsuccessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lsuc gr nde]
+
+context :: Graph a b -> NodeId -> ([(b,NodeId)], NodeId, a, [(b,NodeId)])
+context = Gr.context
+
+{-lsuccessors' :: Graph n e -> NodeId -> [(NodeId, n, e)]-}
+{-lsuccessors' gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lsuc gr nde]-}
 
 {-lpredecessors :: Graph n e -> NodeId -> [(NodeId, n, e)]-}
 {-lpredecessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lpre gr nde]-}
