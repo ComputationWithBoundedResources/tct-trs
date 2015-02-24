@@ -77,9 +77,11 @@ instance T.Processor (PredecessorEstimation) where
           candidates = do
             (n,cn) <- lnodes wdg
             let predss = [ (n1,cn1) | (n1,cn1,_) <- lpredecessors wdg n ]
-            guard $ isStrict cn && Trs.member (theRule cn) initialDPs && all (isStrict . snd) predss
+            guard $ isStrict cn && Trs.member (theRule cn) initialDPs
+            guard $ all (\(n1,cn1) -> n1 /= n && isStrict cn1) predss
             return $ Selected { node=n, rule=theRule cn, preds=fmap theRule `map` predss }
 
+          -- MS: estimate in bottom-upway
           sort cs = reverse $ catMaybes [find ((n==) . node) cs | n <- topsort wdg]
           select []     sel = sel
           select (c:cs) sel = select cs sel' where
