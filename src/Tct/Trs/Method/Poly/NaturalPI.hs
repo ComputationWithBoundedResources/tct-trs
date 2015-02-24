@@ -56,6 +56,10 @@ import           Tct.Trs.Interpretation
 -- FIXME
 -- * edge cases with usable
 
+--MS:
+-- TODO
+-- adapt to usable new usable replacement maps..?
+-- generalise reduction pairs
 
 data PolyInterProcessor = PolyInterProc
   { shape    :: PI.Shape

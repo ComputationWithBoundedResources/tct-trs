@@ -23,6 +23,7 @@ module Tct.Trs.Data.Trs
   , definedSymbols
   , constructorSymbols
 
+  , member
   , empty, singleton, concat, union, unions, difference, intersect, filter
 
   , size
@@ -105,6 +106,9 @@ lift1 f (TrsT rs) = f rs
 lift2 :: (RuleSet f v -> RuleSet f v -> a) -> Trs f v -> Trs f v -> a
 lift2 f (TrsT rs1)  (TrsT rs2) = f rs1 rs2
 
+member :: (Ord f, Ord v) => Rule f v -> Trs f v -> Bool
+member = lift1 . S.member 
+
 empty :: Trs f v
 empty = TrsT S.empty
 
@@ -129,7 +133,6 @@ difference trs1 trs2 = TrsT $ lift2 S.difference trs1 trs2
 
 filter :: (Rule f v -> Bool) -> Trs f v -> Trs f v
 filter k (TrsT rs) = TrsT (S.filter k rs)
-
 
 -- * properties
 any' :: (Rule f v -> Bool) -> Trs f v -> Bool

@@ -16,6 +16,7 @@ module Tct.Trs.Data.RuleSelector
   -- ** Boolean Selectors
   , selAnyOf
   , selAllOf
+  , selFirstAlternative
   -- ** Misc
   , rules
   ) where
@@ -262,22 +263,24 @@ selAnd ss = RuleSelector { rsName = "all [" ++ concat (intersperse ", " [rsName 
 selOr :: [ExpressionSelector] -> ExpressionSelector
 selOr ss = RuleSelector { rsName = "any [" ++ concat (intersperse ", " [rsName s | s <- ss])  ++ "]"
                         , rsSelect = \ prob -> BigOr [rsSelect s prob | s <- ss] }
-
+-}
 
 -- | Selects the first alternative from the given rule selector.
-selFirstAlternative :: ExpressionSelector -> ExpressionSelector
-selFirstAlternative rs = RuleSelector { rsName = "first alternative of " ++ rsName rs ,
-                                        rsSelect = \ prob -> let (dps, trs) = selectFirst $ rsSelect rs prob
-                                                             in BigAnd $ [SelectDP d | d <- Trs.rules dps]
-                                                                ++ [SelectTrs r | r <- Trs.rules trs]
-                                      }
-  where selectFirst (BigAnd ss)   = (Trs.unions dpss, Trs.unions trss)
-          where (dpss, trss) = unzip [selectFirst sel | sel <- ss]
-        selectFirst (BigOr [])      = (Trs.empty,Trs.empty)
-        selectFirst (BigOr (sel:_)) = selectFirst sel
-        selectFirst (SelectDP d)    = (Trs.singleton d, Trs.empty)
-        selectFirst (SelectTrs r)   = (Trs.empty, Trs.singleton r)
--}
+selFirstAlternative :: (Ord f, Ord v) => ExpressionSelector f v -> ExpressionSelector f v
+selFirstAlternative rs = RuleSelector 
+  { rsName = "first alternative of " ++ rsName rs
+  , rsSelect = \ prob -> 
+    let (dps, trs) = selectFirst $ rsSelect rs prob
+    in BigAnd $ [SelectDP d | d <- Trs.toList dps] ++ [SelectTrs r | r <- Trs.toList trs] }
+
+  where 
+    selectFirst (BigAnd ss)     = (Trs.unions dpss, Trs.unions trss)
+      where (dpss, trss) = unzip [selectFirst sel | sel <- ss]
+    selectFirst (BigOr [])      = (Trs.empty,Trs.empty)
+    selectFirst (BigOr (sel:_)) = selectFirst sel
+    selectFirst (SelectDP d)    = (Trs.singleton d, Trs.empty)
+    selectFirst (SelectTrs r)   = (Trs.empty, Trs.singleton r)
+
 
 -- | returns the pair of dps and rules mentioned in a 'SelectorExpression'
 rules :: (Ord f, Ord v) => SelectorExpression f v -> (Trs f v, Trs f v)

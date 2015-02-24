@@ -1,7 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Tct.Trs.Method.Compose 
-  (
-  decompose
+  ( decompose
   , decomposeDeclaration
   ) where
 
@@ -25,12 +24,14 @@ import           Tct.Trs.Data.RuleSelector
 import Tct.Trs.Data
 import qualified Tct.Trs.Data.Trs as Trs
 
+
 data DecomposeBound
   = Add
   | RelativeAdd
   | RelativeMul
   | RelativeComp
   deriving (Eq, Show, Typeable)
+
 
 -- checks condition on R and S
 isApplicableRandS :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> Maybe String

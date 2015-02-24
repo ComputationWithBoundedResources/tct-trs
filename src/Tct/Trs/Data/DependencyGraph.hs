@@ -13,7 +13,10 @@ module Tct.Trs.Data.DependencyGraph
   , successors
   , lsuccessors
   , predecessors
+  , lpredecessors
 
+  , topsort
+  , reachablesBfs
 
   , estimatedDependencyGraph 
   -- * dependency graph
@@ -35,10 +38,8 @@ import Data.Maybe (catMaybes, isNothing, fromMaybe)
 import qualified Data.List as L
 
 import qualified Data.Graph.Inductive as Gr
-{-import Data.Graph.Inductive.Basic (undir)-}
-import Data.Graph.Inductive.Query.DFS (dfs)
 import qualified Data.Graph.Inductive.Query.DFS as DFS
-{-import Data.Graph.Inductive.Query.BFS (bfsn)-}
+import qualified Data.Graph.Inductive.Query.BFS as BFS
 
 import qualified Data.Rewriting.Term         as R
 import qualified Data.Rewriting.Rule         as R (Rule (..))
@@ -125,8 +126,8 @@ withNodeLabels' gr ns = [(n, lookupNodeLabel' gr n) | n <- ns]
   {-where ns = Gr.labNodes gr-}
         {-es = [ (n2, n1, i) | (n1,n2,i) <- Gr.labEdges gr ]-}
 
-{-topsort :: Graph n e -> [NodeId]-}
-{-topsort = DFS.topsort-}
+topsort :: Graph n e -> [NodeId]
+topsort = DFS.topsort
 
 {-sccs :: Graph n e -> [[NodeId]]-}
 {-sccs = DFS.scc-}
@@ -137,11 +138,11 @@ withNodeLabels' gr ns = [(n, lookupNodeLabel' gr n) | n <- ns]
 successors :: Graph n e -> NodeId -> [NodeId]
 successors = Gr.suc
 
-{-reachablesBfs :: Graph n e -> [NodeId] -> [NodeId]-}
-{-reachablesBfs = flip bfsn-}
+reachablesBfs :: Graph n e -> [NodeId] -> [NodeId]
+reachablesBfs = flip BFS.bfsn
 
 reachablesDfs :: Graph n e -> [NodeId] -> [NodeId]
-reachablesDfs = flip dfs
+reachablesDfs = flip DFS.dfs
 
 predecessors :: Graph n e -> NodeId -> [NodeId]
 predecessors = Gr.pre
@@ -155,8 +156,8 @@ context = Gr.context
 {-lsuccessors' :: Graph n e -> NodeId -> [(NodeId, n, e)]-}
 {-lsuccessors' gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lsuc gr nde]-}
 
-{-lpredecessors :: Graph n e -> NodeId -> [(NodeId, n, e)]-}
-{-lpredecessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lpre gr nde]-}
+lpredecessors :: Graph n e -> NodeId -> [(NodeId, n, e)]
+lpredecessors gr nde = [(n, lookupNodeLabel' gr n, e) | (n,e) <- Gr.lpre gr nde]
 
 {-isEdgeTo :: Graph n e -> NodeId -> NodeId -> Bool-}
 {-isEdgeTo g n1 n2 = n2 `elem` successors g n1 -}
@@ -282,6 +283,9 @@ isCyclicNode cdg n = isCyclic $ lookupNodeLabel' cdg n
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
+
+instance PP.Pretty [NodeId] where
+  pretty = PP.set . map PP.int
 
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (DG f v) where 
   pretty wdg 

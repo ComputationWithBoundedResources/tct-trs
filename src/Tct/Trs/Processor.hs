@@ -7,28 +7,46 @@ module Tct.Trs.Processor
   ) where
 
 
-import           Control.Monad.Error  (throwError)
+import           Control.Monad.Error                             (throwError)
 
-import qualified Tct.Core.Data                     as T
-import qualified Tct.Core.Processor.Empty          as E
+import qualified Tct.Core.Data                                   as T
+import qualified Tct.Core.Processor.Empty                        as E
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.CeTA                 as CeTA
-import           Tct.Trs.Data.Problem              (isTrivial)
+import qualified Tct.Trs.Data.CeTA                               as CeTA
+import           Tct.Trs.Data.Problem                            (isTrivial)
 
-import           Tct.Trs.Method.DP.DependencyPairs (dependencyPairsDeclaration, dependencyTuplesDeclaration)
-import           Tct.Trs.Method.DP.UsableRules     (usableRulesDeclaration)
-import           Tct.Trs.Method.Poly.NaturalPI     (polyDeclaration)
+import           Tct.Trs.Method.DP.DependencyPairs               (dependencyPairsDeclaration,
+                                                                  dependencyTuplesDeclaration)
+import           Tct.Trs.Method.DP.DPGraph.PredecessorEstimation (predecessorEstimationOnDeclaration)
+import           Tct.Trs.Method.DP.DPGraph.RemoveHeads           (removeHeadsDeclaration)
+import           Tct.Trs.Method.DP.DPGraph.RemoveInapplicable    (removeInapplicableDeclaration)
+import           Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes    (removeWeakSuffixesDeclaration)
+import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           (simplifyRHSDeclaration)
+import           Tct.Trs.Method.DP.DPGraph.Trivial               (trivialDeclaration)
+import           Tct.Trs.Method.DP.UsableRules                   (usableRulesDeclaration)
+import           Tct.Trs.Method.Poly.NaturalPI                   (polyDeclaration)
 
 
 defaultDeclarations :: [T.StrategyDeclaration TrsProblem]
 defaultDeclarations =
   [ T.SD emptyDeclaration
-  , T.SD usableRulesDeclaration
+  , T.SD withCertificationDeclaration
+
+  -- Semantic
+  , T.SD polyDeclaration
+
+  -- DP
   , T.SD dependencyPairsDeclaration
   , T.SD dependencyTuplesDeclaration
-  , T.SD polyDeclaration
-  , T.SD withCertificationDeclaration
+  , T.SD usableRulesDeclaration
+  -- DP graph
+  , T.SD predecessorEstimationOnDeclaration
+  , T.SD removeHeadsDeclaration
+  , T.SD trivialDeclaration
+  , T.SD removeWeakSuffixesDeclaration
+  , T.SD removeInapplicableDeclaration
+  , T.SD simplifyRHSDeclaration
   ]
 
 empty :: T.Strategy TrsProblem
@@ -58,7 +76,7 @@ instance T.Processor WithCertificationProcessor where
       toRet = case ret of
         T.Abort _    -> T.Abort
         T.Continue _ -> T.Continue
-      prover 
+      prover
         | allowPartial p = CeTA.partialProofIO' tmp
         | otherwise      = CeTA.totalProofIO' tmp
 

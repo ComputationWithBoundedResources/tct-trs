@@ -23,7 +23,6 @@ import qualified Tct.Core.Data               as T
 import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
-import           Tct.Trs.Data.DependencyGraph (estimatedDependencyGraph)
 import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Trs            as Trs

@@ -1,6 +1,6 @@
 module Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes
-  ( removeWeakSuffix
-  , removeWeakSuffixDeclaration
+  ( removeWeakSuffixes
+  , removeWeakSuffixesDeclaration
   ) where
 
 
@@ -87,8 +87,8 @@ instance T.Processor RemoveWeakSuffixes where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-removeWeakSuffixDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-removeWeakSuffixDeclaration = T.declare "removeWeakSuffixes" desc () removeWeakSuffix where
+removeWeakSuffixesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+removeWeakSuffixesDeclaration = T.declare "removeWeakSuffixes" desc () removeWeakSuffixes where
   desc =
     [ "Removes trailing paths that do not need to be oriented."
     , "Only applicable if the strict component is empty."]
@@ -99,8 +99,8 @@ removeWeakSuffixDeclaration = T.declare "removeWeakSuffixes" desc () removeWeakS
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
-removeWeakSuffix :: T.Strategy TrsProblem
-removeWeakSuffix = T.Proc RemoveWeakSuffixes
+removeWeakSuffixes :: T.Strategy TrsProblem
+removeWeakSuffixes = T.Proc RemoveWeakSuffixes
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
