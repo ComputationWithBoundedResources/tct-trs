@@ -28,10 +28,10 @@ module Tct.Trs.Data.Trs
 
   , size
   , null
-  , isDuplicating, isLinear
+  , isDuplicating, isLinear, isRightLinear
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
 
-  , isLinear', isNonErasing', isNonSizeIncreasing', isNonDuplicating'
+  , isLinear', isRightLinear', isNonErasing', isNonSizeIncreasing', isNonDuplicating'
   ) where
 
 
@@ -147,8 +147,9 @@ size = lift1 S.size
 null :: Trs f v -> Bool
 null = lift1 S.null
 
-isLinear, isDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
+isLinear, isRightLinear, isDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
 isLinear         = all' R.isLinear
+isRightLinear    = all' R.isRightLinear
 isDuplicating    = any' R.isDuplicating
 
 isNonErasing, isNonSizeIncreasing, isNonDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
@@ -162,8 +163,9 @@ isNonDuplicating    = not . isDuplicating
 note :: Bool -> String -> Maybe String
 note b st = if b then Just st else Nothing
 
-isLinear'  :: (Ord f, Ord v) => Trs f v -> Maybe String
-isLinear' trs = note (not $ isLinear trs) " some rule is non-linear"
+isLinear', isRightLinear'  :: (Ord f, Ord v) => Trs f v -> Maybe String
+isLinear' trs      = note (not $ isLinear trs) " some rule is non-linear"
+isRightLinear' trs = note (not $ isRightLinear trs) " some rule is not right linear"
 
 isNonErasing', isNonSizeIncreasing', isNonDuplicating' :: (Ord f, Ord v) => Trs f v -> Maybe String
 isNonErasing' trs        = note (not $ isNonErasing trs) " some rule is erasing"

@@ -134,6 +134,24 @@ fromRewriting prob = Problem
     defs = Trs.definedSymbols trs
     cons = Trs.constructorSymbols sig defs
 
+toInnermost :: Problem f v -> Problem f v
+toInnermost prob = prob { strategy = Innermost }
+
+toFull :: Problem f v -> Problem f v
+toFull prob = prob { strategy = Full }
+
+toDC :: (Ord f, Ord v) => Problem f v -> Problem f v
+toDC prob = prob { startTerms = AllTerms (defs `S.union` cons) }
+  where
+    defs = Trs.definedSymbols (allComponents prob)
+    cons = Trs.constructorSymbols (signature prob) defs
+
+toRC :: (Ord f, Ord v) => Problem f v -> Problem f v
+toRC prob = prob { startTerms = BasicTerms defs cons }
+  where
+    defs = Trs.definedSymbols (allComponents prob)
+    cons = Trs.constructorSymbols (signature prob) defs
+
 progressUsingSize :: Problem f v -> Problem f v -> Bool
 progressUsingSize p1 p2 =
   Trs.size (strictDPs p1) /= Trs.size (strictDPs p2)

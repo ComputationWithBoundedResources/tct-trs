@@ -15,6 +15,8 @@ module Tct.Trs.Data.DependencyGraph
   , predecessors
   , lpredecessors
 
+  , congruence
+  , allRulesFromNode
   , topsort
   , reachablesBfs
 
@@ -266,16 +268,16 @@ toCongruenceGraph gr = Gr.mkGraph ns es
     cn1 `edgesTo` cn2 = 
       [ (theRule r1, i) | (n1,r1) <- theSCC cn1, (n, _, i) <- lsuccessors gr n1, n `elem` map fst (theSCC cn2)]
 
-{-allRulesFromNode :: CDG f v -> NodeId -> [(Strictness, R.Rule f v)]-}
-{-allRulesFromNode gr n = case lookupNodeLabel gr n of -}
-  {-Nothing -> []-}
-  {-Just cn -> [ sr | (_, sr) <- theSCC cn]-}
+allRulesFromNode :: CDG f v -> NodeId -> [DGNode f v]
+allRulesFromNode gr n = case lookupNodeLabel gr n of 
+  Nothing -> []
+  Just cn -> [ sr | (_, sr) <- theSCC cn]
 
 {-allRulesFromNodes :: CDG f v -> [NodeId] -> [(Strictness, R.Rule f v)]-}
 {-allRulesFromNodes gr ns = concatMap (allRulesFromNode gr) ns-}
 
-{-congruence :: CDG f v -> NodeId -> [NodeId]-}
-{-congruence cdg n = fromMaybe [] ((map fst . theSCC) `liftM` lookupNodeLabel cdg n)-}
+congruence :: CDG f v -> NodeId -> [NodeId]
+congruence cdg n = fromMaybe [] ((map fst . theSCC) `liftM` lookupNodeLabel cdg n)
 
 isCyclicNode :: CDG f v -> NodeId -> Bool
 isCyclicNode cdg n = isCyclic $ lookupNodeLabel' cdg n

@@ -4,6 +4,8 @@ module Tct.Trs.Processor
 
   , empty
   , emptyDeclaration
+
+  , module M
   ) where
 
 
@@ -16,16 +18,16 @@ import           Tct.Trs.Data
 import qualified Tct.Trs.Data.CeTA                               as CeTA
 import           Tct.Trs.Data.Problem                            (isTrivial)
 
-import           Tct.Trs.Method.DP.DependencyPairs               (dependencyPairsDeclaration,
-                                                                  dependencyTuplesDeclaration)
-import           Tct.Trs.Method.DP.DPGraph.PredecessorEstimation (predecessorEstimationOnDeclaration)
-import           Tct.Trs.Method.DP.DPGraph.RemoveHeads           (removeHeadsDeclaration)
-import           Tct.Trs.Method.DP.DPGraph.RemoveInapplicable    (removeInapplicableDeclaration)
-import           Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes    (removeWeakSuffixesDeclaration)
-import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           (simplifyRHSDeclaration)
-import           Tct.Trs.Method.DP.DPGraph.Trivial               (trivialDeclaration)
-import           Tct.Trs.Method.DP.UsableRules                   (usableRulesDeclaration)
-import           Tct.Trs.Method.Poly.NaturalPI                   (polyDeclaration)
+import           Tct.Trs.Method.DP.DependencyPairs               as M
+import           Tct.Trs.Method.DP.DPGraph.PathAnalysis          as M
+import           Tct.Trs.Method.DP.DPGraph.PredecessorEstimation as M
+import           Tct.Trs.Method.DP.DPGraph.RemoveHeads           as M
+import           Tct.Trs.Method.DP.DPGraph.RemoveInapplicable    as M
+import           Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes    as M
+import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           as M
+import           Tct.Trs.Method.DP.DPGraph.Trivial               as M
+import           Tct.Trs.Method.DP.UsableRules                   as M
+import           Tct.Trs.Method.Poly.NaturalPI                   as M
 
 
 defaultDeclarations :: [T.StrategyDeclaration TrsProblem]
@@ -40,13 +42,15 @@ defaultDeclarations =
   , T.SD dependencyPairsDeclaration
   , T.SD dependencyTuplesDeclaration
   , T.SD usableRulesDeclaration
+  
   -- DP graph
+  , T.SD pathAnalysisDeclaration
   , T.SD predecessorEstimationOnDeclaration
   , T.SD removeHeadsDeclaration
-  , T.SD trivialDeclaration
-  , T.SD removeWeakSuffixesDeclaration
   , T.SD removeInapplicableDeclaration
+  , T.SD removeWeakSuffixesDeclaration
   , T.SD simplifyRHSDeclaration
+  , T.SD trivialDeclaration
   ]
 
 empty :: T.Strategy TrsProblem

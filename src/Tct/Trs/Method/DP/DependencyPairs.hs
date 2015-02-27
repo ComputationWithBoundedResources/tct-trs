@@ -154,7 +154,8 @@ instance Xml.Xml DPProof where
         [ Xml.toCeTA $ Sig.filter Prob.isCompoundf (newSignature proof)
         , Xml.elt "strictDTs" (map ruleWith $ strictTransformation proof)
         , Xml.elt "weakDTs" (map ruleWith $ weakTransformation proof)
-        , Xml.elt "innermostLhss" (map lhss $ strictTransformation proof ++ weakTransformation proof) ] --TODO: MS left hand sides of all components?
+        -- FIXME: MS this should probably be marked starting terms;
+        , Xml.elt "innermostLhss" (map lhss $ strictTransformation proof ++ weakTransformation proof) ]
       where
         ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.toCeTA old, Xml.toCeTA new ]
         lhss (_, new)      = Xml.toCeTA (R.lhs new)
