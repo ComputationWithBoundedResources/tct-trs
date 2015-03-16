@@ -23,7 +23,7 @@ import qualified Tct.Trs.Data.Trs             as Trs
 import           Tct.Trs.Data.Signature       (Signature)
 import qualified Tct.Trs.Data.Signature       as Sig
 
-
+-- MS: FIXME: properly update dpGraphs when rule shifting, prdecessor estimation...
 -- | The problem type.
 data Problem f v = Problem
   { startTerms :: StartTerms f
@@ -89,15 +89,12 @@ instance Xml.Xml V where
 type TrsProblem = Problem F V
 
 sanitise :: (Ord f, Ord v) => Problem f v -> Problem f v
-sanitise = sanitiseDPGraph . sanitiseDPGraph
+sanitise = sanitiseDPGraph . sanitiseSignature
 
 sanitiseDPGraph :: (Ord f, Ord v) => Problem f v -> Problem f v
 sanitiseDPGraph prob = prob
   { dpGraph = DPG.estimatedDependencyGraph (ruleSet prob) (strategy prob) }
 
--- MS: TODO should startterms be restricted in subproblems?
--- check and comment; I think it is necessary for ceta unknwon proofs to work
--- should we restrict this to ceta output
 sanitiseSignature :: (Ord f, Ord v) => Problem f v -> Problem f v
 sanitiseSignature prob = prob
   { startTerms = restrictST (startTerms prob)
@@ -226,14 +223,21 @@ instance Xml.Xml BS.ByteString where
   toXml  = Xml.text . BS.unpack
   toCeTA = Xml.text . BS.unpack
 
-instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
+instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
   pretty prob = PP.vcat
     [ PP.text "Strict Rules:"
     , PP.indent 2 $ PP.pretty (strictDPs prob)
     , PP.indent 2 $ PP.pretty (strictTrs prob)
     , PP.text "Weak Rules:"
     , PP.indent 2 $ PP.pretty (weakDPs prob)
-    , PP.indent 2 $ PP.pretty (weakTrs prob) ]
+    , PP.indent 2 $ PP.pretty (weakTrs prob) 
+    , PP.text "Signature:"
+    , PP.indent 2 $ PP.pretty (signature prob)
+    , PP.text "Kind:"
+    , PP.indent 2 $ PP.pretty (strategy prob)
+    , PP.indent 2 $ PP.pretty (startTerms prob)
+    , PP.text "Graph:"
+    , PP.indent 2 $ PP.pretty (dependencyGraph prob)]
 
 
 -- MS: the ceta instance is not complete as it contains a tag <complexityClass> which depends on ProofTree

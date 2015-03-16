@@ -88,20 +88,15 @@ instance T.Processor PathAnalysis where
 
           paths = [pth | (pth, _) <- subsumedBy] ++ [pth | (pth,_) <- probPaths]
 
-
-
 nodesFrom :: (Ord v, Ord f) => CDG f v -> NodeId -> (Trs f v, Trs f v)
-nodesFrom cdg n = (stricts,weaks)
-  where
-    rs = allRulesFromNode cdg n
-    stricts = Trs.fromList [theRule ln | ln <- rs, isStrict ln]
-    weaks   = Trs.fromList [theRule ln | ln <- rs, not (isStrict ln)]
-
+nodesFrom cdg n = (Trs.fromList srs, Trs.fromList wrs)
+  where (srs,wrs) = allRulesPairFromNodes cdg [n]
 
 walkFromL :: (Ord v, Ord f) => CDG f v -> NodeId -> [Subsumed f v]
 walkFromL cdg root = map toSubsumed walked where
   walked = walkFromL' ([],S.empty) Prob.emptyRuleSet root
   toSubsumed (path1, nds1, rs1) =
+    -- TODO: MS can there not be identic node sets
     case [ path2 | (path2, nds2 , _) <- walked , nds1 `S.isProperSubsetOf` nds2 ] of
       []   -> Right (path1, rs1)
       pths -> Left  (path1, pths)

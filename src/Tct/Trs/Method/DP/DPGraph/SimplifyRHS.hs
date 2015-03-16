@@ -106,7 +106,7 @@ instance PP.Pretty SimplifyRHSProof where
     , PP.empty
     , PP.pretty (wdg_ p)
     , PP.empty
-    , PP.text "Due to miising edges in the depndency graph, the right-hand sides of following rules could be simplified:"
+    , PP.text "Due to missing edges in the depndency graph, the right-hand sides of following rules could be simplified:"
     , PP.empty
     , PP.pretty (Trs.fromList $ simplified_ p) ]
 

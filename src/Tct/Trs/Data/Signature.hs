@@ -67,8 +67,9 @@ restrictSignature sig fs = onSignature (M.filterWithKey k) sig
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
-instance PP.Pretty f => PP.Pretty (f, Int) where
-  pretty (f,i) = PP.tupled [PP.pretty f, PP.int i]
+instance PP.Pretty f => PP.Pretty (Signature f) where
+  pretty = PP.set . map k . elems
+    where k (f,i) = PP.tupled [PP.pretty f, PP.int i]
 
 instance Xml.Xml f => Xml.Xml (Signature f) where
   toXml sig = Xml.elt "signature" [ symb f i | (f,i) <- elems sig ]

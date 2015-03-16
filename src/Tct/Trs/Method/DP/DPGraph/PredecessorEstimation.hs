@@ -2,14 +2,14 @@
 This module provides the /Predecessor Estimation/ Processor.
 
 @
-  <Pre(S1#) + S2# + S / S1# + W# + W, Q, T#> :f
-  ---------------------------------------------
-      <S1# + S2# + S / W# + W, Q, T#> :f
+  |- <pre(S1#) + S2# + S / S1# + W# + W, Q, T#> :f
+  ------------------------------------------------
+      |- <S1# + S2# + S / W# + W, Q, T#> :f
 @
 
-Here @Pre(R#)@, is defined as the union of all direct predecessors of all rules in @R#@.
+Here @pre(R#)@, is defined as the union of all direct predecessors of all rules in @R#@.
 
-We compute @S1#@ from a 'ExpressionSelector' sucht that @Pre(S1#)@ is a subset of @S2#@, ie., all predeccessors occur
+We compute @S1#@ from a 'ExpressionSelector' sucht that @pre(S1#)@ is a subset of @S2#@, ie., all predeccessors occur
 in the strict components.
 -}
 -- MS: TODO currently only the static variant is provided
@@ -81,7 +81,7 @@ instance T.Processor (PredecessorEstimation) where
             guard $ all (\(n1,cn1) -> n1 /= n && isStrict cn1) predss
             return $ Selected { node=n, rule=theRule cn, preds=fmap theRule `map` predss }
 
-          -- MS: estimate in bottom-upway
+          -- estimate in bottom-upway
           sort cs = reverse $ catMaybes [find ((n==) . node) cs | n <- topsort wdg]
           select []     sel = sel
           select (c:cs) sel = select cs sel' where
@@ -95,7 +95,8 @@ instance T.Processor (PredecessorEstimation) where
 
           shiftStrict = Trs.fromList [ r | s <- selected , (_,r) <- preds s ]
           shiftWeak   = Trs.fromList [ rule s | s <- selected ]
-          nprob = prob
+          -- MS: TODO modify isStrict for selected ones
+          nprob = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = (Prob.strictDPs prob `Trs.difference` shiftWeak) `Trs.union` shiftStrict
             , Prob.weakDPs   = (Prob.weakDPs prob `Trs.union` shiftWeak) `Trs.difference` shiftStrict }
           proof = PredecessorEstimationProof

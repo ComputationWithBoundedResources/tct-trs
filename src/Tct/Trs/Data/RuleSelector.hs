@@ -3,11 +3,16 @@ module Tct.Trs.Data.RuleSelector
   RuleSelector (..)
   -- * RuleSet Selectors
   , RuleSetSelector
+  , selInter
   -- ** Constructors
   , selRules
   , selDPs
   , selStricts
   , selWeaks
+
+  , selFromDG
+  , selFromWDG
+  , selFromCDG
     -- ** Combinators
   -- * Selector Expressions
   , SelectorExpression (..)
@@ -24,13 +29,14 @@ module Tct.Trs.Data.RuleSelector
 
 import           Data.Typeable
 
-import qualified Tct.Core.Common.Parser as P
-import qualified Tct.Core.Data          as T
+import qualified Tct.Core.Common.Parser       as P
+import qualified Tct.Core.Data                as T
 
-import qualified Tct.Trs.Data.RuleSet   as Rs
-import qualified Tct.Trs.Data.Problem   as Prob
-import           Tct.Trs.Data.Trs       (SelectorExpression (..), Trs)
-import qualified Tct.Trs.Data.Trs       as Trs
+import           Tct.Trs.Data.DependencyGraph (CDG, DG, DependencyGraph)
+import qualified Tct.Trs.Data.Problem         as Prob
+import qualified Tct.Trs.Data.RuleSet         as Rs
+import           Tct.Trs.Data.Trs             (SelectorExpression (..), Trs)
+import qualified Tct.Trs.Data.Trs             as Trs
 
 
 -- | This datatype is used to select a subset of rules recorded in a problem.
@@ -96,11 +102,10 @@ selCombine cn ctrs s1 s2 = RuleSelector { rsName = cn (rsName s1) (rsName s2)
 selUnion :: (Ord f, Ord v) => RuleSetSelector f v -> RuleSetSelector f v -> RuleSetSelector f v
 selUnion = selCombine (\ n1 n2 -> "union of " ++ n1 ++ " and " ++ n2) Trs.union
 
-{-
 -- | Select intersection of selections of given rule-selectors.
-selInter :: RuleSetSelector -> RuleSetSelector -> RuleSetSelector
+selInter :: (Ord f, Ord v) => RuleSetSelector f v -> RuleSetSelector f v -> RuleSetSelector f v
 selInter= selCombine (\ n1 n2 -> "intersect of " ++ n1 ++ " and " ++ n2) Trs.intersect
--}
+
 
 -- | Select rewrite rules, i.e., non dependency pair rules.
 selRules :: RuleSetSelector f v
@@ -138,21 +143,28 @@ selWeaks = RuleSelector { rsName = "weak-rules" , rsSelect = fn } where
     , Rs.strs = Trs.empty
     , Rs.wtrs = Prob.weakTrs prob }
 
-{-
 -- | Select from the dependency graph, using the given function.
 -- The first parameter should specify a short name for the rule-selector.
-selFromWDG :: (DG -> Prob.Ruleset) -> RuleSetSelector
-selFromWDG f = RuleSelector { rsName = "selected from WDG"
-                              , rsSelect = \ prob -> f (dg prob) }
-    where dg = DG.estimatedDependencyGraph DG.defaultApproximation
+selFromDG :: (DependencyGraph f v -> Rs.RuleSet f v) -> RuleSetSelector f v
+selFromDG f = RuleSelector 
+  { rsName   = "selected from DG"
+  , rsSelect = f . Prob.dpGraph }
+
+-- | Select from the dependency graph, using the given function.
+-- The first parameter should specify a short name for the rule-selector.
+selFromWDG :: (DG f v -> Rs.RuleSet f v) -> RuleSetSelector f v
+selFromWDG f = RuleSelector 
+  { rsName   = "selected from WDG"
+  , rsSelect = f . Prob.dependencyGraph }
 
 -- | Select from the congruence dependency graph, using the given function.
 -- The first parameter should specify a short name for the rule-selector.
-selFromCWDG :: (CDG -> Prob.Ruleset) -> RuleSetSelector
-selFromCWDG f = RuleSelector { rsName = "selected from CWDG"
-                             , rsSelect = \ prob -> f (dg prob) }
-    where dg = toCongruenceGraph . DG.estimatedDependencyGraph DG.defaultApproximation
+selFromCDG :: (CDG f v -> Rs.RuleSet f v) -> RuleSetSelector f v
+selFromCDG f = RuleSelector 
+  { rsName   = "selected from CWDG"
+  , rsSelect = f . Prob.congruenceGraph }
 
+{-
 restrictToCongruences :: Prob.Ruleset -> [NodeId] -> CDG -> Prob.Ruleset
 restrictToCongruences rs ns cdg = rs { Prob.sdp = Trs.fromRules [ r | (DG.StrictDP, r) <- rr]
                                      , Prob.wdp = Trs.fromRules [ r | (DG.WeakDP, r) <- rr] }

@@ -24,6 +24,7 @@ module Tct.Trs.Data.Trs
   , constructorSymbols
 
   , member
+  , isSubset
   , empty, singleton, concat, union, unions, difference, intersect, filter
 
   , size
@@ -39,10 +40,10 @@ import qualified Data.Foldable          as F
 import qualified Data.Map.Strict        as M
 import qualified Data.Set               as S
 import           Data.Typeable
-import           Prelude                hiding (filter, concat, map, null)
+import           Prelude                hiding (concat, filter, map, null)
 
-import qualified Tct.Core.Common.Xml as Xml
 import qualified Tct.Core.Common.Pretty as PP
+import qualified Tct.Core.Common.Xml    as Xml
 
 import           Data.Rewriting.Rule    (Rule)
 import qualified Data.Rewriting.Rule    as R
@@ -107,7 +108,7 @@ lift2 :: (RuleSet f v -> RuleSet f v -> a) -> Trs f v -> Trs f v -> a
 lift2 f (TrsT rs1)  (TrsT rs2) = f rs1 rs2
 
 member :: (Ord f, Ord v) => Rule f v -> Trs f v -> Bool
-member = lift1 . S.member 
+member = lift1 . S.member
 
 empty :: Trs f v
 empty = TrsT S.empty
@@ -146,6 +147,9 @@ size = lift1 S.size
 
 null :: Trs f v -> Bool
 null = lift1 S.null
+
+isSubset :: (Ord f, Ord v) => Trs f v -> Trs f v -> Bool
+isSubset = lift2 S.isSubsetOf
 
 isLinear, isRightLinear, isDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
 isLinear         = all' R.isLinear
@@ -192,7 +196,7 @@ instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Term f v) where
   toCeTA = Xml.toXml
 
 instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Rule f v) where
-  toXml r = Xml.elt "rule" 
+  toXml r = Xml.elt "rule"
     [ Xml.elt "lhs" [Xml.toXml $ R.lhs r]
     , Xml.elt "rhs" [Xml.toXml $ R.rhs r] ]
   toCeTA = Xml.toXml

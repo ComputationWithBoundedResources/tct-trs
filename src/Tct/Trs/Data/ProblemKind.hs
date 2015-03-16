@@ -1,10 +1,12 @@
 module Tct.Trs.Data.ProblemKind where
 
 
+import Data.Monoid
 import qualified Data.Set               as S
 
 import qualified Data.Rewriting.Term    as R
 
+import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml    as Xml
 
 import           Tct.Trs.Data.Signature (Signature, Symbols, restrictSignature)
@@ -32,6 +34,13 @@ data Strategy
 
 
 --- * proof data -----------------------------------------------------------------------------------------------------
+
+instance PP.Pretty Strategy where
+  pretty = PP.text . show
+
+instance (Ord f, PP.Pretty f) => PP.Pretty (StartTerms f) where
+  pretty st@AllTerms{}   = PP.text "all terms: " <> PP.set' (alls st)
+  pretty st@BasicTerms{} = PP.text "basic terms: " <> PP.set' (defineds st) <> PP.char '/' <> PP.set' (constructors st)
 
 instance Xml.Xml Strategy where
   toXml s = Xml.elt "strategy" $ (:[]) $ case s of

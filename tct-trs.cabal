@@ -83,6 +83,7 @@ Library
     Tct.Trs.Interpretation
     Tct.Trs.Method.Compose
     Tct.Trs.Method.DP.DependencyPairs
+    Tct.Trs.Method.DP.DPGraph.Compose
     Tct.Trs.Method.DP.DPGraph.PathAnalysis
     Tct.Trs.Method.DP.DPGraph.PredecessorEstimation
     Tct.Trs.Method.DP.DPGraph.RemoveHeads

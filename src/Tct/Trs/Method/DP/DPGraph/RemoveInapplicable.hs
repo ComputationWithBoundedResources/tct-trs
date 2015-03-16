@@ -56,7 +56,7 @@ instance T.Processor RemoveInapplicable where
           wdg = Prob.dependencyGraph prob
           st  = Prob.startTerms prob
 
-          linitials   = [ (n,r) | (n,cn) <- withNodeLabels' wdg (roots wdg), let r = theRule cn, Prob.isStartTerm st (R.lhs r) ]
+          linitials   = [ (n,r) | (n,cn) <- lnodes wdg, let r = theRule cn, Prob.isStartTerm st (R.lhs r) ]
           reachable   = reachablesDfs wdg $ fst (unzip linitials)
           unreachable = filter (`S.notMember` reachableS) (nodes wdg)
             where reachableS = S.fromList reachable

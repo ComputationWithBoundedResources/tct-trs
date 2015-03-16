@@ -4,19 +4,28 @@ module Tct.Trs.Interactive
   , loadRC
   , loadIDC
   , loadIRC
+
+  , wdg
   ) where
 
 
 import           Tct.Core.Interactive
 import qualified Tct.Core.Main        as T
+import qualified Tct.Core.Common.Pretty as PP
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem as Prob
 
 
+loadX :: T.TctMode TrsProblem o -> FilePath -> (TrsProblem -> TrsProblem) -> IO ()
+loadX tm f k = load tm f >> modifyProblem k >> state
+
 loadDC, loadIDC, loadRC, loadIRC :: T.TctMode TrsProblem o -> FilePath -> IO ()
-loadDC tm f  = load tm f >> modifyProblem (Prob.toDC . Prob.toFull      :: TrsProblem -> TrsProblem)
-loadIDC tm f = load tm f >> modifyProblem (Prob.toDC . Prob.toInnermost :: TrsProblem -> TrsProblem)
-loadRC tm f  = load tm f >> modifyProblem (Prob.toRC . Prob.toFull      :: TrsProblem -> TrsProblem)
-loadIRC tm f = load tm f >> modifyProblem (Prob.toRC . Prob.toInnermost :: TrsProblem -> TrsProblem)
+loadDC tm f  = loadX tm f (Prob.toDC . Prob.toFull)
+loadIDC tm f = loadX tm f (Prob.toDC . Prob.toInnermost)
+loadRC tm f  = loadX tm f (Prob.toRC . Prob.toFull)
+loadIRC tm f = loadX tm f (Prob.toRC . Prob.toInnermost)
+
+wdg :: IO ()
+wdg = onProblem $ PP.putPretty . (Prob.dependencyGraph :: TrsProblem -> DG F V)
 
