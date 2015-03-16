@@ -36,7 +36,7 @@ data Problem f v = Problem
   , weakTrs    :: Trs f v
 
   , dpGraph    :: DependencyGraph f v
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Typeable)
 
 dependencyGraph :: Problem f v -> DG f v
 dependencyGraph = DPG.dependencyGraph . dpGraph
