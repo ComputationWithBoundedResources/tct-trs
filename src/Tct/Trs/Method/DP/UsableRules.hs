@@ -1,10 +1,7 @@
-{- |
- - This module provides the usable rules transformation.
--}
+-- | this module provides the /Usable Rules/ processor.
 module Tct.Trs.Method.DP.UsableRules
-  (
-  usableRules
-  , usableRulesDeclaration
+  ( usableRulesDeclaration
+  , usableRules
   ) where
 
 
@@ -64,7 +61,7 @@ usableRulesOf' rhss trs = Trs.fromList $ usableRulesOf rhss (Trs.toList trs)
 
 --- * processor ------------------------------------------------------------------------------------------------------
 
-data UsableRulesProcessor = UsableRulesProc deriving Show
+data UsableRules = UsableRules deriving Show
 
 data UsableRulesProof = UsableRulesProof
   { strictUsables :: Trs F V      -- ^ Usable strict rules
@@ -75,9 +72,9 @@ data UsableRulesProof = UsableRulesProof
 progress :: UsableRulesProof -> Bool
 progress = not . Trs.null . nonUsables
 
-instance T.Processor UsableRulesProcessor where
-  type ProofObject UsableRulesProcessor = ApplicationProof UsableRulesProof
-  type Problem UsableRulesProcessor     = TrsProblem
+instance T.Processor UsableRules where
+  type ProofObject UsableRules = ApplicationProof UsableRulesProof
+  type Problem UsableRules     = TrsProblem
 
   solve p prob                          = return . T.resultToTree p prob $
     maybe usables (T.Fail . Inapplicable) (Prob.isDPProblem' prob)
@@ -127,12 +124,12 @@ instance Xml.Xml UsableRulesProof where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-usableRules :: T.Strategy TrsProblem
-usableRules = T.Proc UsableRulesProc
-
 usableRulesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-usableRulesDeclaration = T.declare "usableRules" description () usableRules where
+usableRulesDeclaration = T.declare "usableRules" description () (T.Proc UsableRules) where
   description =
-    [ "This processor restricts the strict- and weak-rules to usable rules with"                                                                                                              
+    [ "This processor restricts the strict- and weak-rules to usable rules with"
     ,"respect to the dependency pairs." ]
+
+usableRules :: T.Strategy TrsProblem
+usableRules = T.declFun usableRulesDeclaration
 

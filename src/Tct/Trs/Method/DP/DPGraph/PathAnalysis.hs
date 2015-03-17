@@ -1,7 +1,8 @@
 -- | This module provides the \Path Analysis\ processor.
 module Tct.Trs.Method.DP.DPGraph.PathAnalysis 
-  ( pathAnalysis
-  , pathAnalysisDeclaration
+  ( pathAnalysisDeclaration
+  , pathAnalysis
+  , pathAnalysis'
   ) where
 
 -- notes:
@@ -132,11 +133,11 @@ walkFromQ cdg root = walkFromQ' [] Prob.emptyRuleSet root where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-pathAnalysis :: Bool -> T.Strategy TrsProblem
-pathAnalysis b = T.Proc $ PathAnalysis { onlyLinear=b }
+pathAnalysisStrategy :: Bool -> T.Strategy TrsProblem
+pathAnalysisStrategy b = T.Proc $ PathAnalysis { onlyLinear=b }
 
 pathAnalysisDeclaration :: T.Declaration ('[T.Argument 'T.Optional Bool] T.:-> T.Strategy TrsProblem)
-pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) pathAnalysis
+pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) pathAnalysisStrategy
   where
     desc = ["This processor implements path-analysis as described in the dependency pair paper."]
     linArg = T.bool
@@ -144,6 +145,11 @@ pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) path
       `T.withHelp` ["If this flag is set, linear path analysis is employed."]
       `T.optional` True
 
+pathAnalysis :: Bool -> T.Strategy TrsProblem
+pathAnalysis = T.declFun pathAnalysisDeclaration
+
+pathAnalysis' :: T.Strategy TrsProblem
+pathAnalysis' = T.deflFun pathAnalysisDeclaration
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 

@@ -73,7 +73,6 @@ newtype PolyInterProof = PolyInterProof (OrientationProof PolyOrder) deriving Sh
 
 type PolyInter      = PI.PolyInter F
 type Kind           = PI.Kind F
-type CoefficientVar = PI.CoefficientVar F
 
 data PolyOrder = PolyOrder
   { kind_      :: Kind
@@ -128,12 +127,13 @@ interpret ebsi = interpretTerm interpretFun interpretVar
 
 newtype StrictVar f v = StrictVar (R.Rule f v) deriving (Show, Eq, Ord)
 
+
 entscheide :: (MonadError e m, MonadIO m) => PolyInterProcessor -> TrsProblem -> m (SMT.Result PolyOrder)
 entscheide p prob = do
-  res :: SMT.Result (M.Map CoefficientVar Int, UPEnc.UsablePositions F, Maybe (UREnc.UsableSymbols F)) <- liftIO $ SMT.solveStM SMT.minismt $ do
+  res :: SMT.Result (PI.PolyInter F Int, UPEnc.UsablePositions F, Maybe (UREnc.UsableSymbols F)) <- liftIO $ SMT.solveStM SMT.minismt $ do
     SMT.setFormat "QF_NIA"
     -- encode abstract interpretation
-    (ebsi,coefficientEncoder) <- SMT.memo $ PI.PolyInter `fmap` F.mapM encode absi
+    ebsi <- PI.PolyInter `fmap` F.mapM encode absi
     -- encode strict vars
     (_, strictEncoder) <- SMT.memo $ mapM (SMT.snvarMO . StrictVar) rules
     -- encode usable rules
@@ -189,7 +189,7 @@ entscheide p prob = do
     SMT.assert usableRulesConstraints
     SMT.assert filteringConstraints
 
-    return $ SMT.decode (coefficientEncoder, usablePositions, usableEncoder)
+    return $ SMT.decode (ebsi, usablePositions, usableEncoder)
   return $ mkOrder `fmap` res
   where
 
@@ -198,8 +198,8 @@ entscheide p prob = do
 
     encode = P.fromViewWithM enc where
       enc c
-        | PI.restrict c = SMT.snvarMO c
-        | otherwise     = SMT.nvarMO c
+        | PI.restrict c = SMT.snvarM'
+        | otherwise     = SMT.nvarM'
     rules = Trs.toList (Prob.allComponents prob)
     sig   = Prob.signature prob
     absi  = M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
@@ -208,7 +208,7 @@ entscheide p prob = do
         then PI.ConstructorBased (shape p) (Prob.constructors $ Prob.startTerms prob)
         else PI.Unrestricted (shape p)
 
-    mkOrder (inter, uposs, ufuns) = PolyOrder
+    mkOrder (pint, uposs, ufuns) = PolyOrder
       { kind_      = kind
       , pint_      = pint
       , sig_       = sig
@@ -220,7 +220,6 @@ entscheide p prob = do
       , weakDPs_   = wDPs
       , weakTrs_   = wTrs }
       where
-        pint        = PI.PolyInter $ M.map (P.fromViewWith (inter M.!)) absi
         (sDPs,wDPs) = L.partition (isStrict . snd) (rs $ Prob.dpComponents prob)
         (sTrs,wTrs) = L.partition (isStrict . snd) (rs $ Prob.trsComponents prob)
         isStrict (lpoly,rpoly) = P.constantValue (lpoly `sub` rpoly) > 0

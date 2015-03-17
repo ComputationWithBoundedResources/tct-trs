@@ -16,9 +16,9 @@ in the strict components.
 -- we do not support solvePartial as in tct2
 -- provide functions to easily integreate predecessorEstimation with other processors
 module Tct.Trs.Method.DP.DPGraph.PredecessorEstimation
-  ( predecessorEstimation
-  , predecessorEstimationOn
-  , predecessorEstimationOnDeclaration
+  ( predecessorEstimationDeclaration
+  , predecessorEstimation
+  , predecessorEstimation'
   ) where
 
 
@@ -106,17 +106,20 @@ instance T.Processor (PredecessorEstimation) where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-predecessorEstimation :: T.Strategy TrsProblem
-predecessorEstimation = T.defaultFun predecessorEstimationOnDeclaration
+predecessorEstimationStrategy :: ExpressionSelector F V -> T.Strategy TrsProblem
+predecessorEstimationStrategy rs = T.Proc $ PredecessorEstimation { onSelection=rs }
 
-predecessorEstimationOn :: ExpressionSelector F V -> T.Strategy TrsProblem
-predecessorEstimationOn sel = T.Proc $ PredecessorEstimation { onSelection=sel }
+predecessorEstimation :: ExpressionSelector F V -> T.Strategy TrsProblem
+predecessorEstimation = T.declFun predecessorEstimationDeclaration
 
-predecessorEstimationOnDeclaration :: T.Declaration (
+predecessorEstimation' :: T.Strategy TrsProblem
+predecessorEstimation' = T.deflFun predecessorEstimationDeclaration
+
+predecessorEstimationDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V) ]
   T.:-> T.Strategy TrsProblem)
-predecessorEstimationOnDeclaration =
-  T.declare "predecessorEstimationOn" desc (T.OneTuple selArg) predecessorEstimationOn
+predecessorEstimationDeclaration =
+  T.declare "predecessorEstimation" desc (T.OneTuple selArg) predecessorEstimationStrategy
   where
     desc =
       [ "Moves a strict dependency into the weak component, if all predecessors in the dependency graph are strict"

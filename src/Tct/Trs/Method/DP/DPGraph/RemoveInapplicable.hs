@@ -1,6 +1,6 @@
 module Tct.Trs.Method.DP.DPGraph.RemoveInapplicable
-  ( removeInapplicable
-  , removeInapplicableDeclaration
+  ( removeInapplicableDeclaration
+  , removeInapplicable
   ) where
 
 
@@ -80,13 +80,13 @@ instance T.Processor RemoveInapplicable where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 removeInapplicable :: T.Strategy TrsProblem
-removeInapplicable = T.Proc RemoveInapplicable
+removeInapplicable = T.declFun removeInapplicableDeclaration
 
 -- | Removes inapplicable rules in DP deriviations.
 --
 -- We check wether nodes are reachable from starting terms.
 removeInapplicableDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-removeInapplicableDeclaration = T.declare "removeInapplicable" desc () removeInapplicable
+removeInapplicableDeclaration = T.declare "removeInapplicable" desc () (T.Proc RemoveInapplicable)
   where desc = ["Removes rules that are not applicable in DP derivations."]
 
 

@@ -81,9 +81,9 @@ Library
     Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interactive
     Tct.Trs.Interpretation
-    Tct.Trs.Method.Compose
+    Tct.Trs.Method.Decompose
     Tct.Trs.Method.DP.DependencyPairs
-    Tct.Trs.Method.DP.DPGraph.Compose
+    Tct.Trs.Method.DP.DPGraph.DecomposeDG
     Tct.Trs.Method.DP.DPGraph.PathAnalysis
     Tct.Trs.Method.DP.DPGraph.PredecessorEstimation
     Tct.Trs.Method.DP.DPGraph.RemoveHeads

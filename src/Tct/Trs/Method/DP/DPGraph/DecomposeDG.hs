@@ -12,7 +12,7 @@
 
 Here @sep(R#) = {l->ri | l -> Com(r1,...,rk) in R#}@.
 -}
-module Tct.Trs.Method.DP.DPGraph.Compose
+module Tct.Trs.Method.DP.DPGraph.DecomposeDG
   ( decomposeDGselect
   , decomposeDG
   , decomposeDGDeclaration

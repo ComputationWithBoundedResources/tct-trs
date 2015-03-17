@@ -12,7 +12,7 @@ import           Tct.Core.Common.Error      (TctError (..))
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml (putXml)
 import           Tct.Core.Main
-import           Tct.Core.Processor.Trivial (failing)
+import           Tct.Core.Processor.Simple  (failing)
 
 import qualified Data.Rewriting.Problem     as R
 

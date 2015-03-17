@@ -1,6 +1,6 @@
 module Tct.Trs.Method.DP.DPGraph.Trivial
-  ( trivial
-  , trivialDeclaration
+  ( trivialDeclaration
+  , trivial
   ) where
 
 
@@ -50,13 +50,13 @@ instance T.Processor Trivial where
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
 trivialDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-trivialDeclaration = T.declare "trivial" desc () trivial where
+trivialDeclaration = T.declare "trivial" desc () (T.Proc Trivial) where
   desc =
     [ "Checks wether the DP problem is trivial, i.e. the dependency graph contains no loops."
     , "Only applicable if the strict component is empty."]
 
 trivial :: T.Strategy TrsProblem
-trivial = T.Proc Trivial
+trivial = T.declFun trivialDeclaration
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

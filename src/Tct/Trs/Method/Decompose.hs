@@ -1,7 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
-module Tct.Trs.Method.Compose 
-  ( decompose
-  , decomposeDeclaration
+module Tct.Trs.Method.Decompose 
+  ( 
+  -- decompose
+  -- , decomposeDeclaration
+  --
+  -- , DecomposeBound
+  -- , combineBy
   ) where
 
 import           Data.Typeable
@@ -176,20 +180,32 @@ instance Xml.Xml DecomposeProof where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-decompose :: ExpressionSelector F V -> DecomposeBound -> T.Strategy TrsProblem
-decompose rs = T.Proc . DecomposeStaticProc rs
 
-decomposeDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional DecomposeBound ]
-   T.:-> T.Strategy TrsProblem )
-decomposeDeclaration = T.declare "decomposeStatic" description (selectorArg', boundArg') decompose
-  where
-    boundArg'    = boundArg `T.optional` RelativeAdd
-    selectorArg' = selectorArg `T.optional` selAnyOf selStricts
+decomposeProcessor :: ExpressionSelector F V -> DecomposeBound -> DecomposeStaticProcessor
+decomposeProcessor rs = DecomposeStaticProc rs
 
-description :: [String]
-description =
+-- decompose :: RuleSelector F V (SelectorExpression F V) -> DecomposeBound -> DecomposeStaticProcessor
+-- decompose = T.declFun decomposeDeclaration
+--
+-- decompose' :: DecomposeStaticProcessor
+-- decompose' = T.defaultFun decomposeDeclaration
+--
+-- combineBy :: ExpressionSelector F V -> DecomposeStaticProcessor
+-- combineBy rs = case decompose' of
+--   DecomposeStaticProc _ b -> DecomposeStaticProc rs b
+
+
+-- decomposeDeclaration :: T.Declaration (
+--   '[ T.Argument 'T.Optional (ExpressionSelector F V)
+--    , T.Argument 'T.Optional DecomposeBound ]
+--    T.:-> T.Strategy TrsProblem )
+-- decomposeDeclaration = T.declare "decomposeStatic" desc (selectorArg', boundArg') DecomposeStaticProc
+--   where
+--     boundArg'    = boundArg `T.optional` RelativeAdd
+--     selectorArg' = selectorArg `T.optional` selAnyOf selStricts
+
+desc :: [String]
+desc =
   [ "This transformation implements techniques for splitting the complexity problem"
   , "into two complexity problems (R) and (S) so that the complexity of the input problem"
   , "can be estimated by the complexity of the transformed problem."

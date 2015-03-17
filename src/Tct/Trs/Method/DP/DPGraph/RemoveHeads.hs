@@ -1,6 +1,7 @@
+-- | This module provides the /Remove Heads/ processor.
 module Tct.Trs.Method.DP.DPGraph.RemoveHeads
-  ( removeHeads
-  , removeHeadsDeclaration
+  ( removeHeadsDeclaration
+  , removeHeads
   ) where
 
 
@@ -69,12 +70,12 @@ instance T.Processor RemoveHeads where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-removeHeads :: T.Strategy TrsProblem
-removeHeads = T.Proc RemoveHeads
-
 removeHeadsDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-removeHeadsDeclaration = T.declare "removeHeads" desc () removeHeads
+removeHeadsDeclaration = T.declare "removeHeads" desc () (T.Proc RemoveHeads)
   where desc = ["Removes roots from the dependency graph that lead to starting terms only."]
+
+removeHeads :: T.Strategy TrsProblem
+removeHeads = T.declFun removeHeadsDeclaration
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

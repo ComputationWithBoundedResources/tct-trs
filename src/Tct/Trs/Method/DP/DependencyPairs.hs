@@ -1,11 +1,11 @@
--- | This module implements the /weak dependency pair/ and the /dependency tuples/ transformation.
+-- | This module implements the /Weak Dependency Pairs/ and the /Dependency Tuples/ processor.
 module Tct.Trs.Method.DP.DependencyPairs
-  (
-  dependencyPairs
-  , dependencyPairsDeclaration
-  , dependencyTuples
+  ( dependencyPairsDeclaration
+  , dependencyPairs
   , dependencyTuplesDeclaration
+  , dependencyTuples
   ) where
+
 
 import           Control.Applicative         ((<|>))
 import           Control.Monad.State.Strict
@@ -78,18 +78,19 @@ dependencyPairsOf useTuples strat defineds trs
 
 --- * processor ------------------------------------------------------------------------------------------------------
 
-data DPProcessor = DPProc { useTuples_ :: Bool } deriving Show
+data DependencyPairs = DependencyPairs { useTuples_ :: Bool } deriving Show
 
-data DPProof = DPProof
+data DependencyPairsProof = DependencyPairsProof
   { strictTransformation :: [Transformation F V]
   , weakTransformation   :: [Transformation F V]
   , tuplesUsed           :: Bool
   , newSignature         :: Signature F }
   deriving Show
 
-instance T.Processor DPProcessor where
-  type ProofObject DPProcessor = ApplicationProof DPProof
-  type Problem DPProcessor     = TrsProblem
+instance T.Processor DependencyPairs where
+  type ProofObject DependencyPairs = ApplicationProof DependencyPairsProof
+  type Problem DependencyPairs     = TrsProblem
+
   solve p prob                 = return . T.resultToTree p prob $
     maybe dp (T.Fail . Inapplicable) maybeApplicable
     where
@@ -116,7 +117,7 @@ instance T.Processor DPProcessor where
         , Prob.weakDPs   = wDPs
         , Prob.strictTrs = if useTuples then Trs.empty else Prob.strictTrs prob
         , Prob.weakTrs   = if useTuples then Prob.trsComponents prob else Prob.weakTrs prob }
-      nproof = DPProof
+      nproof = DependencyPairsProof
         { strictTransformation = stricts
         , weakTransformation   = weaks
         , tuplesUsed   = useTuples
@@ -128,7 +129,7 @@ instance T.Processor DPProcessor where
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
-instance PP.Pretty DPProof where
+instance PP.Pretty DependencyPairsProof where
   pretty proof
     = PP.vcat
       [ PP.text $ "We add the following "
@@ -141,7 +142,7 @@ instance PP.Pretty DPProof where
       , PP.empty
       , PP.text "and mark the set of starting terms." ]
 
-instance Xml.Xml DPProof where
+instance Xml.Xml DependencyPairsProof where
   toXml proof =
     Xml.elt "dp"
       [ Xml.elt (if tuplesUsed proof then "tuples" else "pairs") []
@@ -163,17 +164,17 @@ instance Xml.Xml DPProof where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-dependencyPairs :: T.Strategy TrsProblem
-dependencyPairs = T.Proc (DPProc False)
-
 dependencyPairsDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-dependencyPairsDeclaration = T.declare "dependencyPairs" description () dependencyPairs
+dependencyPairsDeclaration = T.declare "dependencyPairs" description () (T.Proc $ DependencyPairs False)
   where description = [ "Applies the (weak) dependency pairs transformation." ]
 
-dependencyTuples :: T.Strategy TrsProblem
-dependencyTuples = T.Proc (DPProc True)
+dependencyPairs :: T.Strategy TrsProblem
+dependencyPairs = T.declFun dependencyPairsDeclaration
 
 dependencyTuplesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-dependencyTuplesDeclaration = T.declare "dependencyTuples" description () dependencyTuples
+dependencyTuplesDeclaration = T.declare "dependencyTuples" description () (T.Proc $ DependencyPairs True)
   where description = [ "Applies the dependency tuples transformation." ]
+
+dependencyTuples :: T.Strategy TrsProblem
+dependencyTuples = T.declFun dependencyTuplesDeclaration
 

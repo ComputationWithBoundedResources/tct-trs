@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
 module Tct.Trs.Processor
   ( module M
 
@@ -22,8 +23,9 @@ import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.DependencyGraph                    as DG
 
+import           Tct.Trs.Method.Decompose as M
 import           Tct.Trs.Method.DP.DependencyPairs               as M
-import           Tct.Trs.Method.DP.DPGraph.Compose               as M
+import           Tct.Trs.Method.DP.DPGraph.DecomposeDG           as M
 import           Tct.Trs.Method.DP.DPGraph.PathAnalysis          as M
 import           Tct.Trs.Method.DP.DPGraph.PredecessorEstimation as M
 import           Tct.Trs.Method.DP.DPGraph.RemoveHeads           as M
@@ -40,6 +42,8 @@ defaultDeclarations =
   [ T.SD emptyDeclaration
   , T.SD withCertificationDeclaration
 
+  -- , T.sd decomposeDeclaration
+
   -- Semantic
   , T.SD polyDeclaration
 
@@ -51,7 +55,7 @@ defaultDeclarations =
   -- DP graph
   , T.SD decomposeDGDeclaration
   , T.SD pathAnalysisDeclaration
-  , T.SD predecessorEstimationOnDeclaration
+  , T.SD predecessorEstimationDeclaration
   , T.SD removeHeadsDeclaration
   , T.SD removeInapplicableDeclaration
   , T.SD removeWeakSuffixesDeclaration
@@ -146,7 +150,7 @@ dpsimps = force $
 -- and usable rules are re-computed ('usableRules').
 cleanSuffix :: T.Strategy TrsProblem
 cleanSuffix = force $
-  te (predecessorEstimationOn sel)
+  te (predecessorEstimation sel)
   >>> try (removeWeakSuffixes >>> try (simplifyRHS >>> try usableRules))
   where
     sel = RS.selAllOf (RS.selFromWDG f) { RS.rsName = "simple predecessor estimation selector" }

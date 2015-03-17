@@ -1,4 +1,8 @@
-module Tct.Trs.Method.DP.DPGraph.SimplifyRHS where
+-- | This module provides the /Simplify RHS/ processor.
+module Tct.Trs.Method.DP.DPGraph.SimplifyRHS 
+  ( simplifyRHSDeclaration
+  , simplifyRHS 
+  ) where
 
 
 import qualified Data.List                    as L (partition)
@@ -81,7 +85,7 @@ instance T.Processor SimplifyRHS where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 simplifyRHSDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-simplifyRHSDeclaration = T.declare "simplifyRHS" desc () simplifyRHS where
+simplifyRHSDeclaration = T.declare "simplifyRHS" desc () (T.Proc SimplifyRHS) where
   desc =
     [ "Simplify right hand sides of dependency pairs by removing marked subterms "
     , "whose root symbols are undefined."
@@ -94,7 +98,7 @@ simplifyRHSDeclaration = T.declare "simplifyRHS" desc () simplifyRHS where
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
 simplifyRHS :: T.Strategy TrsProblem
-simplifyRHS = T.Proc SimplifyRHS
+simplifyRHS = T.declFun simplifyRHSDeclaration
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
