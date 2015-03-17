@@ -109,12 +109,6 @@ instance T.Processor (PredecessorEstimation) where
 predecessorEstimationStrategy :: ExpressionSelector F V -> T.Strategy TrsProblem
 predecessorEstimationStrategy rs = T.Proc $ PredecessorEstimation { onSelection=rs }
 
-predecessorEstimation :: ExpressionSelector F V -> T.Strategy TrsProblem
-predecessorEstimation = T.declFun predecessorEstimationDeclaration
-
-predecessorEstimation' :: T.Strategy TrsProblem
-predecessorEstimation' = T.deflFun predecessorEstimationDeclaration
-
 predecessorEstimationDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V) ]
   T.:-> T.Strategy TrsProblem)
@@ -131,6 +125,11 @@ predecessorEstimationDeclaration =
         , "Per default all dependency pairs are selected for knowledge propagation." ]
       `T.optional` (RS.selAllOf RS.selDPs)
 
+predecessorEstimation :: ExpressionSelector F V -> T.Strategy TrsProblem
+predecessorEstimation = T.declFun predecessorEstimationDeclaration
+
+predecessorEstimation' :: T.Strategy TrsProblem
+predecessorEstimation' = T.deflFun predecessorEstimationDeclaration
 
 --- * proof data -----------------------------------------------------------------------------------------------------
 

@@ -1,32 +1,40 @@
+-- | This module provides the /Decompose/ processor.
 {-# LANGUAGE RecordWildCards #-}
-module Tct.Trs.Method.Decompose 
-  ( 
-  -- decompose
-  -- , decomposeDeclaration
-  --
-  -- , DecomposeBound
-  -- , combineBy
+module Tct.Trs.Method.Decompose
+  ( decomposeDeclaration
+  , decompose
+  , decompose'
+
+  -- * processor interface
+  , Decompose
+  , DecomposeBound (..)
+  , decomposeProcDeclaration
+  , decomposeProc
+  , decomposeProc'
+  , combineBy
+  , decomposeBy
   ) where
 
-import           Data.Typeable
+
 import           Control.Applicative
+import           Data.Typeable
 
-import qualified Data.Rewriting.Term           as R (isVariantOf)
-import qualified Data.Rewriting.Rule           as R (Rule)
+import qualified Data.Rewriting.Rule         as R (Rule)
+import qualified Data.Rewriting.Term         as R (isVariantOf)
 
-import qualified Tct.Core.Common.Parser        as P
-import qualified Tct.Core.Common.Pretty        as PP
-import qualified Tct.Core.Common.Xml           as Xml
+import qualified Tct.Core.Common.Parser      as P
+import qualified Tct.Core.Common.Pretty      as PP
 import           Tct.Core.Common.SemiRing
-import qualified Tct.Core.Data                 as T
+import qualified Tct.Core.Common.Xml         as Xml
+import qualified Tct.Core.Data               as T
 
 import           Tct.Common.ProofCombinators
 
-import qualified Tct.Trs.Data.Problem as Prob
-import qualified Tct.Trs.Data.Rewriting        as R
+import           Tct.Trs.Data
+import qualified Tct.Trs.Data.Problem        as Prob
+import qualified Tct.Trs.Data.Rewriting      as R
 import           Tct.Trs.Data.RuleSelector
-import Tct.Trs.Data
-import qualified Tct.Trs.Data.Trs as Trs
+import qualified Tct.Trs.Data.Trs            as Trs
 
 
 data DecomposeBound
@@ -101,43 +109,49 @@ mkProbs prob compfn dps trs = (rProb, sProb)
 
 --- * processor ------------------------------------------------------------------------------------------------------
 
-data DecomposeStaticProcessor = DecomposeStaticProc (ExpressionSelector F V) DecomposeBound
+data Decompose = Decompose 
+  { onSelection :: ExpressionSelector F V
+  , withBound   :: DecomposeBound }
   deriving Show
 
 data DecomposeProof
-  = DecomposeStaticProof
-    { proofBound       :: DecomposeBound
-    , proofSelectedTrs :: Trs F V
-    , proofSelectedDPs :: Trs F V
-    , proofSubProblems :: (TrsProblem, TrsProblem) }
+  = DecomposeProof
+    { bound_       :: DecomposeBound
+    , selectedTrs_ :: Trs F V
+    , selectedDPs_ :: Trs F V
+    , rProb_       :: TrsProblem
+    , sProb_       :: TrsProblem }
+  | DecomposeFail
     deriving Show
 
 progress :: DecomposeProof -> Bool
-progress DecomposeStaticProof{..} =
-  case proofBound of
-    Add -> not $ Trs.null (Prob.allComponents rProb) || Trs.null (Prob.allComponents sProb)
-    _   -> not $ Prob.isTrivial rProb || Prob.isTrivial sProb
-    where  (rProb, sProb) = proofSubProblems
+progress DecomposeProof{..} =
+  case bound_ of
+    Add -> not $ Trs.null (Prob.allComponents rProb_) || Trs.null (Prob.allComponents sProb_)
+    _   -> not $ Prob.isTrivial rProb_ || Prob.isTrivial sProb_
+progress DecomposeFail = False  
 
-instance T.Processor DecomposeStaticProcessor where
-  type ProofObject DecomposeStaticProcessor = ApplicationProof DecomposeProof
-  type Problem DecomposeStaticProcessor = TrsProblem
-  type Forking DecomposeStaticProcessor = T.Pair
-  solve p@(DecomposeStaticProc rs compfn) prob = return . T.resultToTree p prob $
+instance T.Processor Decompose where
+  type ProofObject Decompose = ApplicationProof DecomposeProof
+  type Problem Decompose = TrsProblem
+  type Forking Decompose = T.Pair
+
+  solve p@Decompose{..} prob = return . T.resultToTree p prob $
     maybe decomposition (T.Fail . Inapplicable) maybeApplicable
     where
       decomposition
-        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) (cert (fromBound compfn))
-        | otherwise      = T.Fail (Applicable proof)
-      maybeApplicable = isApplicableRandS prob compfn <|> isApplicableRModuloS rProb sProb compfn
+        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) (cert (fromBound withBound))
+        | otherwise      = T.Fail (Applicable DecomposeFail)
+      maybeApplicable = isApplicableRandS prob withBound <|> isApplicableRModuloS rProb sProb withBound
 
-      (dps,trs) = rules $ BigAnd [ rsSelect rs prob, selectForcedRules prob compfn]
-      (rProb, sProb) = mkProbs prob compfn dps trs
-      proof = DecomposeStaticProof
-        { proofBound       = compfn
-        , proofSelectedTrs = trs
-        , proofSelectedDPs = dps
-        , proofSubProblems = (rProb, sProb) }
+      (dps,trs) = rules $ BigAnd [ rsSelect onSelection prob, selectForcedRules prob withBound]
+      (rProb, sProb) = mkProbs prob withBound dps trs
+      proof = DecomposeProof
+        { bound_       = withBound
+        , selectedTrs_ = trs
+        , selectedDPs_ = dps
+        , rProb_       = rProb
+        , sProb_       = sProb }
       fromBound Add          = add
       fromBound RelativeAdd  = add
       fromBound RelativeMul  = mul
@@ -148,31 +162,30 @@ instance T.Processor DecomposeStaticProcessor where
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty DecomposeProof where
-  pretty proof@DecomposeStaticProof{..}
-    | progress proof = PP.vcat
-        [ PP.text "We analyse the complexity of following sub-problems (R) and (S)."
-        , case proofBound of
-          Add -> PP.text
-            "Problem (S) is obtained by removing rules in (R) from the input problem."
-          RelativeAdd -> PP.text
-            "Problem (S) is obtained from the input problem by shifting strict rules from (R) into the weak component."
-          RelativeMul -> PP.paragraph $ unwords
-            [ "Observe that Problem (R) is non-size-increasing. "
-            , "Once the complexity of (R) has been assessed, it suffices "
-            , "to consider only rules whose complexity has not been estimated in (R) "
-            , "resulting in the following Problem (S). Overall the certificate is obtained by multiplication." ]
-          RelativeComp -> PP.paragraph $ unwords
-            [ "Observe that weak rules from Problem (R) are non-size-increasing. "
-            , "Once the complexity of (R) has been assessed, it suffices "
-            , "to consider only rules whose complexity has not been estimated in (R) "
-            , "resulting in the following Problem (S). Overall the certificate is obtained by composition." ]
-        , PP.empty
-        , PP.text "Problem (R)"
-        , PP.indent 2 $ PP.pretty (fst proofSubProblems)
-        , PP.empty
-        , PP.text "Problem (S)"
-        , PP.indent 2 $ PP.pretty (snd proofSubProblems) ]
-    | otherwise =  PP.text "No rule was selected."
+  pretty DecomposeProof{..} = PP.vcat
+    [ PP.text "We analyse the complexity of following sub-problems (R) and (S)."
+    , case bound_ of
+      Add -> PP.text
+        "Problem (S) is obtained by removing rules in (R) from the input problem."
+      RelativeAdd -> PP.text
+        "Problem (S) is obtained from the input problem by shifting strict rules from (R) into the weak component."
+      RelativeMul -> PP.paragraph $ unwords
+        [ "Observe that Problem (R) is non-size-increasing. "
+        , "Once the complexity of (R) has been assessed, it suffices "
+        , "to consider only rules whose complexity has not been estimated in (R) "
+        , "resulting in the following Problem (S). Overall the certificate is obtained by multiplication." ]
+      RelativeComp -> PP.paragraph $ unwords
+        [ "Observe that weak rules from Problem (R) are non-size-increasing. "
+        , "Once the complexity of (R) has been assessed, it suffices "
+        , "to consider only rules whose complexity has not been estimated in (R) "
+        , "resulting in the following Problem (S). Overall the certificate is obtained by composition." ]
+    , PP.empty
+    , PP.text "Problem (R)"
+    , PP.indent 2 $ PP.pretty (rProb_)
+    , PP.empty
+    , PP.text "Problem (S)"
+    , PP.indent 2 $ PP.pretty (sProb_) ]
+  pretty DecomposeFail = PP.text "Decomposition failed."
 
 instance Xml.Xml DecomposeProof where
   toXml _ = Xml.elt "decompose" []
@@ -180,29 +193,42 @@ instance Xml.Xml DecomposeProof where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
+decomposeProcessor :: ExpressionSelector F V -> DecomposeBound -> Decompose
+decomposeProcessor rs bd = Decompose { onSelection=rs, withBound=bd }
 
-decomposeProcessor :: ExpressionSelector F V -> DecomposeBound -> DecomposeStaticProcessor
-decomposeProcessor rs = DecomposeStaticProc rs
+decomposeProcDeclaration :: T.Declaration (
+  '[ T.Argument 'T.Optional (ExpressionSelector F V)
+   , T.Argument 'T.Optional DecomposeBound ]
+   T.:-> Decompose )
+decomposeProcDeclaration = T.declare "decomposeStatic" desc (selectorArg', boundArg') decomposeProcessor
+  where
+    boundArg'    = boundArg `T.optional` RelativeAdd
+    selectorArg' = selectorArg `T.optional` selAnyOf selStricts
 
--- decompose :: RuleSelector F V (SelectorExpression F V) -> DecomposeBound -> DecomposeStaticProcessor
--- decompose = T.declFun decomposeDeclaration
---
--- decompose' :: DecomposeStaticProcessor
--- decompose' = T.defaultFun decomposeDeclaration
---
--- combineBy :: ExpressionSelector F V -> DecomposeStaticProcessor
--- combineBy rs = case decompose' of
---   DecomposeStaticProc _ b -> DecomposeStaticProc rs b
+decomposeProc :: ExpressionSelector F V -> DecomposeBound -> Decompose
+decomposeProc = T.declFun decomposeProcDeclaration
+
+decomposeProc' :: Decompose
+decomposeProc' = T.deflFun decomposeProcDeclaration
+
+decomposeDeclaration :: T.Declaration (
+  '[ T.Argument 'T.Optional (ExpressionSelector F V)
+   , T.Argument 'T.Optional DecomposeBound ] 
+   T.:-> T.Strategy TrsProblem)
+decomposeDeclaration = T.liftP decomposeProcDeclaration
+
+decomposeBy :: Decompose -> ExpressionSelector F V -> Decompose
+decomposeBy p rs = p { onSelection=rs }
+
+combineBy :: Decompose -> DecomposeBound -> Decompose
+combineBy p b = p{ withBound=b }
 
 
--- decomposeDeclaration :: T.Declaration (
---   '[ T.Argument 'T.Optional (ExpressionSelector F V)
---    , T.Argument 'T.Optional DecomposeBound ]
---    T.:-> T.Strategy TrsProblem )
--- decomposeDeclaration = T.declare "decomposeStatic" desc (selectorArg', boundArg') DecomposeStaticProc
---   where
---     boundArg'    = boundArg `T.optional` RelativeAdd
---     selectorArg' = selectorArg `T.optional` selAnyOf selStricts
+decompose :: ExpressionSelector F V -> DecomposeBound -> T.Strategy TrsProblem
+decompose = T.declFun decomposeDeclaration
+
+decompose' :: T.Strategy TrsProblem
+decompose' = T.deflFun decomposeDeclaration
 
 desc :: [String]
 desc =

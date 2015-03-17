@@ -4,8 +4,18 @@ module Tct.Trs.Processor
 
   , defaultDeclarations
 
-  , empty
   , emptyDeclaration
+  , empty
+
+  , withCertificationDeclaration
+  , withCertification
+  , withCertification'
+
+  -- * Strategies
+  , dpsimps
+  , decomposeIndependent
+  , decomposeIndependentSG
+  , cleanSuffix
   ) where
 
 
@@ -42,7 +52,7 @@ defaultDeclarations =
   [ T.SD emptyDeclaration
   , T.SD withCertificationDeclaration
 
-  -- , T.sd decomposeDeclaration
+  , T.SD decomposeDeclaration
 
   -- Semantic
   , T.SD polyDeclaration
@@ -73,15 +83,15 @@ emptyDeclaration = T.declare "empty" [desc] () empty
 
 --- * withCertification ----------------------------------------------------------------------------------------------
 
-data WithCertificationProcessor =
-  WithCertificationProc { allowPartial :: Bool, onStrategy :: T.Strategy TrsProblem } deriving Show
+data WithCertification =
+  WithCertification { allowPartial :: Bool, onStrategy :: T.Strategy TrsProblem } deriving Show
 
 -- TODO:
 -- MS: the only way to stop a computation currently is using throwError;
 -- we could extend the Continue type with Stop ?
-instance T.Processor WithCertificationProcessor where
-  type ProofObject WithCertificationProcessor = ()
-  type Problem WithCertificationProcessor     = TrsProblem
+instance T.Processor WithCertification where
+  type ProofObject WithCertification = ()
+  type Problem WithCertification     = TrsProblem
 
   solve p prob = do
     ret <- T.evaluate (onStrategy p) prob
@@ -97,14 +107,20 @@ instance T.Processor WithCertificationProcessor where
     errM <- prover (T.fromReturn ret)
     either (throwError . userError) (return . toRet) errM
 
+withCertificationStrategy :: Bool -> T.Strategy TrsProblem -> T.Strategy TrsProblem
+withCertificationStrategy b st = T.Proc $ WithCertification { allowPartial=b, onStrategy=st }
+
 withCertification :: Bool -> T.Strategy TrsProblem -> T.Strategy TrsProblem
-withCertification b = T.Proc . WithCertificationProc b
+withCertification = T.declFun withCertificationDeclaration
+
+withCertification' :: T.Strategy TrsProblem -> T.Strategy TrsProblem
+withCertification' = T.deflFun withCertificationDeclaration
 
 withCertificationDeclaration :: T.Declaration(
   '[T.Argument 'T.Optional Bool
    , T.Argument 'T.Required (T.Strategy TrsProblem)]
    T.:-> T.Strategy TrsProblem)
-withCertificationDeclaration = T.declare "withCertification" [desc] (apArg, T.strat) withCertification
+withCertificationDeclaration = T.declare "withCertification" [desc] (apArg, T.strat) withCertificationStrategy
   where
     desc = "This processor "
     apArg = T.bool
@@ -130,20 +146,20 @@ dpsimps = force $
 -- decomposes dependency pairs into two independent sets, in the sense that these DPs
 -- constitute unconnected sub-graphs of the dependency graph. Applies 'cleanSuffix' on the resulting sub-problems,
 -- if applicable.
--- decomposeIndependent :: T.Strategy Trs.Problem
--- decomposeIndependent = some $
---   Compose.decomposeBy (selAllOf selIndependentSG)
---   >>> try simpDPRHS
---   >>> try cleanSuffix
+decomposeIndependent :: T.Strategy TrsProblem
+decomposeIndependent =
+  -- T.Proc (decomposeProc' `decomposeBy` (RS.selAllOf RS.selIndependentSG))
+  decompose (RS.selAllOf RS.selIndependentSG) RelativeAdd
+  >>> try simplifyRHS
+  >>> try cleanSuffix
 
 -- | Similar to 'decomposeIndependent', but in the computation of the independent sets,
 -- dependency pairs above cycles in the dependency graph are not taken into account.
--- decomposeIndependentSG :: T.TheTransformer T.SomeTransformation
--- decomposeIndependentSG = some $
---   Compose.decomposeBy (selAllOf selCycleIndependentSG)
---   >>> try DPSimp.simpDPRHS
---   >>> try cleanSuffix
-
+decomposeIndependentSG :: T.Strategy TrsProblem
+decomposeIndependentSG =
+  decompose (RS.selAllOf RS.selCycleIndependentSG) RelativeAdd
+  >>> try simplifyRHS
+  >>> try cleanSuffix
 
 -- | Use 'predecessorEstimationOn' and 'removeWeakSuffixes' to remove leafs from the dependency graph.
 -- If successful, right-hand sides of dependency pairs are simplified ('simplifyRHS')
@@ -165,7 +181,8 @@ cleanSuffix = force $
 -- removeLeaf :: T.Strategy TrsProblem -> T.Strategy TrsProblem
 -- removeLeaf  =
 --   p `DPSimp.withPEOn` anyStrictLeaf -- TODO
---   >>> try (removeWeakSuffix >>> try simpDPRHS)
+--   >>> try (removeWeakSuffixes >>> try simplifyRHS)
 --   >>> try usableRules
 --   >>> try trivial
---   where anyStrictLeaf = selAnyOf $ selLeafCWDG `selInter` selStricts
+--   where anyStrictLeaf = RS.selAnyOf $ RS.selLeafCDG `RS.selInter` RS.selStricts
+
