@@ -195,14 +195,26 @@ instance Xml.Xml DecomposeProof where
 decomposeProcessor :: ExpressionSelector F V -> DecomposeBound -> Decompose
 decomposeProcessor rs bd = Decompose { onSelection=rs, withBound=bd }
 
+desc :: [String]
+desc =
+  [ "This transformation implements techniques for splitting the complexity problem"
+  , "into two complexity problems (R) and (S) so that the complexity of the input problem"
+  , "can be estimated by the complexity of the transformed problem."
+  , "The processor closely follows the ideas presented in"
+  , "/Complexity Bounds From Relative Termination Proofs/"
+  , "(<http://www.imn.htwk-leipzig.de/~waldmann/talk/06/rpt/rel/main.pdf>)" ]
+
+bndArg :: T.Argument 'T.Optional DecomposeBound
+bndArg = boundArg `T.optional` RelativeAdd
+
+selArg :: T.Argument 'T.Optional (ExpressionSelector F V)
+selArg = selectorArg `T.optional` selAnyOf selStricts
+
 decomposeProcDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional DecomposeBound ]
    T.:-> Decompose )
-decomposeProcDeclaration = T.declare "decomposeStatic" desc (selectorArg', boundArg') decomposeProcessor
-  where
-    boundArg'    = boundArg `T.optional` RelativeAdd
-    selectorArg' = selectorArg `T.optional` selAnyOf selStricts
+decomposeProcDeclaration = T.declare "decompose" desc (selArg, bndArg) decomposeProcessor
 
 decomposeProc :: ExpressionSelector F V -> DecomposeBound -> (Decompose -> Decompose) -> T.Strategy TrsProblem
 decomposeProc sel b f = T.Proc . f $ T.declFun decomposeProcDeclaration sel b
@@ -214,7 +226,7 @@ decomposeDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional DecomposeBound ] 
    T.:-> T.Strategy TrsProblem)
-decomposeDeclaration = T.liftP decomposeProcDeclaration
+decomposeDeclaration = T.declare "decompose" desc (selArg, bndArg) (\x y -> T.Proc (decomposeProcessor x y ))
 
 decomposeBy :: ExpressionSelector F V -> Decompose -> Decompose
 decomposeBy sel p = p{ onSelection=sel }
@@ -229,14 +241,6 @@ decompose = T.declFun decomposeDeclaration
 decompose' :: T.Strategy TrsProblem
 decompose' = T.deflFun decomposeDeclaration
 
-desc :: [String]
-desc =
-  [ "This transformation implements techniques for splitting the complexity problem"
-  , "into two complexity problems (R) and (S) so that the complexity of the input problem"
-  , "can be estimated by the complexity of the transformed problem."
-  , "The processor closely follows the ideas presented in"
-  , "/Complexity Bounds From Relative Termination Proofs/"
-  , "(<http://www.imn.htwk-leipzig.de/~waldmann/talk/06/rpt/rel/main.pdf>)" ]
 
 boundArg :: T.Argument 'T.Required DecomposeBound
 boundArg = T.arg { T.argName = "allow", T.argDomain = "<bound>"} `T.withHelp` help

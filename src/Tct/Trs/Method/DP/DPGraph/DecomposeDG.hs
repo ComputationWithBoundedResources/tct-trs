@@ -173,39 +173,47 @@ decomposeDGProcessor sel st1 st2 = DecomposeDG
   , onUpper     = st1
   , onLower     = st2 }
 
+help :: [String]
+help =
+  [ "This processor implements processor 'compose' specifically for the"
+  , "(weak) dependency pair setting."
+  , "It tries to estimate the complexity of the input problem"
+  , "based on the complexity of dependency pairs of upper congruence classes"
+  , "(with respect to the congruence graph)"
+  , "relative to the dependency pairs in the remaining lower congruence classes."
+  , "The overall upper bound for the complexity of the input problem"
+  , "is estimated by multiplication of upper bounds of the sub problems."
+  , "Note that the processor allows the optional specification of processors"
+  , "that are applied on the two individual subproblems."
+  , "The transformation results into the systems which could not be oriented"
+  , "by those processors." ]
+
+selArg :: T.Argument 'T.Optional (ExpressionSelector F V)
+selArg = RS.selectorArg
+  `T.withName` "onSelection"
+  `T.withHelp`
+    [ "Determines the strict rules of the selected upper conguence rules." ]
+  `T.optional` decomposeDGselect
+
+upperArg :: T.Argument 'T.Optional (Maybe (T.Strategy prob))
+upperArg = T.some T.strat
+  `T.withName` "onUpper"
+  `T.withHelp` ["Use this processor to solve the upper component."]
+  `T.optional` Nothing
+
+lowerArg :: T.Argument 'T.Optional (Maybe (T.Strategy prob))
+lowerArg = T.some T.strat
+  `T.withName` "onLower"
+  `T.withHelp` ["Use this processor to solve the lower component."]
+  `T.optional` Nothing
+
 decomposeDGProcDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem))
    , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem)) ]
   T.:-> DecomposeDG)
-decomposeDGProcDeclaration = T.declare "decomposeDG" desc (selArg,upperArg,lowerArg) decomposeDGProcessor
-  where
-    desc =
-      [ "This processor implements processor 'compose' specifically for the"
-      , "(weak) dependency pair setting."
-      , "It tries to estimate the complexity of the input problem"
-      , "based on the complexity of dependency pairs of upper congruence classes"
-      , "(with respect to the congruence graph)"
-      , "relative to the dependency pairs in the remaining lower congruence classes."
-      , "The overall upper bound for the complexity of the input problem"
-      , "is estimated by multiplication of upper bounds of the sub problems."
-      , "Note that the processor allows the optional specification of processors"
-      , "that are applied on the two individual subproblems."
-      , "The transformation results into the systems which could not be oriented"
-      , "by those processors." ]
-    selArg = RS.selectorArg
-      `T.withName` "onSelection"
-      `T.withHelp`
-        [ "Determines the strict rules of the selected upper conguence rules." ]
-      `T.optional` decomposeDGselect
-    upperArg = T.some T.strat
-      `T.withName` "onUpper"
-      `T.withHelp` ["Use this processor to solve the upper component."]
-      `T.optional` Nothing
-    lowerArg = T.some T.strat
-      `T.withName` "onLower"
-      `T.withHelp` ["Use this processor to solve the lower component."]
-      `T.optional` Nothing
+decomposeDGProcDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) decomposeDGProcessor
+
 
 decomposeDGProc :: 
   ExpressionSelector F V -> Maybe (T.Strategy TrsProblem) -> Maybe (T.Strategy TrsProblem) 
@@ -241,7 +249,7 @@ decomposeDGDeclaration :: T.Declaration (
    , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem))
    , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem)) ]
   T.:-> T.Strategy TrsProblem)
-decomposeDGDeclaration = T.liftP decomposeDGProcDeclaration
+decomposeDGDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) (\x y z -> T.Proc (decomposeDGProcessor x y z))
 
 decomposeDG :: ExpressionSelector F V -> Maybe (T.Strategy TrsProblem) -> Maybe (T.Strategy TrsProblem) 
   -> T.Strategy TrsProblem
