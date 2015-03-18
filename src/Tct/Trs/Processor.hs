@@ -148,8 +148,7 @@ dpsimps = force $
 -- if applicable.
 decomposeIndependent :: T.Strategy TrsProblem
 decomposeIndependent =
-  -- T.Proc (decomposeProc' `decomposeBy` (RS.selAllOf RS.selIndependentSG))
-  decompose (RS.selAllOf RS.selIndependentSG) RelativeAdd
+  decomposeProc' (decomposeBy (RS.selAllOf RS.selIndependentSG))
   >>> try simplifyRHS
   >>> try cleanSuffix
 

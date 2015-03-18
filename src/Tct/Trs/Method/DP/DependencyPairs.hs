@@ -31,8 +31,9 @@ import qualified Tct.Trs.Data.Signature      as Sig
 
 -- FIXME:
 -- MS Compound Symbols should have identifier component
--- it is necessary to compute a fresh symbol
+-- it is necessary to compute a fresh symbol for pretty printing only
 
+-- maximal subterms that are variables or have a root in the defined symbols
 subtermsWDP :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
 subtermsWDP defineds s@(R.Fun f ss)
   | f `S.member` defineds = [s]
@@ -45,6 +46,7 @@ subtermsWIDP defineds s@(R.Fun f ss)
   | otherwise             = concatMap (subtermsWIDP defineds) ss
 subtermsWIDP _ _ = []
 
+-- subterms that have a root in the defined symbols
 subtermsWDT :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
 subtermsWDT defineds s@(R.Fun f ss)
   | f `S.member` defineds = s :subs
@@ -52,6 +54,7 @@ subtermsWDT defineds s@(R.Fun f ss)
   where subs = concatMap (subtermsWDT defineds) ss
 subtermsWDT _ _ = []
 
+-- MS: we follow tct2 and Com(t)=Com(t) for singleton argument list t; hence rhs always have a compound symbol
 markRule :: (R.Term F V -> [R.Term F V]) -> R.Rule F V -> State Int (R.Rule F V)
 markRule subtermsOf (R.Rule lhs rhs)= do
   i <- modify succ >> get

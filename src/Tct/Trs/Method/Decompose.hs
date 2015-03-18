@@ -8,7 +8,6 @@ module Tct.Trs.Method.Decompose
   -- * processor interface
   , Decompose
   , DecomposeBound (..)
-  , decomposeProcDeclaration
   , decomposeProc
   , decomposeProc'
   , combineBy
@@ -205,11 +204,11 @@ decomposeProcDeclaration = T.declare "decomposeStatic" desc (selectorArg', bound
     boundArg'    = boundArg `T.optional` RelativeAdd
     selectorArg' = selectorArg `T.optional` selAnyOf selStricts
 
-decomposeProc :: ExpressionSelector F V -> DecomposeBound -> Decompose
-decomposeProc = T.declFun decomposeProcDeclaration
+decomposeProc :: ExpressionSelector F V -> DecomposeBound -> (Decompose -> Decompose) -> T.Strategy TrsProblem
+decomposeProc sel b f = T.Proc . f $ T.declFun decomposeProcDeclaration sel b
 
-decomposeProc' :: Decompose
-decomposeProc' = T.deflFun decomposeProcDeclaration
+decomposeProc' :: (Decompose -> Decompose) -> T.Strategy TrsProblem
+decomposeProc' f = T.Proc . f $ T.deflFun decomposeProcDeclaration
 
 decomposeDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
@@ -217,11 +216,11 @@ decomposeDeclaration :: T.Declaration (
    T.:-> T.Strategy TrsProblem)
 decomposeDeclaration = T.liftP decomposeProcDeclaration
 
-decomposeBy :: Decompose -> ExpressionSelector F V -> Decompose
-decomposeBy p rs = p { onSelection=rs }
+decomposeBy :: ExpressionSelector F V -> Decompose -> Decompose
+decomposeBy sel p = p{ onSelection=sel }
 
-combineBy :: Decompose -> DecomposeBound -> Decompose
-combineBy p b = p{ withBound=b }
+combineBy :: DecomposeBound -> Decompose -> Decompose
+combineBy bnd p = p{ withBound=bnd }
 
 
 decompose :: ExpressionSelector F V -> DecomposeBound -> T.Strategy TrsProblem

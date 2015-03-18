@@ -86,6 +86,7 @@ instance T.Processor UsableRules where
         { strictUsables = surs
         , weakUsables   = wurs
         , nonUsables    = nurs }
+      -- FXIME: MS this seems definitely not correct; should it depend on start symbols
       rhss = [ R.rhs r | r  <- Trs.toList (Prob.dpComponents prob)]
       surs = usableRulesOf' rhss (Prob.strictTrs prob)
       wurs = usableRulesOf' rhss (Prob.weakTrs prob)
@@ -101,12 +102,12 @@ instance PP.Pretty UsableRulesProof where
   pretty proof
     | prog && allUrs = PP.text "No rule is usable, rules are removed from the input problem."
     | prog = PP.vcat
-        [ PP.text "We replace rewrite rules by usable rules:"
-        , PP.empty
-        , PP.text "Strict Usable Ruless"
-        , PP.indent 2 $ PP.pretty (strictUsables proof)
-        , PP.text "Weak Usable Rules"
-        , PP.indent 2 $ PP.pretty (weakUsables proof) ]
+      [ PP.text "We replace rewrite rules by usable rules:"
+      , PP.empty
+      , PP.text "Strict Usable Ruless"
+      , PP.indent 2 $ PP.pretty (strictUsables proof)
+      , PP.text "Weak Usable Rules"
+      , PP.indent 2 $ PP.pretty (weakUsables proof) ]
     | otherwise = PP.text "All rules are usable."
     where
       allUrs = Trs.null (strictUsables proof) && Trs.null (weakUsables proof)

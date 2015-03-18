@@ -1,3 +1,12 @@
+{- | This module provides the /Trivial/ processor.
+
+Suppose the dependency graph contains no /non-trivial SCC/, then
+@
+    |- <   /      W, Q, T#> :f
+  -------------------------------------
+    |- <S# / W# + W, Q, T#> :f
+@
+-}
 module Tct.Trs.Method.DP.DPGraph.Trivial
   ( trivialDeclaration
   , trivial

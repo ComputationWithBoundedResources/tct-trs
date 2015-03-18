@@ -1,3 +1,13 @@
+{-|
+This module provides the /Remove Weak Suffixes/ processor.
+
+Let @Wl#@ be forward closed, then
+@
+    |- <S# / W#       + W, Q, T#> :f
+  -------------------------------------
+    |- <S# / W# + Wl# + W, Q, T#> :f
+@
+-}
 module Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes
   ( removeWeakSuffixesDeclaration
   , removeWeakSuffixes
@@ -19,17 +29,6 @@ import qualified Tct.Trs.Data.Trs as Trs
 import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 
-
-{-
-
-Remove Weak Suffixes:
-
-let Wl# be forward closed then
-
-<S#/W# + W, Q, T@> : f
-<S#/W# + Wl# + W, Q, T@> : f
-
--}
 
 data RemoveWeakSuffixes = RemoveWeakSuffixes deriving Show
 

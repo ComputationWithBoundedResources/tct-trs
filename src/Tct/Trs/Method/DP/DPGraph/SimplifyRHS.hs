@@ -1,4 +1,13 @@
--- | This module provides the /Simplify RHS/ processor.
+{- | This module provides the /Simplify RHS/ processor.
+
+@
+    |- <simp(S#) / simp(W#) + W, Q, T#> :f
+  ------------------------------------------
+          |- <S# / W# + W, Q, T#> :f
+@
+, where simp(R#) removes @ri@ from right-hand sides @c_n(r_1,...,r_n)@ if no instance of @ri@ can be rewritten, ie. if
+there is no outgoing edge @i@.
+-}
 module Tct.Trs.Method.DP.DPGraph.SimplifyRHS 
   ( simplifyRHSDeclaration
   , simplifyRHS 
