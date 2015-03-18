@@ -165,6 +165,14 @@ dpComponents, trsComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
 dpComponents prob  = strictDPs prob `Trs.concat` weakDPs prob
 trsComponents prob = strictTrs prob `Trs.concat` weakTrs prob
 
+startComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
+startComponents prob = case st of
+  AllTerms{}   -> k (trsComponents prob)
+  BasicTerms{} -> k (dpComponents prob)
+  where 
+    st = startTerms prob
+    k  = Trs.filter (isStartTerm st . R.lhs)
+
 isDPProblem :: Problem f v -> Bool
 isDPProblem prob = not $ Trs.null (strictDPs prob) && Trs.null (weakDPs prob)
 

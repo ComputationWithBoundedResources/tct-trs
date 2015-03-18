@@ -1,4 +1,11 @@
--- | this module provides the /Usable Rules/ processor.
+{- | this module provides the /Usable Rules/ processor.
+@
+    |- <U(S# + S) / U(W# + W), Q, T#> :f
+  ----------------------------------------
+      |- <S# + S / W# + W, Q, T#> :f
+@
+, where @U(R)@ denotes an approximation of the usable rules wrt. to the starting terms.
+-}
 module Tct.Trs.Method.DP.UsableRules
   ( usableRulesDeclaration
   , usableRules
@@ -47,30 +54,32 @@ cap rs t = evalState (capM t) 0
   {-where caps = [ cap rules ti | ti@T.Fun{} <- T.subterms t ]    -}
 
 usableRulesOf :: (Show v, Show f, Ord v, Eq f) => [T.Term f v] -> [R.Rule f v] -> [R.Rule f v]
-usableRulesOf ts rules | null ts || null rules = []
-usableRulesOf ts rules = walk (caps ts) [] rules
+usableRulesOf rhss rules | null rhss || null rules = []
+usableRulesOf rhss rules = walk (caps rhss) [] rules
   where
     walk []     ur _  = ur
     walk (s:ss) ur rs = walk (caps (RS.rhss ur') ++ ss) (ur' ++ ur) rs'
       where (ur',rs') = partition (\ rl -> s `isUnifiableWith` R.lhs rl) rs
     caps ss = [ cap rules s | si <- ss, s@T.Fun{} <- T.subterms si ]
 
-usableRulesOf' :: (Show f, Show v, Ord v, Ord f) => [T.Term f v] -> Trs.Trs f v -> Trs.Trs f v
-usableRulesOf' rhss trs = Trs.fromList $ usableRulesOf rhss (Trs.toList trs)
+usableRulesOf' :: (Show f, Show v, Ord v, Ord f) => Trs.Trs f v -> Trs.Trs f v -> Trs.Trs f v
+usableRulesOf' start trs = start `Trs.union` steps
+  where steps = Trs.fromList (usableRulesOf (RS.rhss $ Trs.toList start) (Trs.toList trs))
 
 
 --- * processor ------------------------------------------------------------------------------------------------------
 
 data UsableRules = UsableRules deriving Show
 
-data UsableRulesProof = UsableRulesProof
-  { strictUsables :: Trs F V      -- ^ Usable strict rules
-  , weakUsables   :: Trs F V      -- ^ Usable weak rules
-  , nonUsables    :: Trs F V      -- ^ Not usable rules
-  } deriving Show
+data UsableRulesProof 
+  = UsableRulesProof
+  { usable_    :: Trs F V
+  , notUsable_ :: Trs F V }
+  | UsableRulesFail
+  deriving Show
 
 progress :: UsableRulesProof -> Bool
-progress = not . Trs.null . nonUsables
+progress = not . Trs.null . notUsable_
 
 instance T.Processor UsableRules where
   type ProofObject UsableRules = ApplicationProof UsableRulesProof
@@ -81,46 +90,39 @@ instance T.Processor UsableRules where
     where
       usables
         | progress proof = T.Success (T.toId nprob) (Applicable proof) T.fromId
-        | otherwise      = T.Fail (Applicable proof)
+        | otherwise      = T.Fail (Applicable UsableRulesFail)
+
+      usable = usableRulesOf' (Prob.startComponents prob) (Prob.allComponents prob)
+
       proof = UsableRulesProof
-        { strictUsables = surs
-        , weakUsables   = wurs
-        , nonUsables    = nurs }
-      -- FXIME: MS this seems definitely not correct; should it depend on start symbols
-      rhss = [ R.rhs r | r  <- Trs.toList (Prob.dpComponents prob)]
-      surs = usableRulesOf' rhss (Prob.strictTrs prob)
-      wurs = usableRulesOf' rhss (Prob.weakTrs prob)
-      nurs = Prob.trsComponents prob `Trs.difference` (surs `Trs.union` wurs)
+        { usable_    = usable
+        , notUsable_ = Prob.allComponents prob `Trs.difference` usable }
+
       nprob = Prob.sanitise $ prob
-        { Prob.strictTrs = surs
-        , Prob.weakTrs   = wurs }
+        { Prob.strictDPs = Prob.strictDPs prob `Trs.intersect` usable
+        , Prob.weakDPs   = Prob.weakDPs   prob `Trs.intersect` usable
+        , Prob.strictTrs = Prob.strictTrs prob `Trs.intersect` usable
+        , Prob.weakTrs   = Prob.weakTrs   prob `Trs.intersect` usable }
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty UsableRulesProof where
-  pretty proof
-    | prog && allUrs = PP.text "No rule is usable, rules are removed from the input problem."
-    | prog = PP.vcat
+  pretty p@UsableRulesProof{}
+    | Trs.null (usable_ p) = PP.text "No rule is usable, rules are removed from the input problem."
+    | otherwise = PP.vcat
       [ PP.text "We replace rewrite rules by usable rules:"
       , PP.empty
-      , PP.text "Strict Usable Ruless"
-      , PP.indent 2 $ PP.pretty (strictUsables proof)
-      , PP.text "Weak Usable Rules"
-      , PP.indent 2 $ PP.pretty (weakUsables proof) ]
-    | otherwise = PP.text "All rules are usable."
-    where
-      allUrs = Trs.null (strictUsables proof) && Trs.null (weakUsables proof)
-      prog = progress proof
+      , PP.indent 2 $ PP.pretty (usable_ p) ]
+  pretty UsableRulesFail = PP.text "All rules are usable."
 
 instance Xml.Xml UsableRulesProof where
-  toXml proof =
-    Xml.elt "usablerules"
-      [ Xml.elt "strict" [Xml.toXml (strictUsables proof)]
-      , Xml.elt "weak"   [Xml.toXml (weakUsables proof)] ]
-  toCeTA proof =
+  toXml p@UsableRulesProof{} = Xml.elt "usablerules" [Xml.toXml (usable_ p)]
+  toXml UsableRulesFail = Xml.elt "usablerules" []
+  toCeTA p@UsableRulesProof{} =
     Xml.elt "usableRules"
-      [ Xml.elt "nonUsableRules" [Xml.toXml (nonUsables proof)] ]
+      [ Xml.elt "nonUsableRules" [Xml.toXml (notUsable_ p)] ]
+  toCeTA UsableRulesFail = Xml.elt "usableRules" []
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
