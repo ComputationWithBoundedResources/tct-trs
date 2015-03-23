@@ -2,7 +2,6 @@
 This module implements usable argument positions.
 By convention, n-ary function symbols admit argument positions '[1..n]'.
 -}
--- TODO: MS this is a straightforward (unchecked) adaption from the previous version; check it.
 module Tct.Trs.Encoding.UsablePositions
   (
   -- * Usable Argument Positions
@@ -13,24 +12,24 @@ module Tct.Trs.Encoding.UsablePositions
   ) where
 
 
-import qualified Data.IntSet            as IS
-import qualified Data.List              as L
-import qualified Data.Map.Strict        as M
+import qualified Data.IntSet              as IS
+import qualified Data.List                as L
+import qualified Data.Map.Strict          as M
 import           Data.Monoid
-import qualified Data.Set               as S
+import qualified Data.Set                 as S
 
-import qualified Data.Rewriting.Rule    as R
-import qualified Data.Rewriting.Term    as R
+import qualified Data.Rewriting.Rule      as R
+import qualified Data.Rewriting.Term      as R
 
-import qualified Tct.Core.Common.Pretty as PP
-import qualified Tct.Core.Common.Xml    as Xml
+import qualified Tct.Core.Common.Pretty   as PP
+import qualified Tct.Core.Common.Xml      as Xml
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.Problem   as Prob
+import qualified Tct.Trs.Data.Problem     as Prob
 import qualified Tct.Trs.Data.ProblemKind as Prob
-import           Tct.Trs.Data.Rewriting (isUnifiableWith)
-import qualified Tct.Trs.Data.Signature as Sig
-import qualified Tct.Trs.Data.Trs       as Trs
+import qualified Tct.Trs.Data.Rewriting   as R (isUnifiable)
+import qualified Tct.Trs.Data.Signature   as Sig
+import qualified Tct.Trs.Data.Trs         as Trs
 
 
 
@@ -117,7 +116,7 @@ usableReplacementMap trs up = unions [ snd $ uArgs l r | R.Rule l r <- rules]
       where
         uArgs' = [ let (usable,uargs) = uArgs l ti in (i,usable,uargs)  | (i, ti) <- zip [1 :: Int ..] ts]
         subtermUsable = any (\ (_,usable,_) -> usable) uArgs'
-        hasRedex = any (isRenamedUnifiable t . R.lhs) rules
+        hasRedex = any (R.isUnifiable t . R.lhs) rules
         new = singleton f [i | (i, usable, _) <- uArgs', usable]
     isBlockedProperSubtermOf s t = any (isBlockedProperSubtermOf s . snd) uSubs || any (isSubtermOf s . snd) nonSubs
       where
@@ -126,13 +125,12 @@ usableReplacementMap trs up = unions [ snd $ uArgs l r | R.Rule l r <- rules]
           case R.root t of
             Left  _  -> error "Tct.Encoding.UsablePositions.isBlockedProperSubtermOf: root t called for a variable t"
             Right f' -> f'
-    isRenamedUnifiable = isUnifiableWith
     isSubtermOf t s = t `elem` R.subterms s
     immediateSubterms (R.Var _)    = []
     immediateSubterms (R.Fun _ ts) = ts
 
 -- | Returns an approximation of the usable positions of @prob@.
-usableArgsWhereApplicable :: Ord v => Problem F v 
+usableArgsWhereApplicable :: Ord v => Problem F v
   -> Bool  -- ^ map non-compound symbols to the empty set
   -> Bool  -- ^ approximate usable positions using CAP variant
   -> UsablePositions F

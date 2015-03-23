@@ -28,30 +28,18 @@ import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem        as Prob
-import           Tct.Trs.Data.Rewriting      (isUnifiableWith)
+import qualified Tct.Trs.Data.Rewriting      as R
 import qualified Tct.Trs.Data.Trs            as Trs
 
 
 -- MS: stolen from mzini/hoca
 
 -- cap f(t1,...,tn) == f(tcap(t1),...,tcap(tn))
-cap :: (Show v2, Show f, Eq f, Ord v1, Ord v2) => [R.Rule f v1] -> T.Term f v2 -> T.Term f Int
+cap :: (Show v2, Show f, Eq f, Ord v1, Ord v2) => [R.Rule f v1] -> T.Term f v2 -> T.Term f (R.Fresh v2)
 cap rs t = evalState (capM t) 0
   where
-    freshVar = T.Var <$> (modify succ >> get)
-    lhss     = RS.lhss rs
-
-    capM (T.Var _)    = freshVar
-    capM (T.Fun f ts) = T.Fun f <$> mapM tcapM ts
-
-    tcapM (T.Var _)    = freshVar
-    tcapM (T.Fun f ts) = do
-      s <- T.Fun f <$> mapM tcapM ts
-      if any (isUnifiableWith s) lhss then freshVar else return s
-
-{-calls :: (Eq f, Ord v1, Ord v2) => T.Term f v1 -> [R.Rule f v2] -> [R.Rule f v2]-}
-{-calls t rules = concatMap (\ ti -> filter (\ rl -> ti `isUnifiableWith` R.lhs rl) rules) caps-}
-  {-where caps = [ cap rules ti | ti@T.Fun{} <- T.subterms t ]    -}
+    capM (T.Var _)    = R.freshVar
+    capM (T.Fun f ts) = T.Fun f <$> mapM (R.tcapM (RS.lhss rs) . T.rename R.Old) ts
 
 usableRulesOf :: (Show v, Show f, Ord v, Eq f) => [T.Term f v] -> [R.Rule f v] -> [R.Rule f v]
 usableRulesOf rhss rules | null rhss || null rules = []
@@ -59,7 +47,7 @@ usableRulesOf rhss rules = walk (caps rhss) [] rules
   where
     walk []     ur _  = ur
     walk (s:ss) ur rs = walk (caps (RS.rhss ur') ++ ss) (ur' ++ ur) rs'
-      where (ur',rs') = partition (\ rl -> s `isUnifiableWith` R.lhs rl) rs
+      where (ur',rs') = partition (\ rl -> s `R.isUnifiable` R.lhs rl) rs
     caps ss = [ cap rules s | si <- ss, s@T.Fun{} <- T.subterms si ]
 
 usableRulesOf' :: (Show f, Show v, Ord v, Ord f) => Trs.Trs f v -> Trs.Trs f v -> Trs.Trs f v

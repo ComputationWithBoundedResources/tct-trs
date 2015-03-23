@@ -80,7 +80,7 @@ isCommutative rRules' sRules' = isCommutative' 5 cps
     cps                = R.toPairs $ R.forwardPairs rRules' sRules'
     isCommutative' n    = all (\(l,r) -> r `reductOf` take n (reducts l))
 
-mkProbs :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> Trs f v -> Trs f v -> (Problem f v, Problem f v)
+mkProbs :: (Show f, Show v, Ord f, Ord v) => Problem f v -> DecomposeBound -> Trs f v -> Trs f v -> (Problem f v, Problem f v)
 mkProbs prob compfn dps trs = (rProb, sProb)
   where
     rDps = dps `Trs.intersect` Prob.strictDPs prob

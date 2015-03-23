@@ -11,7 +11,7 @@ module Tct.Trs.Data.DependencyGraph
   , withRulesPair'
   , filterWeak
   , filterStrict
-  
+
   -- * congruence graph
   , CDG, CDGNode (..)
   , toCongruenceGraph
@@ -27,10 +27,11 @@ module Tct.Trs.Data.DependencyGraph
 import           Control.Monad.State.Strict
 import           Data.Function               (on)
 import qualified Data.List                   as L
-import           Data.Maybe                  (catMaybes, fromMaybe, isNothing)
+import           Data.Maybe                  (fromMaybe, isNothing, isJust)
 import           Data.Monoid
 
 import qualified Data.Rewriting.Rule         as R (Rule (..))
+import qualified Data.Rewriting.Rules        as RS
 import qualified Data.Rewriting.Substitution as R
 import qualified Data.Rewriting.Term         as R
 
@@ -41,6 +42,7 @@ import           Tct.Common.Graph            as Gr hiding (empty)
 import qualified Tct.Common.Graph            as Gr (empty)
 
 import qualified Tct.Trs.Data.ProblemKind    as Prob
+import qualified Tct.Trs.Data.Rewriting      as R
 import qualified Tct.Trs.Data.RuleSet        as Rs
 import qualified Tct.Trs.Data.Trs            as Trs
 
@@ -94,12 +96,6 @@ withRulesPair' = foldl k ([],[],[])
 
 --- ** estimated dependency graph -------------------------------------------------------------------------------------
 
-data Unique v = S v | U v | T v | Some v deriving (Eq, Ord, Show)
-data Fresh v  = Old v | Fresh Int deriving (Eq, Ord, Show)
-
-freshVar :: State Int (R.Term f (Fresh v))
-freshVar = (R.Var . Fresh) `liftM` (modify succ >> get)
-
 estimatedDependencyGraph :: (Ord f, Ord v) => Rs.RuleSet f v -> Prob.Strategy -> DependencyGraph f v
 estimatedDependencyGraph rs strat  = DependencyGraph wdg cdg where
   wdg = estimatedDependencyGraph' rs strat
@@ -117,45 +113,37 @@ estimatedDependencyGraph' rs strat = mkGraph ns es
         R.Var _    -> []
         R.Fun _ ts -> [ i | (i,ti) <- zip [1..] ts, (s,ti) `edgeTo` (u,v) ]
 
-    (s,t) `edgeTo` (u,_) = flip evalState 0 $ do
+    (s,t) `edgeTo` (u,_) =
       let
-        (s',t',u') = (R.rename (Old . S) s, R.rename (Old . T) t, R.rename (Old . U) u)
+        s'   = R.rename (Right . R.Old) s
+        u'   = R.rename (Right . R.Old) u
+        t' f = R.rename Left . f $ R.rename R.Old t
+
         trsComponents = Trs.toList (Rs.strs rs) ++ Trs.toList (Rs.wtrs rs)
-        lhss = map (R.rename (Old . Some) . R.lhs) trsComponents
-        rhss = map (R.rename (Old . Some) . R.rhs) trsComponents
+        lhss          = RS.lhss trsComponents
+      in
+      case strat of
+          Prob.Innermost -> case R.unify (t' $ R.icap trsComponents) u' of
+            Nothing  -> False
+            Just mgu -> isINF (R.apply mgu s') && isINF (R.apply mgu u')
+              where isINF v = all isNothing [ l `R.match` vi | l <- lhss, vi <- R.properSubterms v ]
 
-        -- MS: FIXME something wrong with this test; ex jones1.trs IRC w/o usablerules
-        unifyNF t1 t2 = case R.unify t1 t2 of
-          Just delta -> True -- isQNF (R.apply delta s') && isQNF (R.apply delta u')
-          Nothing    -> False
-        qs = case strat of
-          Prob.Innermost -> lhss
-          _              -> []
-        -- isQNF v = all isNothing [ vi `R.match` l | l <- qs, vi <- R.properSubterms v ]
-
-      tcap <- icap lhss qs [s', u'] t'
-      if unifyNF tcap u'
-        then return True --icap rhss [] [] u' >>= \ucap -> return (unifyNF ucap t')
-        else return False
+          _              -> isJust $ R.unify (t' $ R.tcap trsComponents) u'
 
 
-icap :: (Ord f, Ord v)
-  => [R.Term f (Fresh v)] -> [R.Term f (Fresh v)]
-  -> [R.Term f (Fresh v)] -> R.Term f (Fresh v) -> State Int (R.Term f (Fresh v))
-icap rs qs ss = icap' where
-  icap' t@(R.Var v)
-    | all (`elem` qs) rs && or [v `elem` R.vars s | s <- ss] = return t
-    | otherwise                                               = freshVar
-  icap' (R.Fun f ts) = do
-    t' <- R.Fun f `fmap` mapM icap' ts
-    let matches = catMaybes [ (,) l `liftM` R.unify t' l | l <- rs ]
-    if and [ any (not . isQNF) [ R.apply delta s | s <- ss ++ directSubterms l ] | (l,delta) <- matches ]
-      then return t'
-      else freshVar
-
-  directSubterms (R.Var _)    = []
-  directSubterms (R.Fun _ ts) = ts
-  isQNF t = all isNothing [t `R.match` q | q <- qs]
+      --   unifyNF t1 t2 = case R.unify t1 t2 of
+      --     Just  d -> isQNF (R.apply d s') && isQNF (R.apply d u')
+      --     Nothing -> False
+      --   isQNF v = all isNothing [ vi `R.match` l | l <- qsLhss, vi <- R.properSubterms v ]
+      --
+      --   qsLhss = case strat of
+      --     Prob.Innermost -> lhss
+      --     _              -> []
+      --
+      -- tcap <- R.qcapM lhss qsLhss [s',t'] t'
+      -- if unifyNF tcap u'
+      --   then R.tcapM rhss u' >>= \ucap -> return (unifyNF ucap t') -- what does this
+      --   else return False
 
 
 --- * congruence graph -----------------------------------------------------------------------------------------------
@@ -181,7 +169,7 @@ allRulesFromNode gr n = case lookupNodeLabel gr n of
   Just cn -> [ sr | (_, sr) <- theSCC cn]
 
 allRulesFromNodes :: CDG f v -> [NodeId] -> [DGNode f v]
-allRulesFromNodes gr = concatMap (allRulesFromNode gr) 
+allRulesFromNodes gr = concatMap (allRulesFromNode gr)
 
 allRulesPairFromNodes :: CDG f v -> [NodeId] -> ([R.Rule f v], [R.Rule f v])
 allRulesPairFromNodes cdg = foldl k ([],[]) . allRulesFromNodes cdg
