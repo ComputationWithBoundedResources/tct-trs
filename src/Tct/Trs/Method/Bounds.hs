@@ -247,4 +247,5 @@ instance Xml.Xml BoundsProof where
             Xml.elt "transition"
               [ Xml.elt "lhs" [stateToXml p]
               , Xml.elt "rhs" [stateToXml q] ]
+  toCeTA = Xml.toXml
 

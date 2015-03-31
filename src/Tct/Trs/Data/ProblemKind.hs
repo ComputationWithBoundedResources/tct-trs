@@ -51,10 +51,10 @@ instance Xml.Xml Strategy where
     Innermost -> Xml.elt "innermost" []
     Outermost -> Xml.elt "outermost" []
     Full      -> Xml.elt "full" []
-  toCeTA s = Xml.elt "strategy" $ case s of
-    Innermost -> [Xml.elt "innermost" []]
-    Outermost -> [Xml.elt "outermost" []]
-    Full      -> []
+  toCeTA s = case s of
+    Innermost -> Xml.elt "strategy" [Xml.elt "innermost" []]
+    Outermost -> Xml.elt "strategy" [Xml.elt "outermost" []]
+    Full      -> Xml.empty
 
 -- MS: restrictSignature is necessary for CeTA unknown proofs ? really ?
 instance (Xml.Xml f, Ord f) => Xml.Xml (StartTerms f, Signature f) where
