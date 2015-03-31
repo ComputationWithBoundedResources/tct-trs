@@ -1,6 +1,7 @@
 -- This module contains some useful functions (yet) not available in rewriting library
 module Tct.Trs.Data.Rewriting where
 
+import Data.Traversable as F
 import Control.Applicative
 import Control.Monad.State.Strict
 import Data.Maybe
@@ -9,12 +10,28 @@ import qualified Data.Set                    as S
 
 import           Data.Rewriting.CriticalPair (CP (..))
 import qualified Data.Rewriting.CriticalPair as R
-import           Data.Rewriting.Rule         (Rule (..))
+import           Data.Rewriting.Rule         (Rule)
 import qualified Data.Rewriting.Rule         as R
 import qualified Data.Rewriting.Rules        as RS
 import           Data.Rewriting.Term         (Term (..))
 import qualified Data.Rewriting.Term         as T
 import qualified Data.Rewriting.Substitution as S
+
+tvars :: Ord v => Term f v -> S.Set v
+tvars = S.fromList . T.vars
+
+rvars :: Ord v => Rule f v -> S.Set v
+rvars = S.fromList . R.vars
+
+tmapM :: Applicative m => (f -> m f') -> (v -> m v') -> Term f v -> m (Term f' v')
+tmapM _ g (T.Var v)    = T.Var <$> g v
+tmapM f g (T.Fun t ts) = T.Fun <$> f t <*> F.traverse (tmapM f g) ts
+
+rmap :: (Term f v -> Term f' v') -> Rule f v -> Rule f' v'
+rmap f (R.Rule lhs rhs) = R.Rule (f lhs) (f rhs)
+
+rmapM :: Applicative m => (Term f v  -> m (Term f' v')) -> Rule f v -> m (Rule f' v')
+rmapM f (R.Rule lhs rhs) = R.Rule <$> f lhs <*> f rhs
 
 -- | Returns the size of the term.
 size :: Term f v -> Int
@@ -31,7 +48,7 @@ isUnifiable t = isJust . unifyE t
 -- | Checks wether the given rule is non-erasing, ie. all variables occuring in the left hand side also occur in the
 -- right hand side.
 isNonErasing :: Ord v => Rule f v -> Bool
-isNonErasing (Rule l r) = varsS l == varsS r
+isNonErasing (R.Rule l r) = varsS l == varsS r
   where varsS = S.fromList . T.vars
 
 directSubterms :: Term f v -> [Term f v]
@@ -48,10 +65,10 @@ isNonDuplicating = not . R.isDuplicating
 -- | Checks wether the given rule non-size increasing, ie. the size of the lhs is at least the size of the rhs and the
 -- rule is not duplicating.
 isNonSizeIncreasing :: Ord v => Rule f v -> Bool
-isNonSizeIncreasing rule@(Rule l r) = size l >= size r && isNonDuplicating rule
+isNonSizeIncreasing rule@(R.Rule l r) = size l >= size r && isNonDuplicating rule
 
 invertRule :: Rule f v -> Rule f v
-invertRule (Rule l r) = Rule r l
+invertRule (R.Rule l r) = R.Rule r l
 
 -- TODO: check
 mutualCriticalPairs :: (Eq f, Ord v) => [Rule f v] -> [Rule f v] -> [R.CP f v v]
@@ -86,13 +103,13 @@ icap rs t = evalState (icapM (RS.lhss rs) t) 0
 tcapM :: (Eq f, Ord v1, Ord v2) => [T.Term f v1] -> T.Term f (Fresh v2) -> State Int (T.Term f (Fresh v2))
 tcapM _    (T.Var _)  = freshVar
 tcapM lhss (T.Fun f ts) = do
-  t <- T.Fun f <$> mapM (tcapM lhss) ts
+  t <- T.Fun f <$> F.mapM (tcapM lhss) ts
   if any (isUnifiable t) lhss then freshVar else return t
 
 icapM :: (Eq f, Ord v1, Ord v2) => [T.Term f v1] -> T.Term f (Fresh v2) -> State Int (T.Term f (Fresh v2))
 icapM _    t@(T.Var _)  = return t
 icapM lhss (T.Fun f ts) = do
-  t <- T.Fun f <$> mapM (icapM lhss) ts
+  t <- T.Fun f <$> F.mapM (icapM lhss) ts
   if any (isUnifiable t) lhss then freshVar else return t
 
 -- generalisation of tcap/icap to generalised q restricted rewriting

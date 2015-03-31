@@ -52,6 +52,7 @@ Executable trs
     ConstraintKinds,
     DataKinds,
     DeriveDataTypeable,
+    GeneralizedNewtypeDeriving,
     FlexibleInstances,
     MultiParamTypeClasses, 
     TypeFamilies,
@@ -79,8 +80,13 @@ Library
     Tct.Trs.Data.Trs
     Tct.Trs.Encoding.UsablePositions
     Tct.Trs.Encoding.UsableRules
+    Tct.Trs.Encoding.Bounds.Automata
+    Tct.Trs.Encoding.Bounds.Violations
+    Tct.Trs.Encoding.Bounds.Violations.Find
+    Tct.Trs.Encoding.Bounds.Violations.Fix
     Tct.Trs.Interactive
     Tct.Trs.Interpretation
+    Tct.Trs.Method.Bounds
     Tct.Trs.Method.Decompose
     Tct.Trs.Method.DP.DependencyPairs
     Tct.Trs.Method.DP.DPGraph.DecomposeDG

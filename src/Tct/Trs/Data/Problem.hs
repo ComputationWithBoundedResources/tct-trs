@@ -23,8 +23,12 @@ import qualified Tct.Trs.Data.Trs             as Trs
 import           Tct.Trs.Data.Signature       (Signature)
 import qualified Tct.Trs.Data.Signature       as Sig
 
--- MS: FIXME: properly update dpGraphs when rule shifting, prdecessor estimation...
+-- FIXME: properly update dpGraphs when rule shifting, prdecessor estimation...
 -- | The problem type.
+-- FIXME:
+-- there is a problem with certification when giving startTerms;
+-- check should they be "sanitised"; also for the signature ?
+-- the signature should contain symbols of rules and startterms
 data Problem f v = Problem
   { startTerms :: StartTerms f
   , strategy   :: Strategy

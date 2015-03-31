@@ -33,6 +33,7 @@ import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.DependencyGraph                    as DG
 
+import           Tct.Trs.Method.Bounds as M
 import           Tct.Trs.Method.Decompose as M
 import           Tct.Trs.Method.DP.DependencyPairs               as M
 import           Tct.Trs.Method.DP.DPGraph.DecomposeDG           as M
@@ -53,6 +54,8 @@ defaultDeclarations =
   , T.SD withCertificationDeclaration
 
   , T.SD decomposeDeclaration
+
+  , T.SD boundsDeclaration
 
   -- Semantic
   , T.SD polyDeclaration

@@ -29,7 +29,7 @@ module Tct.Trs.Data.Trs
 
   , size
   , null
-  , isDuplicating, isLinear, isRightLinear
+  , isDuplicating, isLinear, isRightLinear, isCollapsing
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
 
   , isLinear', isRightLinear', isNonErasing', isNonSizeIncreasing', isNonDuplicating'
@@ -151,10 +151,11 @@ null = lift1 S.null
 isSubset :: (Ord f, Ord v) => Trs f v -> Trs f v -> Bool
 isSubset = lift2 S.isSubsetOf
 
-isLinear, isRightLinear, isDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
-isLinear         = all' R.isLinear
-isRightLinear    = all' R.isRightLinear
-isDuplicating    = any' R.isDuplicating
+isLinear, isRightLinear, isDuplicating, isCollapsing :: (Ord f, Ord v) => Trs f v -> Bool
+isLinear      = all' R.isLinear
+isRightLinear = all' R.isRightLinear
+isDuplicating = any' R.isDuplicating
+isCollapsing  = any' R.isCollapsing
 
 isNonErasing, isNonSizeIncreasing, isNonDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
 isNonErasing        = all' R.isNonErasing
@@ -175,8 +176,6 @@ isNonErasing', isNonSizeIncreasing', isNonDuplicating' :: (Ord f, Ord v) => Trs 
 isNonErasing' trs        = note (not $ isNonErasing trs) " some rule is erasing"
 isNonSizeIncreasing' trs = note (not $ isNonSizeIncreasing trs) " some rule is size-increasing"
 isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is duplicating"
-
-
 
 
 -- * pretty printing --

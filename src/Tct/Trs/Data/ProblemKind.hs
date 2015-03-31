@@ -26,6 +26,10 @@ isStartTerm (BasicTerms ds cs) t = case t of
   (R.Var _)    -> True
   (R.Fun f ts) -> f `S.member` ds && all (`S.member` cs) (concatMap R.funs ts)
 
+mapStartTerms :: Ord f' => (f -> f') -> StartTerms f -> StartTerms f'
+mapStartTerms f (AllTerms fs)      = AllTerms (f `S.map` fs)
+mapStartTerms f (BasicTerms ds cs) = BasicTerms (f `S.map` ds) (f `S.map` cs)
+
 data Strategy
   = Innermost
   | Outermost
@@ -52,7 +56,7 @@ instance Xml.Xml Strategy where
     Outermost -> [Xml.elt "outermost" []]
     Full      -> []
 
--- MS: restrictSignature is necessary for CeTA unknown proofs
+-- MS: restrictSignature is necessary for CeTA unknown proofs ? really ?
 instance (Xml.Xml f, Ord f) => Xml.Xml (StartTerms f, Signature f) where
   toXml (st,sig) = case st of
     (AllTerms fs)      -> Xml.elt "derivationalComplexity" [Xml.toXml $ restrictSignature sig fs]
