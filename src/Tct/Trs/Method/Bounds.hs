@@ -111,10 +111,11 @@ instance T.Processor Bounds where
   -- this is wrong in many other cases; 
   -- a monadic action should always return after computation; otherwise concurrency is not handled correctly
   -- especially important for computation intensive - non-terminating computations
-  solve p prob = boundHeight_ automaton `seq` return . T.resultToTree p prob $
-    maybe apply (T.Fail . Inapplicable) maybeApplicable
+  solve p prob =  fmap (T.resultToTree p prob) $
+    maybe apply (return . T.Fail . Inapplicable) maybeApplicable
     where
-      apply = T.Success (T.Judgement) (Applicable proof) (T.judgement $ T.timeUBCert T.linear)
+      apply = boundHeight_ automaton `seq` 
+        return (T.Success (T.Judgement) (Applicable proof) (T.judgement $ T.timeUBCert T.linear))
       maybeApplicable = Trs.isRightLinear' (strict `Trs.union` weak)
 
       strict       = Prob.strictComponents prob
