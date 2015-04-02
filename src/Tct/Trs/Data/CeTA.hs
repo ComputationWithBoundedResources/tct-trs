@@ -38,7 +38,6 @@ import           Tct.Trs.Data.Problem
 -- Assumption: CeTA 2.2
 -- toCeTA proof constructs valid xml elements, and </unsupported> otherwise
 -- toCeTA problem constructs a valid xml problem element, with the complextiyClass tag missing
---
 
 data CertFail
   = Infeasible
@@ -46,6 +45,8 @@ data CertFail
   deriving Show
 
 type Result r = Either CertFail r
+
+data Proof = TotalProof | PartialProof deriving Eq
 
 isFeasible :: Bool -> T.ProofTree l -> Result Xml.XmlContent
 isFeasible partial pt
@@ -112,22 +113,24 @@ totalProof pt = isFeasible False pt *> (toDoc <$> subProblem pt <*> totalProofM1
 
 --- * io -------------------------------------------------------------------------------------------------------------
 
-proofIO :: MonadIO m => FilePath -> (l -> Either CertFail XmlDocument) -> FilePath -> l -> m (Either String l)
-proofIO tmpDir prover cmd p = 
+proofIO :: MonadIO m => FilePath -> (l -> Either CertFail XmlDocument) -> Proof -> l -> m (Either String l)
+proofIO tmpDir prover allowPartial p = 
     case prover p of
       Left Infeasible -> return $ Right p
-      Left err             -> return $ Left (show err)
-      Right xml            ->
+      Left err        -> return $ Left (show err)
+      Right xml       ->
         liftIO . withFile $ \file hfile -> do
           Xml.putXmlHandle xml hfile
           hClose hfile
-          (code , stdout, stderr) <- readProcessWithExitCode cmd [file] ""
+          (code , stdout, stderr) <- readProcessWithExitCode "ceta" (args [file]) ""
           return $ case code of
             ExitFailure i -> Left $ "Error(" ++ show i ++ "," ++ show stderr ++ ")"
             ExitSuccess   -> case lines stdout of
               "CERTIFIED <complexityProof>" :_ -> Right p
               _                                -> Left stdout
-    where withFile = E.bracket (openTempFile tmpDir "ceta") (hClose . snd) . uncurry
+    where 
+      args = if allowPartial == PartialProof then ("--allow-assumptions":) else id
+      withFile = E.bracket (openTempFile tmpDir "ceta") (hClose . snd) . uncurry
 
 totalProofIO :: (MonadIO m, Ord f, Ord v, Xml f, Xml v, l ~ T.ProofTree (Problem f v)) => l -> m (Either String l)
 totalProofIO = totalProofIO' "/tmp"
@@ -136,9 +139,8 @@ partialProofIO :: (MonadIO m, Ord f, Ord v, Xml f, Xml v, l ~ T.ProofTree (Probl
 partialProofIO = partialProofIO' "/tmp"
 
 totalProofIO' :: (MonadIO m, Ord f, Ord v, Xml f, Xml v, l ~ T.ProofTree (Problem f v)) => FilePath -> l -> m (Either String l)
-totalProofIO' tmpDir = proofIO tmpDir totalProof "ceta"
+totalProofIO' tmpDir = proofIO tmpDir totalProof TotalProof
 
 partialProofIO' :: (MonadIO m, Ord f, Ord v, Xml f, Xml v, l ~ T.ProofTree (Problem f v)) => FilePath -> l -> m (Either String l)
-partialProofIO' tmpDir = proofIO tmpDir partialProof "ceta --allow-assumptions"
-
+partialProofIO' tmpDir = proofIO tmpDir partialProof PartialProof
 
