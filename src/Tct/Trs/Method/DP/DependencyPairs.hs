@@ -2,7 +2,9 @@
 module Tct.Trs.Method.DP.DependencyPairs
   ( dependencyPairsDeclaration
   , dependencyPairs
-  , dependencyTuplesDeclaration
+  , dependencyPairs'
+
+  , weakDependencyPairs
   , dependencyTuples
   ) where
 
@@ -10,6 +12,7 @@ module Tct.Trs.Method.DP.DependencyPairs
 import           Control.Applicative         ((<|>))
 import           Control.Monad.State.Strict
 import qualified Data.Traversable            as F
+import           Data.Typeable
 
 import qualified Data.Map                    as M
 import qualified Data.Set                    as S
@@ -25,13 +28,25 @@ import           Tct.Common.ProofCombinators
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.ProblemKind    as Prob
-import qualified Tct.Trs.Data.Trs            as Trs
 import qualified Tct.Trs.Data.Signature      as Sig
+import qualified Tct.Trs.Data.Trs            as Trs
 
 
 -- FIXME:
 -- MS Compound Symbols should have identifier component
 -- it is necessary to compute a fresh symbol for pretty printing only
+
+data DPKind = WDP | WIDP | DT
+  deriving (Eq, Enum, Bounded, Typeable)
+
+instance Show DPKind where
+  show WDP  = "wdp"
+  show WIDP = "widp"
+  show DT   = "dt"
+
+isTuples :: DPKind -> Bool
+isTuples = (DT==)
+
 
 -- maximal subterms that are variables or have a root in the defined symbols
 subtermsWDP :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
@@ -47,16 +62,16 @@ subtermsWIDP defineds s@(R.Fun f ss)
 subtermsWIDP _ _ = []
 
 -- subterms that have a root in the defined symbols
-subtermsWDT :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
-subtermsWDT defineds s@(R.Fun f ss)
+subtermsDT :: Ord f => Symbols f -> R.Term f v -> [R.Term f v]
+subtermsDT defineds s@(R.Fun f ss)
   | f `S.member` defineds = s :subs
   | otherwise             = subs
-  where subs = concatMap (subtermsWDT defineds) ss
-subtermsWDT _ _ = []
+  where subs = concatMap (subtermsDT defineds) ss
+subtermsDT _ _ = []
 
 -- MS: we follow tct2 and Com(t)=Com(t) for singleton argument list t; hence rhs always have a compound symbol
 markRule :: (R.Term F V -> [R.Term F V]) -> R.Rule F V -> State Int (R.Rule F V)
-markRule subtermsOf (R.Rule lhs rhs)= do
+markRule subtermsOf (R.Rule lhs rhs) = do
   i <- modify succ >> get
   return $ R.Rule (markTerm lhs) (R.Fun (Prob.compoundf i) (map markTerm $ subtermsOf rhs))
   where
@@ -72,21 +87,21 @@ fromTransformation = Trs.fromList . snd . unzip
 markRules :: (R.Term F V -> [R.Term F V]) -> Trs F V -> State Int [Transformation F V]
 markRules subtermsOf trs = F.mapM (\r -> markRule subtermsOf r >>= \r' -> return (r,r')) (Trs.toList trs)
 
-dependencyPairsOf :: Bool -> Prob.Strategy -> Symbols F -> Trs F V -> State Int [Transformation F V]
-dependencyPairsOf useTuples strat defineds trs
-  | useTuples               = markRules (subtermsWDT defineds) trs
-  | strat == Prob.Innermost = markRules (subtermsWIDP defineds) trs
-  | otherwise               = markRules (subtermsWDP defineds) trs
+dependencyPairsOf :: DPKind -> Symbols F -> Trs F V -> State Int [Transformation F V]
+dependencyPairsOf dpKind defineds = markRules $ case dpKind of
+  WDP  -> subtermsWDP defineds
+  WIDP -> subtermsWIDP defineds
+  DT   -> subtermsDT defineds
 
 
 --- * processor ------------------------------------------------------------------------------------------------------
 
-data DependencyPairs = DependencyPairs { useTuples_ :: Bool } deriving Show
+data DependencyPairs = DependencyPairs { dpKind_ :: DPKind } deriving Show
 
 data DependencyPairsProof = DependencyPairsProof
   { strictTransformation :: [Transformation F V]
   , weakTransformation   :: [Transformation F V]
-  , tuplesUsed           :: Bool
+  , dpKindUsed           :: DPKind
   , newSignature         :: Signature F }
   deriving Show
 
@@ -101,12 +116,19 @@ instance T.Processor DependencyPairs where
       maybeApplicable =
         Prob.isRCProblem' prob
         <|> Prob.note (not . Trs.null $ Prob.dpComponents prob) " already containts dependency paris"
-        <|> if useTuples then Prob.isInnermostProblem' prob else Nothing
+        -- <|> if useTuples then Prob.isInnermostProblem' prob else Nothing
+
+      dpKind
+        | Prob.strategy prob == Prob.Innermost = dpKind_ p
+        | otherwise                            = WDP
+      useTuples = isTuples dpKind
 
       (stricts, weaks) = flip evalState 0 $ do
-        let defineds = Trs.definedSymbols (Prob.allComponents prob)
-        ss <- dependencyPairsOf useTuples (Prob.strategy prob) defineds (Prob.strictTrs prob)
-        ws <- dependencyPairsOf useTuples (Prob.strategy prob) defineds (Prob.weakTrs prob)
+        let
+          defineds = Trs.definedSymbols (Prob.allComponents prob)
+          dpsOf    = dependencyPairsOf dpKind defineds
+        ss <- dpsOf (Prob.strictTrs prob)
+        ws <- dpsOf (Prob.weakTrs prob)
         return (ss,ws)
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks
@@ -120,39 +142,41 @@ instance T.Processor DependencyPairs where
         , Prob.weakDPs   = wDPs
         , Prob.strictTrs = if useTuples then Trs.empty else Prob.strictTrs prob
         , Prob.weakTrs   = if useTuples then Prob.trsComponents prob else Prob.weakTrs prob }
+        where starts = Prob.startTerms prob
       nproof = DependencyPairsProof
         { strictTransformation = stricts
         , weakTransformation   = weaks
-        , tuplesUsed   = useTuples
-        , newSignature = nsig }
-
-      useTuples = useTuples_ p
-      starts = Prob.startTerms prob
+        , dpKindUsed           = dpKind
+        , newSignature         = nsig }
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty DependencyPairsProof where
-  pretty proof
-    = PP.vcat
-      [ PP.text $ "We add the following "
-        ++ (if tuplesUsed proof then "dependency tuples" else "weak dependency pairs") ++ ":"
-      , PP.empty
-      , PP.text "Strict DPs"
-      , PP.indent 2 $ PP.pretty (fromTransformation $ strictTransformation proof)
-      , PP.text "Weak DPs"
-      , PP.indent 2 $ PP.pretty (fromTransformation $ weakTransformation proof)
-      , PP.empty
-      , PP.text "and mark the set of starting terms." ]
+  pretty proof = PP.vcat
+    [ PP.text $ "We add the following " ++ info (dpKindUsed proof) ++ ":"
+    , PP.empty
+    , PP.text "Strict DPs"
+    , PP.indent 2 $ PP.pretty (fromTransformation $ strictTransformation proof)
+    , PP.text "Weak DPs"
+    , PP.indent 2 $ PP.pretty (fromTransformation $ weakTransformation proof)
+    , PP.empty
+    , PP.text "and mark the set of starting terms." ]
+    where
+      info WDP  = "weak dependency pairs"
+      info WIDP = "weak innermost dependency pairs"
+      info DT   = "dependency tuples"
 
+
+-- TODO: MS: there should be a new CeTA version that supports wdps
 instance Xml.Xml DependencyPairsProof where
   toXml proof =
     Xml.elt "dp"
-      [ Xml.elt (if tuplesUsed proof then "tuples" else "pairs") []
+      [ Xml.elt (if isTuples (dpKindUsed proof) then "tuples" else "pairs") []
       , Xml.elt "strictDPs" [Xml.toXml (fromTransformation $ strictTransformation proof) ]
       , Xml.elt "weakDPs" [Xml.toXml (fromTransformation $ weakTransformation proof)] ]
   toCeTA proof
-    | not (tuplesUsed proof) = Xml.elt "unknown" []
+    | dpKindUsed proof == WIDP = Xml.elt "unknown" []
     | otherwise =
       Xml.elt "dtTransformation"
         [ Xml.toCeTA $ Sig.filter Prob.isCompoundf (newSignature proof)
@@ -167,17 +191,31 @@ instance Xml.Xml DependencyPairsProof where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-dependencyPairsDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-dependencyPairsDeclaration = T.declare "dependencyPairs" description () (T.Proc $ DependencyPairs False)
-  where description = [ "Applies the (weak) dependency pairs transformation." ]
+dpKindArg :: T.Argument T.Required DPKind
+dpKindArg = T.arg
+  `T.withName` "dpKind"
+  `T.withHelp`  ["Specifies preferred kind of dependency pairs. Overrides to wdp for non-innermost problems."]
+  `T.withDomain` fmap show [(minBound :: DPKind)..]
 
-dependencyPairs :: T.Strategy TrsProblem
+instance T.SParsable prob DPKind where
+  parseS = T.mkEnumParser (undefined :: DPKind)
+
+description :: [String]
+description = ["Applies the (weak) dependency pairs transformation."]
+
+dependencyPairsDeclaration :: T.Declaration ('[T.Argument 'T.Optional DPKind] T.:-> T.Strategy TrsProblem)
+dependencyPairsDeclaration = T.declare "dependencyPairs" description (T.OneTuple dpArg) (T.Proc . DependencyPairs)
+  where dpArg = dpKindArg `T.optional` WIDP
+
+dependencyPairs :: DPKind -> T.Strategy TrsProblem
 dependencyPairs = T.declFun dependencyPairsDeclaration
 
-dependencyTuplesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-dependencyTuplesDeclaration = T.declare "dependencyTuples" description () (T.Proc $ DependencyPairs True)
-  where description = [ "Applies the dependency tuples transformation." ]
+dependencyPairs' :: T.Strategy TrsProblem
+dependencyPairs' = T.deflFun dependencyPairsDeclaration
+
+weakDependencyPairs :: T.Strategy TrsProblem
+weakDependencyPairs = dependencyPairs WIDP
 
 dependencyTuples :: T.Strategy TrsProblem
-dependencyTuples = T.declFun dependencyTuplesDeclaration
+dependencyTuples = dependencyPairs DT
 

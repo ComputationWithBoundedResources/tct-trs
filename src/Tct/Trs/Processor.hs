@@ -62,7 +62,6 @@ defaultDeclarations =
 
   -- DP
   , T.SD dependencyPairsDeclaration
-  , T.SD dependencyTuplesDeclaration
   , T.SD usableRulesDeclaration
 
   -- DP graph
