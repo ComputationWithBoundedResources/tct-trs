@@ -8,9 +8,9 @@ module Tct.Trs.Method.InnermostRuleRemoval
 
 
 import           Control.Applicative          ((<$>))
-import           Data.Maybe                   (catMaybes)
 
-import qualified Data.Rewriting.Rule          as R
+import           Data.Rewriting.Rule          (lhs)
+import           Data.Rewriting.Rules.Rewrite (fullRewrite)
 
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
@@ -20,20 +20,15 @@ import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem         as Prob
-import qualified Tct.Trs.Data.Rewriting       as R
+import           Tct.Trs.Data.Rewriting       (directSubterms)
 import qualified Tct.Trs.Data.Trs             as Trs
 
 
 data InnermostRuleRemoval = InnermostRuleRemoval
   deriving Show
 
-data RuleRemoval f v = RuleRemoval
-  { removed_ :: [R.Rule f v]
-  , reason_  :: R.Rule f v }
-  deriving Show
-
 data InnermostRuleRemovalProof
-  = InnermostRuleRemovalProof { removals_ :: [RuleRemoval F V] }
+  = InnermostRuleRemovalProof { removed_ :: Trs F V }
   | InnermostRuleRemovalFail
   deriving Show
 
@@ -46,24 +41,20 @@ instance T.Processor InnermostRuleRemoval where
     maybe irr (return . T.Fail . Inapplicable) (Prob.isInnermostProblem' prob)
     where
       irr
-        | null removals = return $ T.Fail (Applicable InnermostRuleRemovalFail)
-        | otherwise     = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | Trs.null removed = return $ T.Fail (Applicable InnermostRuleRemovalFail)
+        | otherwise        = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
 
         where
           trsRules  = Trs.toList $ Prob.trsComponents prob
           allRules  = Trs.toList $ Prob.allComponents prob
 
-          removable cause = any (not . null . R.rewrite [cause]) . R.directSubterms . R.lhs
-          removals = catMaybes $ k `fmap` trsRules where
-            k cause = case filter (removable cause) allRules of
-              []   -> Nothing
-              rems -> Just $ RuleRemoval rems cause
+          removable = any (not . null . fullRewrite allRules) . directSubterms . lhs
+          removed   = Trs.fromList $ filter removable trsRules
 
-          removedRules = Trs.fromList $ concatMap removed_ removals
           nprob = prob
-            { Prob.strictTrs = Prob.strictTrs prob `Trs.difference` removedRules
-            , Prob.weakTrs   = Prob.weakTrs prob `Trs.difference` removedRules }
-          proof = InnermostRuleRemovalProof { removals_ = removals }
+            { Prob.strictTrs = Prob.strictTrs prob `Trs.difference` removed
+            , Prob.weakTrs   = Prob.weakTrs prob `Trs.difference` removed }
+          proof = InnermostRuleRemovalProof { removed_ = removed }
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
@@ -86,14 +77,12 @@ instance PP.Pretty InnermostRuleRemovalProof where
   pretty InnermostRuleRemovalFail      = PP.pretty "No rules can be removed."
   pretty p@InnermostRuleRemovalProof{} = PP.vcat
     [ PP.text "Arguments of following rules are not not normal-forms."
-    , PP.indent 2 . PP.pretty . Trs.fromList $ concatMap removed_ (removals_ p)
+    , PP.indent 2 . PP.pretty $ removed_ p
     , PP.text "All above mentioned rules can be savely removed." ]
 
 instance Xml.Xml InnermostRuleRemovalProof where
   toXml InnermostRuleRemovalFail      = Xml.elt "innermostRuleRemoval" []
-  toXml p@InnermostRuleRemovalProof{} = Xml.elt "innermostRuleRemoval" (xmlremoval `fmap` removals_ p)
-    where
-      xmlremoval r  = Xml.elt "removal" [xmlreason (reason_ r), xmlremoved (removed_ r)]
-      xmlreason r   = Xml.elt "reason" [Xml.toXml r]
-      xmlremoved rs = Xml.elt "removed" (Xml.toXml `fmap` rs)
+  toXml p@InnermostRuleRemovalProof{} = Xml.elt "innermostRuleRemoval" [Xml.toXml (removed_ p)]
+  toCeTA InnermostRuleRemovalFail      = Xml.unsupported
+  toCeTA p@InnermostRuleRemovalProof{} = Xml.elt "removeNonApplicableRules" [Xml.toCeTA (removed_ p)]
 
