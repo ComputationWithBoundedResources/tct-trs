@@ -7,9 +7,12 @@ module Tct.Trs.Processor
   , emptyDeclaration
   , empty
 
+  -- * Certification
   , withCertificationDeclaration
   , withCertification
   , withCertification'
+
+  -- * Complexity Pair Instances
 
   -- * Strategies
   , dpsimps
@@ -32,6 +35,7 @@ import qualified Tct.Trs.Data.Problem                            as Prob
 import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.DependencyGraph                    as DG
+import qualified Tct.Trs.Data.ComplexityPair                    as CP
 
 import           Tct.Trs.Method.Bounds as M
 import           Tct.Trs.Method.Decompose as M
@@ -81,6 +85,7 @@ empty = E.empty Prob.isTrivial
 emptyDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
 emptyDeclaration = T.declare "empty" [desc] () empty
   where desc = "Checks if the the strict components is empty."
+
 
 
 --- * withCertification ----------------------------------------------------------------------------------------------

@@ -19,16 +19,16 @@ License-file: LICENSE
 Homepage: http://cl-informatik.uibk.ac.at/software/tct/
 Synopsis: A Complexity Analyser for Term Rewrite Systems
 Description:
-  The Tyrolean Complexity Tool (TcT for short) is a tool for proving 
-  resource bounds for different formal systems. This package provides 
-  techniques for proving upper bounds on the derivational and runtime 
+  The Tyrolean Complexity Tool (TcT for short) is a tool for proving
+  resource bounds for different formal systems. This package provides
+  techniques for proving upper bounds on the derivational and runtime
   complexity of term rewriting systems automatically.
 
 Cabal-version: >= 1.8
 Build-type: Simple
 
 Executable trs
-  main-is: 
+  main-is:
     Tct/Trs/Main.hs
   hs-source-dirs:
     src
@@ -48,13 +48,14 @@ Executable trs
     tct-core        == 3.*,
     tct-trs         == 3.*
 
-  extensions: 
+  extensions:
     ConstraintKinds,
     DataKinds,
     DeriveDataTypeable,
     GeneralizedNewtypeDeriving,
     FlexibleInstances,
-    MultiParamTypeClasses, 
+    GADTs,
+    MultiParamTypeClasses,
     TypeFamilies,
     TypeOperators
 
@@ -68,7 +69,9 @@ Library
   exposed-modules:
     Tct.Trs
     Tct.Trs.Data.ArgumentFiltering
+    Tct.Trs.Data.Arguments
     Tct.Trs.Data.CeTA
+    Tct.Trs.Data.ComplexityPair
     Tct.Trs.Data.DependencyGraph
     Tct.Trs.Data.Mode
     Tct.Trs.Data.Problem
@@ -87,6 +90,7 @@ Library
     Tct.Trs.Interactive
     Tct.Trs.Interpretation
     Tct.Trs.Method.Bounds
+    Tct.Trs.Method.ComplexityPair
     Tct.Trs.Method.Decompose
     Tct.Trs.Method.DP.DependencyPairs
     Tct.Trs.Method.DP.DPGraph.DecomposeDG
@@ -115,16 +119,17 @@ Library
     slogic         == 0.*,
     tct-common     == 3.*,
     tct-core       == 3.*
-    
+
   ghc-options:
     -j -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
-  extensions: 
+  extensions:
     ConstraintKinds,
     DataKinds,
     DeriveDataTypeable,
     FlexibleInstances,
+    GADTs,
     GeneralizedNewtypeDeriving,
-    MultiParamTypeClasses, 
+    MultiParamTypeClasses,
     TypeFamilies,
     TypeOperators
 

@@ -37,12 +37,10 @@ makeRuleCompatible r !e !str !wb !ml !a
 compatibleAutomaton :: Ord v => Trs.Trs Symbol v -> Trs.Trs Symbol v -> Enrichment -> Automaton -> Automaton
 compatibleAutomaton strict weak e a = eitherVal (iter a (1 :: Int))
   where 
-    -- iter _ i | traceShow i False = undefined
-    iter a' i = case r of
+    iter a' !i = case r of
       Left  a'' -> iter a'' (i + 1)
       Right a'' -> Right a''
       where r = let r' = foldl (f WeakRule (maxlabel a')) (Right a') wrs in foldl (f StrictRule (maxlabel a')) r' srs
-
 
     f str ml a' rule = case a' of
       (Left a'')  -> Left . eitherVal $ makeRuleCompatible rule e str wb ml a''

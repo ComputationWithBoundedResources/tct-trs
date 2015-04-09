@@ -6,6 +6,7 @@ module Tct.Trs.Data.Signature
   , alter
   , Symbols
   , arity
+  , positions
   , symbols
   , elems
   , filter
@@ -42,9 +43,14 @@ alter f k = onSignature (M.alter f k)
 type Symbols f = S.Set f
 
 -- | Returns the arity of a symbol.
-arity :: (Ord f, Show f) => Signature f ->  f -> Int
+arity :: Ord f => Signature f ->  f -> Int
 arity sig f = err `fromMaybe` M.lookup f (toMap sig)
-  where err = error $ "Signature: not found " ++ show f
+  where err = error "Signature: symbol not found "
+
+-- | Returns the positions of a symbol. By convention [1..arity f].
+positions :: Ord f => Signature f ->  f -> [Int]
+positions sig f = err `fromMaybe` (M.lookup f (toMap sig) >>= \ar -> return [1..ar])
+  where err = error "Signature: symbol not found"
 
 -- | Returns a set of symbols.
 symbols :: Signature f -> Symbols f

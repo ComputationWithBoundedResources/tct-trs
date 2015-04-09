@@ -30,6 +30,8 @@ module Tct.Trs.Data.RuleSelector
   , selFirstAlternative
   -- ** Misc
   , rules
+  , dpRules
+  , trsRules
   ) where
 
 
@@ -306,7 +308,15 @@ rules e =
     BigOr ss    -> rules' ss
     SelectDP d  -> (Trs.singleton d, Trs.empty)
     SelectTrs r -> (Trs.empty, Trs.singleton r)
-  where rules' ss = let (dpss,trss) = unzip [rules sel | sel <- ss] in (Trs.unions dpss, Trs.unions trss)
+  where rules' ss = let (dpss,trss) = unzip (rules `fmap` ss) in (Trs.unions dpss, Trs.unions trss)
+
+-- | dpRules = fst . rules
+dpRules :: (Ord f, Ord v) => SelectorExpression f v -> Trs f v
+dpRules = fst . rules
+
+-- | trsRules = snd . rules
+trsRules :: (Ord f, Ord v) => SelectorExpression f v -> Trs f v
+trsRules = snd . rules
 
 
 {-onSelectedRequire :: Boolean a => SelectorExpression -> (Bool -> Rule -> a) -> a-}

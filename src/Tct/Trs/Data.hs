@@ -8,4 +8,5 @@ import Tct.Trs.Data.RuleSelector    as M (ExpressionSelector, RuleSelector)
 import Tct.Trs.Data.RuleSet         as M (RuleSet)
 import Tct.Trs.Data.Signature       as M (Signature, Symbols)
 import Tct.Trs.Data.Trs             as M (Trs)
+import Tct.Trs.Data.ComplexityPair  as M (IsComplexityPair, ComplexityPair, ComplexityPairProof)
 

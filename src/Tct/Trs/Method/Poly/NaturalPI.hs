@@ -4,13 +4,14 @@ module Tct.Trs.Method.Poly.NaturalPI
   -- * Declaration
   poly
   , polyDeclaration
-  , urArg
-  , uaArg
   -- * Strategies
   , stronglyLinear
   , linear
   , quadratic
   , mixed
+
+  -- * Processor
+  , polyDeclarationCP
   ) where
 
 
@@ -38,6 +39,8 @@ import           Tct.Common.SMT                     ((.&&), (.==>), (.>), (.>=),
 import qualified Tct.Common.SMT                     as SMT
 
 import           Tct.Trs.Data
+import           Tct.Trs.Data.Arguments
+import           Tct.Trs.Data.ComplexityPair
 import qualified Tct.Trs.Data.Problem                as Prob
 import qualified Tct.Trs.Data.ProblemKind            as Prob
 import qualified Tct.Trs.Data.RuleSelector           as Trs
@@ -68,6 +71,16 @@ data PolyInterProcessor = PolyInterProc
   , selector :: Maybe (ExpressionSelector F V)
   } deriving Show
 
+instance HasSelection PolyInterProcessor where
+  p `withSelection` sel = p {selector=Just sel} 
+
+instance IsComplexityPair PolyInterProcessor where
+  solveComplexityPair p sel prob = do
+    -- MS: TODO: generalise solve function returning prooftree+compleixtypairProof
+    ret <- T.evaluate (T.Proc p{selector=Just sel}) prob
+    return $ error "not yet implemented"
+
+polyProc = PolyInterProc {}
 
 newtype PolyInterProof = PolyInterProof (OrientationProof PolyOrder) deriving Show
 
@@ -292,34 +305,31 @@ instance Xml.Xml PolyInterProof where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
+description =  [ "This processor tries to find a polynomial interpretation and shifts strict oriented rules to the weak components." ]
+shArg = PI.shapeArg `T.optional` PI.Linear
+
+slArg = T.some Trs.selectorArg 
+  `T.withName` "shift"
+  `T.withHelp`
+    [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
+  `T.optional` Nothing
+
 polyDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional PI.Shape 
    , T.Argument 'T.Optional Bool 
    , T.Argument 'T.Optional Bool 
    , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) ]
    T.:-> T.Strategy TrsProblem)
-polyDeclaration = T.declare "poly" desc  (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) poly where
-  desc =  ["This processor tries to find a polynomial interpretation and shifts strict oriented rules to the weak components."]
-  shArg = PI.shapeArg `T.optional` PI.Linear
-  slArg = T.some Trs.selectorArg 
-    `T.withName` "shift"
-    `T.withHelp`
-      [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
-    `T.optional` Nothing
+polyDeclaration = T.declare "poly" description (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) poly where
 
-uaArg :: T.Argument 'T.Required Bool
-uaArg = T.bool 
-  `T.withName` "uargs"
-  `T.withHelp` 
-    [ "This argument specifies whether usable arguments are computed (if applicable)"
-    , "in order to relax the monotonicity constraints on the interpretation."]
+polyDeclarationCP :: T.Declaration (
+  '[ T.Argument 'T.Optional PI.Shape 
+   , T.Argument 'T.Optional Bool 
+   , T.Argument 'T.Optional Bool 
+   , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) ]
+   T.:-> ComplexityPair )
+polyDeclarationCP = T.declare "poly" description (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg)  (\a1 a2 a3 a4 -> ComplexityPair (PolyInterProc a1 a2 a3 a4))
 
-urArg :: T.Argument 'T.Required Bool
-urArg = T.bool
-  `T.withName` "urules"
-  `T.withHelp`
-    [ "This argument specifies whether usable rules modulo argument filtering is applied"
-    , "in order to decrease the number of rules that have to be orient. "]
 
 
 poly :: PI.Shape -> Bool -> Bool -> Maybe (ExpressionSelector F V) -> T.Strategy TrsProblem

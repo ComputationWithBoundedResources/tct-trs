@@ -33,6 +33,8 @@ import qualified Tct.Trs.Data.Trs            as Trs
 
 
 -- MS: stolen from mzini/hoca
+-- Certifiable subterms and certifiable usable rules. C. Sternagel, and R. Thiemann. (Definition 4.5)
+-- but additionally incorporates starting rules
 
 -- cap f(t1,...,tn) == f(tcap(t1),...,tcap(tn))
 cap :: (Show v2, Show f, Eq f, Ord v1, Ord v2) => [R.Rule f v1] -> T.Term f v2 -> T.Term f (R.Fresh v2)
@@ -46,13 +48,13 @@ usableRulesOf rhss rules | null rhss || null rules = []
 usableRulesOf rhss rules = walk (caps rhss) [] rules
   where
     walk []     ur _  = ur
-    walk (s:ss) ur rs = walk (caps (RS.rhss ur') ++ ss) (ur' ++ ur) rs'
+    walk (s:ss) ur rs = walk (caps (RS.rhss ur') ++ ss) (ur ++ ur') rs'
       where (ur',rs') = partition (\ rl -> s `R.isUnifiable` R.lhs rl) rs
     caps ss = [ cap rules s | si <- ss, s@T.Fun{} <- T.subterms si ]
 
 usableRulesOf' :: (Show f, Show v, Ord v, Ord f) => Trs.Trs f v -> Trs.Trs f v -> Trs.Trs f v
 usableRulesOf' start trs = start `Trs.union` steps
-  where steps = Trs.fromList (usableRulesOf (RS.rhss $ Trs.toList start) (Trs.toList trs))
+  where steps = Trs.fromList $ usableRulesOf (RS.rhss $ Trs.toList start) (Trs.toList trs)
 
 
 --- * processor ------------------------------------------------------------------------------------------------------
