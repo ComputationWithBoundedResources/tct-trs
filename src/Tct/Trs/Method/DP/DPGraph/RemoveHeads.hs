@@ -5,6 +5,7 @@ module Tct.Trs.Method.DP.DPGraph.RemoveHeads
   ) where
 
 
+import Control.Applicative ((<$>))
 import qualified Data.Rewriting.Rule as R (Rule, rhs)
 import qualified Data.Rewriting.Term as R
 
@@ -41,12 +42,12 @@ instance T.Processor RemoveHeads where
   type ProofObject RemoveHeads = ApplicationProof RemoveHeadsProof
   type Problem RemoveHeads     = TrsProblem
 
-  solve p prob =  return . T.resultToTree p prob $
-    maybe remhead (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  solve p prob =  T.resultToTree p prob <$>
+    maybe remhead (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
     where
       remhead
-        | null heads = T.Fail (Applicable RemoveHeadsFail)
-        | otherwise  = T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | null heads = return $ T.Fail (Applicable RemoveHeadsFail)
+        | otherwise  = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
         where
           wdg = Prob.dependencyGraph prob
           st  = Prob.startTerms prob
