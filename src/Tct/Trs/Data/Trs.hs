@@ -16,7 +16,7 @@ module Tct.Trs.Data.Trs
   , SelectorExpression (..)
 
   , map
-  , toList, fromList
+  , toList, toAscList, fromList
   , funs
 
   , signature
@@ -86,6 +86,9 @@ map k = fromList . fmap k . toList
 
 toList :: Trs f v -> [Rule f v]
 toList (TrsT rs) = S.toList rs
+
+toAscList :: Trs f v -> [Rule f v]
+toAscList (TrsT rs) = S.toAscList rs
 
 fromList :: (Ord f, Ord v) => [Rule f v] -> Trs f v
 fromList = TrsT . S.fromList
@@ -186,9 +189,6 @@ ppTrs = F.foldl k PP.empty
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
   pretty = ppTrs
 
-{-instance (Ord f, Ord v, PP.Pretty f, PP.Pretty v) => PP.Pretty [R.Rule f v] where-}
-  {-pretty = ppTrs . fromList-}
-
 instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Term f v) where
   toXml (R.Fun f ts) = Xml.elt "funapp" $ Xml.toXml f :  [ Xml.elt "arg" [Xml.toXml t] | t <- ts ]
   toXml (R.Var v)    = Xml.toXml v
@@ -205,9 +205,5 @@ instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Int, R.Rule f v) where
 
 instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Trs f v) where
   toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- toList rs ]
-  toCeTA = Xml.toXml
-
-{-instance (Xml.Xml f, Xml.Xml v) => Xml.Xml [R.Rule f v] where-}
-  {-toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- rs ]-}
-  {-toCeTA   = Xml.toXml-}
+  toCeTA   = Xml.toXml
 

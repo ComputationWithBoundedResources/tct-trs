@@ -7,12 +7,12 @@ import qualified Tct.Core.Data.Declaration.Parse as P
 
 import Tct.Trs.Data (TrsProblem)
 import Tct.Trs.Data.ComplexityPair
-import Tct.Trs.Method.Poly.NaturalPI (polyDeclarationCP)
+-- import Tct.Trs.Method.Poly.NaturalPI (polyDeclarationCP)
 
 --- * Complexity Pair Instances --------------------------------------------------------------------------------------
 
 cps :: [ComplexityPairDeclaration]
-cps = [ CD $ polyDeclarationCP ]
+cps = []--[ CD $ polyDeclarationCP ]
 
 cpsParser :: P.SParser TrsProblem ComplexityPair
 cpsParser = P.choice ((\(CD d) -> P.decl d) `fmap` cps)

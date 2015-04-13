@@ -26,6 +26,10 @@ isStartTerm (BasicTerms ds cs) t = case t of
   (R.Var _)    -> True
   (R.Fun f ts) -> f `S.member` ds && all (`S.member` cs) (concatMap R.funs ts)
 
+isBasicTerms :: StartTerms f -> Bool
+isBasicTerms BasicTerms{} = True
+isBasicTerms _            = False
+
 mapStartTerms :: Ord f' => (f -> f') -> StartTerms f -> StartTerms f'
 mapStartTerms f (AllTerms fs)      = AllTerms (f `S.map` fs)
 mapStartTerms f (BasicTerms ds cs) = BasicTerms (f `S.map` ds) (f `S.map` cs)

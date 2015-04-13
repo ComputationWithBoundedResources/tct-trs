@@ -68,7 +68,6 @@ Library
     src
   exposed-modules:
     Tct.Trs
-    Tct.Trs.Data.ArgumentFiltering
     Tct.Trs.Data.Arguments
     Tct.Trs.Data.CeTA
     Tct.Trs.Data.ComplexityPair
@@ -81,14 +80,15 @@ Library
     Tct.Trs.Data.RuleSet
     Tct.Trs.Data.Signature
     Tct.Trs.Data.Trs
-    Tct.Trs.Encoding.UsablePositions
-    Tct.Trs.Encoding.UsableRules
+    Tct.Trs.Encoding.ArgumentFiltering
     Tct.Trs.Encoding.Bounds.Automata
     Tct.Trs.Encoding.Bounds.Violations
     Tct.Trs.Encoding.Bounds.Violations.Find
     Tct.Trs.Encoding.Bounds.Violations.Fix
+    Tct.Trs.Encoding.Interpretation
+    Tct.Trs.Encoding.UsablePositions
+    Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interactive
-    Tct.Trs.Interpretation
     Tct.Trs.Method.Bounds
     Tct.Trs.Method.ComplexityPair
     Tct.Trs.Method.Decompose

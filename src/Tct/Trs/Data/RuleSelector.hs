@@ -318,10 +318,3 @@ dpRules = fst . rules
 trsRules :: (Ord f, Ord v) => SelectorExpression f v -> Trs f v
 trsRules = snd . rules
 
-
-{-onSelectedRequire :: Boolean a => SelectorExpression -> (Bool -> Rule -> a) -> a-}
-{-onSelectedRequire (SelectDP r) f  = f True r-}
-{-onSelectedRequire (SelectTrs r) f = f False r-}
-{-onSelectedRequire (BigAnd es) f   = bigAnd [ onSelectedRequire e f | e <- es]-}
-{-onSelectedRequire (BigOr es) f    = bigOr [ onSelectedRequire e f | e <- es]-}
-

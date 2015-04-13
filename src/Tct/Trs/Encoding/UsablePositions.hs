@@ -129,6 +129,7 @@ usableReplacementMap trs up = unions [ snd $ uArgs l r | R.Rule l r <- rules]
     immediateSubterms (R.Var _)    = []
     immediateSubterms (R.Fun _ ts) = ts
 
+
 -- | Returns an approximation of the usable positions of @prob@.
 usableArgsWhereApplicable :: Ord v => Problem F v
   -> Bool  -- ^ map non-compound symbols to the empty set
@@ -140,11 +141,10 @@ usableArgsWhereApplicable prob onlyCompound useUA = case (onlyCompound, useUA, P
   (_,    _,    Prob.AllTerms{}) -> fullWithSignature sig
   (_,    ua,   _)               -> if ua then usableArgs str trs else fullWithSignature sig
   where
-    sig = Prob.signature prob
     trs = Prob.allComponents prob
     str = Prob.strategy prob
-    compSig    = Sig.filter Prob.isCompoundf sig
-    nonCompSig = Sig.filter (not . Prob.isCompoundf) sig
+    sig = Prob.signature prob
+    (compSig, nonCompSig) = Sig.partition Prob.isCompoundf sig
 
 -- | Returns the usable positions as list.
 usablePositions :: UsablePositions f -> [(f, [Int])]

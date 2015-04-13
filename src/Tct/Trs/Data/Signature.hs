@@ -10,8 +10,10 @@ module Tct.Trs.Data.Signature
   , symbols
   , elems
   , filter
+  , partition
   , restrictSignature
   ) where
+
 
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml    as Xml
@@ -64,6 +66,13 @@ elems = M.assocs . toMap
 filter :: (f -> Bool) -> Signature f -> Signature f
 filter g = onSignature (M.filterWithKey k)
   where k f _ = g f
+
+-- | Partition function symbols.
+partition :: (f -> Bool) -> Signature f -> (Signature f, Signature f)
+partition g = both fromMap . M.partitionWithKey k . toMap
+  where 
+    k f _        = g f
+    both f (a,b) = (f a, f b)
 
 -- | Restrict the signature wrt. to a set of symbols.
 restrictSignature :: Ord f => Signature f -> Symbols f -> Signature f

@@ -62,7 +62,7 @@ defaultDeclarations =
   , T.SD boundsDeclaration
 
   -- Semantic
-  , T.SD polyDeclaration
+  --, T.SD polyDeclaration
 
   -- DP
   , T.SD dependencyPairsDeclaration
