@@ -25,6 +25,10 @@ import qualified Data.Set               as S
 import           Prelude                hiding (filter)
 
 
+-- TODO: MS:
+-- functionsymbol should have arity, otherwise ambigious
+-- maybe a set for constructor and defined symbols?
+
 newtype Signature f = Signature (M.Map f Int)
   deriving (Eq, Ord, Show)
 

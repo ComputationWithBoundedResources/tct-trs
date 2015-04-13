@@ -49,6 +49,7 @@ import           Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes    as M
 import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           as M
 import           Tct.Trs.Method.DP.DPGraph.Trivial               as M
 import           Tct.Trs.Method.DP.UsableRules                   as M
+import           Tct.Trs.Method.InnermostRuleRemoval             as M
 import           Tct.Trs.Method.Poly.NaturalPI                   as M
 
 
@@ -60,6 +61,8 @@ defaultDeclarations =
   , T.SD decomposeDeclaration
 
   , T.SD boundsDeclaration
+
+  , T.SD innermostRuleRemovalDeclaration
 
   -- Semantic
   --, T.SD polyDeclaration

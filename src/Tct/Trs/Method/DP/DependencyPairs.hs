@@ -1,6 +1,7 @@
 -- | This module implements the /Weak Dependency Pairs/ and the /Dependency Tuples/ processor.
 module Tct.Trs.Method.DP.DependencyPairs
-  ( dependencyPairsDeclaration
+  ( DPKind (..)
+  , dependencyPairsDeclaration
   , dependencyPairs
   , dependencyPairs'
 
@@ -176,7 +177,7 @@ instance Xml.Xml DependencyPairsProof where
       , Xml.elt "strictDPs" [Xml.toXml (fromTransformation $ strictTransformation proof) ]
       , Xml.elt "weakDPs" [Xml.toXml (fromTransformation $ weakTransformation proof)] ]
   toCeTA proof
-    | dpKindUsed proof == WIDP = Xml.elt "unknown" []
+    | dpKindUsed proof /= DT = Xml.unsupported
     | otherwise =
       Xml.elt "dtTransformation"
         [ Xml.toCeTA $ Sig.filter Prob.isCompoundf (newSignature proof)
@@ -193,7 +194,7 @@ instance Xml.Xml DependencyPairsProof where
 
 dpKindArg :: T.Argument T.Required DPKind
 dpKindArg = T.arg
-  `T.withName` "dpKind"
+  `T.withName` "kind"
   `T.withHelp`  ["Specifies preferred kind of dependency pairs. Overrides to wdp for non-innermost problems."]
   `T.withDomain` fmap show [(minBound :: DPKind)..]
 
@@ -207,15 +208,15 @@ dependencyPairsDeclaration :: T.Declaration ('[T.Argument 'T.Optional DPKind] T.
 dependencyPairsDeclaration = T.declare "dependencyPairs" description (T.OneTuple dpArg) (T.Proc . DependencyPairs)
   where dpArg = dpKindArg `T.optional` WIDP
 
-dependencyPairs :: DPKind -> T.Strategy TrsProblem
-dependencyPairs = T.declFun dependencyPairsDeclaration
+dependencyPairs :: T.Strategy TrsProblem
+dependencyPairs = T.deflFun dependencyPairsDeclaration
 
-dependencyPairs' :: T.Strategy TrsProblem
-dependencyPairs' = T.deflFun dependencyPairsDeclaration
+dependencyPairs' :: DPKind -> T.Strategy TrsProblem
+dependencyPairs' = T.declFun dependencyPairsDeclaration
 
 weakDependencyPairs :: T.Strategy TrsProblem
-weakDependencyPairs = dependencyPairs WIDP
+weakDependencyPairs = dependencyPairs' WIDP
 
 dependencyTuples :: T.Strategy TrsProblem
-dependencyTuples = dependencyPairs DT
+dependencyTuples = dependencyPairs' DT
 

@@ -38,6 +38,7 @@ trsMode = TctMode
 
 answering :: ProofTree TrsProblem -> IO ()
 answering pt = PP.putPretty (answer pt) >> case totalProof pt of
+-- answering pt = PP.putPretty (answer pt) >> case partialProof pt of
   Left s    -> print s
   Right xml -> Xml.putXml xml
 

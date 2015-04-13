@@ -247,9 +247,9 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
     , PP.indent 2 $ PP.pretty (signature prob)
     , PP.text "Kind:"
     , PP.indent 2 $ PP.pretty (strategy prob)
-    , PP.indent 2 $ PP.pretty (startTerms prob)
-    , PP.text "Graph:"
-    , PP.indent 2 $ PP.pretty (dependencyGraph prob)]
+    , PP.indent 2 $ PP.pretty (startTerms prob) ]
+    -- , PP.text "Graph:"
+    -- , PP.indent 2 $ PP.pretty (dependencyGraph prob)]
 
 
 -- MS: the ceta instance is not complete as it contains a tag <complexityClass> which depends on ProofTree

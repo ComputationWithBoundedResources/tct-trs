@@ -33,7 +33,6 @@ import qualified Tct.Common.CeTA      as C
 
 import           Tct.Trs.Data.Problem
 
-
 -- MS:
 -- Assumption: CeTA 2.2
 -- toCeTA proof constructs valid xml elements, and </unsupported> otherwise
@@ -50,8 +49,8 @@ data Proof = TotalProof | PartialProof deriving Eq
 
 isFeasible :: Bool -> T.ProofTree l -> Result Xml.XmlContent
 isFeasible partial pt
-  | partial = k $ T.timeUB (T.certificateWith pt $ T.timeUBCert T.constant)
-  | otherwise    = k $ T.timeUB (T.certificate pt)
+  | partial   = k $ T.timeUB (T.certificateWith pt $ T.timeUBCert T.constant)
+  | otherwise = k $ T.timeUB (T.certificate pt)
   where
     k (T.Poly (Just n)) = Right $ Xml.elt "polynomial" [Xml.int n]
     k _                 = Left Infeasible
@@ -74,9 +73,9 @@ isCertifiable c = Xml.rootTag c /= "unsupported"
 --
 --   * @Left 'CertFail'@ if the sub-problem is not feasible, and * @Right xml@ otherwise.
 partialProof :: (Ord f, Ord v, Xml f, Xml v) => T.ProofTree (Problem f v) -> Result Xml.XmlDocument
-partialProof pt = isFeasible True pt *> (toDoc <$> subProblem pt <*> partialProofM1 pt)
+partialProof pt = toDoc <$> partialProofM1 pt <*> subProblem pt
   where
-    toDoc a b = C.cetaDocument (C.certificationProblem a b)
+    toDoc b a = C.cetaDocument (C.certificationProblem a b)
     subProblem = cetaSubProblem True
     mkAssumption n = Xml.elt "complexityAssumption" . (:[]) <$> subProblem n
 
@@ -96,9 +95,9 @@ partialProof pt = isFeasible True pt *> (toDoc <$> subProblem pt <*> partialProo
 --   * @Left 'CertFail'@ if the problem is not feasible, or an unsupported technique has been used,
 --   * @Right xml@ otherwise.
 totalProof :: (Ord f, Ord v, Xml f, Xml v) => T.ProofTree (Problem f v) -> Result Xml.XmlDocument
-totalProof pt = isFeasible False pt *> (toDoc <$> subProblem pt <*> totalProofM1 pt)
+totalProof pt = toDoc <$> totalProofM1 pt <*> subProblem pt
   where
-    toDoc a b = C.cetaDocument (C.certificationProblem a b)
+    toDoc a b = C.cetaDocument (C.certificationProblem b a)
     subProblem = cetaSubProblem False
 
     totalProofM1 r = C.complexityProof <$> totalProofM2 r
@@ -115,22 +114,21 @@ totalProof pt = isFeasible False pt *> (toDoc <$> subProblem pt <*> totalProofM1
 
 proofIO :: MonadIO m => FilePath -> (l -> Either CertFail XmlDocument) -> Proof -> l -> m (Either String l)
 proofIO tmpDir prover allowPartial p = 
-    case prover p of
-      Left Infeasible -> return $ Right p
-      Left err        -> return $ Left (show err)
-      Right xml       ->
-        liftIO . withFile $ \file hfile -> do
-          Xml.putXmlHandle xml hfile
-          hClose hfile
-          (code , stdout, stderr) <- readProcessWithExitCode "ceta" (args [file]) ""
-          return $ case code of
-            ExitFailure i -> Left $ "Error(" ++ show i ++ "," ++ show stderr ++ ")"
-            ExitSuccess   -> case lines stdout of
-              "CERTIFIED <complexityProof>" :_ -> Right p
-              _                                -> Left stdout
-    where 
-      args = if allowPartial == PartialProof then ("--allow-assumptions":) else id
-      withFile = E.bracket (openTempFile tmpDir "ceta") (hClose . snd) . uncurry
+  case prover p of
+    Left err -> return $ Left (show err)
+    Right xml       ->
+      liftIO . withFile $ \file hfile -> do
+        Xml.putXmlHandle xml hfile
+        hClose hfile
+        (code , stdout, stderr) <- readProcessWithExitCode "ceta" (args [file]) ""
+        return $ case code of
+          ExitFailure i -> Left $ "Error(" ++ show i ++ "," ++ stderr ++ ")"
+          ExitSuccess   -> case lines stdout of
+            "CERTIFIED <complexityProof>" :_ -> Right p
+            _                                -> Left stdout
+  where 
+    args = if allowPartial == PartialProof then ("--allow-assumptions":) else id
+    withFile = E.bracket (openTempFile tmpDir "ceta") (hClose . snd) . uncurry
 
 totalProofIO :: (MonadIO m, Ord f, Ord v, Xml f, Xml v, l ~ T.ProofTree (Problem f v)) => l -> m (Either String l)
 totalProofIO = totalProofIO' "/tmp"

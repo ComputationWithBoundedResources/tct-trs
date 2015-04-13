@@ -16,6 +16,7 @@ module Tct.Trs.Method.Poly.NaturalPI
   ) where
 
 
+import Control.Monad (when)
 import Control.Monad.Error                           (throwError, MonadError)
 import Control.Monad.Trans                           (liftIO, MonadIO)
 import qualified Data.List                           as L
@@ -80,16 +81,17 @@ instance T.Processor NaturalPI where
     | otherwise           = do
         res <- entscheide p prob
         case res of
-          SMT.Sat order -> toProof $ T.Success (newProblem prob order) (Applicable $ Order order) (certification order)
+          -- SMT.Sat order -> toProof $ T.Success (newProblem prob order) (Applicable $ Order order) (certification order)
+          SMT.Sat order 
+            | progressing nprob -> toProof $ T.Success nprob (Applicable $ Order order) (certification order)
+            -- MS: sanity check: if satisfiable we should have progress
+            | otherwise         -> throwError $ userError "naturalpi: sat but no progresss :/"
+            where nprob = newProblem prob order
           _             -> toProof $ T.Fail (Applicable Incompatible)
         where 
           toProof = return . T.resultToTree p prob
-          progressing a = return a 
-
-            -- | Prob.progressUsingSize prob prob' ->
-            --     toProof $ T.Success (T.Id prob') (Applicable $ Order order) (certification order)
-            -- | otherwise -> throwError $ userError "naturalpi: satisfiable but no progress"
-            -- where prob' = newProblem prob order
+          progressing T.Null               = True
+          progressing (T.Opt (T.Id nprob)) = Prob.progressUsingSize prob nprob
 
 newProblem :: TrsProblem -> PolyOrder Int -> T.Optional T.Id TrsProblem
 newProblem prob order = case I.shift_ (pint_ order) of
@@ -151,7 +153,7 @@ entscheide p prob = do
     absi  = I.Interpretation $ M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
     kind  =
       if Prob.isRCProblem prob
-        then PI.ConstructorBased (shape p) (Prob.constructors $ Prob.startTerms prob)
+        then PI.ConstructorBased (shape p) (Prob.constructors (Prob.startTerms prob) `S.union` Sig.symbols (Sig.filter Prob.isCompoundf sig))
         else PI.Unrestricted (shape p)
     
     mkOrder (inter, uposs, ufuns) = PolyOrder
@@ -160,7 +162,7 @@ entscheide p prob = do
       where
       pinter = I.InterpretationProof 
         { I.sig_       = sig
-        , I.inter_     = undefined
+        , I.inter_     = inter
         , I.uargs_     = uposs
         , I.ufuns_     = maybe S.empty UREnc.runUsableSymbols ufuns
         , I.shift_     = shift
@@ -315,3 +317,17 @@ poly sh ua ur sl = T.Proc $ PolyInterProc
 
 
 -}
+--
+--
+-- polyProc :: PI.Shape -> Bool -> Bool -> Maybe (ExpressionSelector F V) -> NaturalPI
+-- polyProc sh ua ur sl = NaturalPI
+--   { shape    = sh
+--   , uargs    = ua
+--   , urules   = ur
+--   , selector = sl }
+--
+--
+-- polyProcDeclaration = T.declare "poly" description (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) (T.Proc `comp4` polyProc)
+--
+-- lift4 f p = T.declare (T.declName p)  (T.declHelp p) (T.declArgs p) (f `comp4` T.declFun p)
+-- comp4 f g a b c d = f $ g a b c d 

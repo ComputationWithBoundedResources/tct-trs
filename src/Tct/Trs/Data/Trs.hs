@@ -29,7 +29,7 @@ module Tct.Trs.Data.Trs
 
   , size
   , null
-  , isDuplicating, isLinear, isRightLinear, isCollapsing
+  , isDuplicating, isLinear, isLeftLinear, isRightLinear, isCollapsing
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
 
   , isLinear', isRightLinear', isNonErasing', isNonSizeIncreasing', isNonDuplicating'
@@ -154,8 +154,9 @@ null = lift1 S.null
 isSubset :: (Ord f, Ord v) => Trs f v -> Trs f v -> Bool
 isSubset = lift2 S.isSubsetOf
 
-isLinear, isRightLinear, isDuplicating, isCollapsing :: (Ord f, Ord v) => Trs f v -> Bool
+isLinear, isLeftLinear, isRightLinear, isDuplicating, isCollapsing :: (Ord f, Ord v) => Trs f v -> Bool
 isLinear      = all' R.isLinear
+isLeftLinear  = all' R.isLeftLinear
 isRightLinear = all' R.isRightLinear
 isDuplicating = any' R.isDuplicating
 isCollapsing  = any' R.isCollapsing
