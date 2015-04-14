@@ -82,7 +82,7 @@ instance PP.Pretty InnermostRuleRemovalProof where
 
 instance Xml.Xml InnermostRuleRemovalProof where
   toXml InnermostRuleRemovalFail      = Xml.elt "innermostRuleRemoval" []
-  toXml p@InnermostRuleRemovalProof{} = Xml.elt "innermostRuleRemoval" [Xml.toXml (removed_ p)]
+  toXml p@InnermostRuleRemovalProof{} = Xml.elt "innermostRuleRemoval" [ Xml.toXml (removed_ p) ]
   toCeTA InnermostRuleRemovalFail      = Xml.unsupported
-  toCeTA p@InnermostRuleRemovalProof{} = Xml.elt "removeNonApplicableRules" [Xml.toCeTA (removed_ p)]
+  toCeTA p@InnermostRuleRemovalProof{} = Xml.elt "removeNonApplicableRules" [ Xml.elt "trs" [Xml.toCeTA (removed_ p)] ]
 
