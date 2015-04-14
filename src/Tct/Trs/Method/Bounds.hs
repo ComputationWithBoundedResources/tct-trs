@@ -28,6 +28,7 @@ import           Data.Typeable
 
 import qualified Data.Rewriting.Term                as R
 
+import qualified Tct.Core.Common.Parser             as P
 import qualified Tct.Core.Common.Pretty             as PP
 import qualified Tct.Core.Common.Xml                as Xml
 import qualified Tct.Core.Data                      as T
@@ -176,10 +177,10 @@ enrichmentArg = T.arg
   `T.withDomain` fmap show [(minBound :: Enrichment)..]
 
 instance T.SParsable prob InitialAutomaton where
-  parseS = T.mkEnumParser (undefined :: InitialAutomaton)
+  parseS = P.enum
 
 instance T.SParsable prob Enrichment where
-  parseS = T.mkEnumParser (undefined :: Enrichment)
+  parseS = P.enum
 
 description :: [String]
 description =
