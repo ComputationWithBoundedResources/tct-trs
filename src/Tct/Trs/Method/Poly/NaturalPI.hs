@@ -171,9 +171,9 @@ entscheide p prob = do
         , I.weakDPs_   = wDPs
         , I.weakTrs_   = wTrs }
 
-      (sDPs,wDPs) = L.partition (isStrict . snd) (rs $ Prob.dpComponents prob)
-      (sTrs,wTrs) = L.partition (isStrict . snd) (rs $ Prob.trsComponents prob)
-      isStrict (lpoly,rpoly) = P.constantValue (lpoly `sub` rpoly) > 0
+      (sDPs,wDPs) = L.partition isStrict (rs $ Prob.dpComponents prob)
+      (sTrs,wTrs) = L.partition isStrict (rs $ Prob.trsComponents prob)
+      isStrict (r,(lpoly,rpoly)) = r `Trs.member` Prob.strictComponents prob && P.constantValue (lpoly `sub` rpoly) > 0
       rs trs =
         [ (r, (interpretf inter lhs, interpretf inter rhs))
         | r@(R.Rule lhs rhs) <- Trs.toList trs
@@ -184,6 +184,56 @@ entscheide p prob = do
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
+
+polyProc :: PI.Shape -> Bool -> Bool -> Maybe (ExpressionSelector F V) -> NaturalPI
+polyProc sh ua ur sl = NaturalPI
+  { shape    = sh
+  , uargs    = ua
+  , urules   = ur
+  , selector = sl }
+
+polyProcDeclaration :: T.Declaration (
+  '[ T.Argument 'T.Optional PI.Shape 
+   , T.Argument 'T.Optional Bool 
+   , T.Argument 'T.Optional Bool 
+   , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) ]
+   T.:-> NaturalPI)
+polyProcDeclaration = T.declare "poly" description (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) polyProc 
+
+
+polyProcDeclaration2 = T.declare 
+  "poly" 
+  (T.declHelp polyProcDeclaration) 
+  -- (T.declArgs polyProcDeclaration)
+  (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) 
+  (T.Proc `comp4` T.declFun polyProcDeclaration)
+
+-- polyDeclaration :: T.Declaration (
+--   '[ T.Argument 'T.Optional PI.Shape 
+--    , T.Argument 'T.Optional Bool 
+--    , T.Argument 'T.Optional Bool 
+--    , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) ]
+--    T.:-> T.Strategy TrsProblem)
+-- polyDeclaration = T.declare 
+--   "poly" 
+--   (T.declHelp polyProcDeclaration)
+--   (T.declArgs polyProcDeclaration)
+--   (\a1 a2 a3 a4 -> T.Proc $ polyProc a1 a2 a3 a4)
+polyDeclaration = undefined
+--
+--
+-- polyProc :: PI.Shape -> Bool -> Bool -> Maybe (ExpressionSelector F V) -> NaturalPI
+-- polyProc sh ua ur sl = NaturalPI
+--   { shape    = sh
+--   , uargs    = ua
+--   , urules   = ur
+--   , selector = sl }
+--
+--
+--
+-- lift4 f p = T.declare (T.declName p)  (T.declHelp p) (T.declArgs p) (f `comp4` T.declFun p)
+comp4 f g a b c d = f $ g a b c d 
+
 
 polyStrategy :: PI.Shape -> Bool -> Bool -> Maybe (ExpressionSelector F V) -> T.Strategy TrsProblem
 polyStrategy sh ua ur sl = T.Proc $ NaturalPI
@@ -205,19 +255,19 @@ slArg = T.some Trs.selectorArg
     [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
   `T.optional` Nothing
 
-polyDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional PI.Shape 
-   , T.Argument 'T.Optional Bool 
-   , T.Argument 'T.Optional Bool 
-   , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) ]
-   T.:-> T.Strategy TrsProblem)
-polyDeclaration = T.declare "poly" description (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) polyStrategy where
+-- polyDeclaration :: T.Declaration (
+--   '[ T.Argument 'T.Optional PI.Shape 
+--    , T.Argument 'T.Optional Bool 
+--    , T.Argument 'T.Optional Bool 
+--    , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) ]
+--    T.:-> T.Strategy TrsProblem)
+-- polyDeclaration = T.declare "poly" description (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) polyStrategy where
 
 poly :: T.Strategy TrsProblem
-poly = T.deflFun polyDeclaration
+poly = undefined -- T.deflFun polyDeclaration
 
 poly' :: PI.Shape -> Bool -> Bool -> Maybe (ExpressionSelector F V) -> T.Strategy TrsProblem
-poly' = T.declFun polyDeclaration
+poly' = undefined -- T.declFun polyDeclaration
 
 -- TODO: MS: better interface
 -- can we do without exposing the processor type a builder a -> Strategy with modifyers f a -> a?
@@ -317,17 +367,3 @@ poly sh ua ur sl = T.Proc $ PolyInterProc
 
 
 -}
---
---
--- polyProc :: PI.Shape -> Bool -> Bool -> Maybe (ExpressionSelector F V) -> NaturalPI
--- polyProc sh ua ur sl = NaturalPI
---   { shape    = sh
---   , uargs    = ua
---   , urules   = ur
---   , selector = sl }
---
---
--- polyProcDeclaration = T.declare "poly" description (shArg, uaArg `T.optional` True,  urArg `T.optional` True, slArg) (T.Proc `comp4` polyProc)
---
--- lift4 f p = T.declare (T.declName p)  (T.declHelp p) (T.declArgs p) (f `comp4` T.declFun p)
--- comp4 f g a b c d = f $ g a b c d 
