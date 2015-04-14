@@ -20,6 +20,7 @@ import qualified Data.Set                    as S
 
 import qualified Data.Rewriting.Rule         as R
 
+import qualified Tct.Core.Common.Parser      as P
 import qualified Tct.Core.Common.Pretty      as PP
 import qualified Tct.Core.Common.Xml         as Xml
 import qualified Tct.Core.Data               as T
@@ -169,25 +170,28 @@ instance PP.Pretty DependencyPairsProof where
       info DT   = "dependency tuples"
 
 
--- TODO: MS: there should be a new CeTA version that supports wdps
 instance Xml.Xml DependencyPairsProof where
   toXml proof =
     Xml.elt "dp"
       [ Xml.elt (if isTuples (dpKindUsed proof) then "tuples" else "pairs") []
       , Xml.elt "strictDPs" [Xml.toXml (fromTransformation $ strictTransformation proof) ]
       , Xml.elt "weakDPs" [Xml.toXml (fromTransformation $ weakTransformation proof)] ]
-  toCeTA proof
-    | dpKindUsed proof /= DT = Xml.unsupported
-    | otherwise =
-      Xml.elt "dtTransformation"
-        [ Xml.toCeTA $ Sig.filter Prob.isCompoundf (newSignature proof)
-        , Xml.elt "strictDTs" (map ruleWith $ strictTransformation proof)
-        , Xml.elt "weakDTs" (map ruleWith $ weakTransformation proof)
-        -- FIXME: MS this should probably be marked starting terms;
-        , Xml.elt "innermostLhss" (map lhss $ strictTransformation proof ++ weakTransformation proof) ]
-      where
-        ruleWith (old,new) = Xml.elt "ruleWithDT" [ Xml.toCeTA old, Xml.toCeTA new ]
-        lhss (_, new)      = Xml.toCeTA (R.lhs new)
+  toCeTA proof = case dpKindUsed proof of
+    WIDP -> Xml.unsupported
+    WDP -> 
+      Xml.elt "wdpTransformation"
+        [ Xml.elt "compoundSymbols" [ xsymb f i | (f,i) <- Sig.elems (newSignature proof) ]
+        , xstrict "WDPs", xweak "WDPs", xlhss ]
+        where xsymb f i = Xml.elt "symbol" [ Xml.toXml f, Xml.elt "arity" [Xml.int i] ]
+    DT -> 
+      Xml.elt "dtTransformation" [ xstrict "DTs" , xweak "DTs", xlhss ]
+    where
+      ruleWith dp (old,new) = Xml.elt ("ruleWith"++dp) [ Xml.toCeTA old, Xml.toCeTA new ]
+      lhss (_, new)       = Xml.toCeTA (R.lhs new)
+
+      xstrict dp = Xml.elt ("strict"++dp) $ map (ruleWith dp) (strictTransformation proof)
+      xweak   dp = Xml.elt ("weak"++dp)   $ map (ruleWith dp) (weakTransformation proof)
+      xlhss      = Xml.elt "innermostLhss" $ map lhss (strictTransformation proof ++ weakTransformation proof)
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
@@ -199,7 +203,7 @@ dpKindArg = T.arg
   `T.withDomain` fmap show [(minBound :: DPKind)..]
 
 instance T.SParsable prob DPKind where
-  parseS = T.mkEnumParser (undefined :: DPKind)
+  parseS = P.enum
 
 description :: [String]
 description = ["Applies the (weak) dependency pairs transformation."]
