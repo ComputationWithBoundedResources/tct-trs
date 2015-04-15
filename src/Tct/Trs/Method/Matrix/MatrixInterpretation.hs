@@ -15,8 +15,6 @@ This module defines matrix interpretations.
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 module Tct.Trs.Method.Matrix.MatrixInterpretation where
 
@@ -57,13 +55,13 @@ data MatrixInterpretation fun var a =
   MInter { dimension       :: Int
          , signature       :: Sig.Signature fun
          , interpretations :: Map.Map fun (LinearInterpretation var a)
-         } deriving (Show)
+         } deriving Show
 
 -- guessing LInter means function label interpretation
 data LinearInterpretation var a =
   LInter { coefficients :: Map.Map var (EncM.Matrix a)
          , constant     :: EncM.Vector a
-         } deriving (Show,Traversable,Foldable)
+         } deriving (Show, DT.Traversable, DF.Foldable)
 
 -- entries of abstract matrix interpretation matrices
 data MatrixInterpretationEntry fun

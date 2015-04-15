@@ -52,7 +52,11 @@ Executable trs
     ConstraintKinds,
     DataKinds,
     DeriveDataTypeable,
+    DeriveFoldable, 
+    DeriveFunctor, 
+    DeriveTraversable,
     GeneralizedNewtypeDeriving,
+    FlexibleContexts,
     FlexibleInstances,
     GADTs,
     MultiParamTypeClasses,
@@ -104,6 +108,10 @@ Library
     Tct.Trs.Method.DP.UsableRules
     Tct.Trs.Method.InnermostRuleRemoval
     Tct.Trs.Method.Poly.NaturalPI
+    Tct.Trs.Method.Matrix.Matrix
+    Tct.Trs.Method.Matrix.MatrixFun
+    Tct.Trs.Method.Matrix.MatrixInterpretation
+    Tct.Trs.Method.Matrix.NaturalMI
     Tct.Trs.Processor
   build-depends:
     base           == 4.*,
@@ -127,6 +135,10 @@ Library
     ConstraintKinds,
     DataKinds,
     DeriveDataTypeable,
+    DeriveFoldable, 
+    DeriveFunctor, 
+    DeriveTraversable,
+    FlexibleContexts,
     FlexibleInstances,
     GADTs,
     GeneralizedNewtypeDeriving,

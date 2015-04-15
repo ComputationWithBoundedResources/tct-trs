@@ -42,6 +42,7 @@ import qualified Tct.Common.ProofCombinators         as PC
 -- imports tct-core
 import qualified Tct.Core.Data                       as CD
 import           Tct.Core.Data.Declaration.Parse     ()
+import qualified Tct.Core.Common.Parser              as P
 import qualified Tct.Core.Common.Pretty              as PP
 import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Common.SemiRing            as SR
@@ -295,7 +296,10 @@ ub order mi inter =
     MI.ConstructorEda _ (Just n) -> CD.Poly $ Just n
 
 maxNonIdMatrix :: Int -> I.Interpretation fun (MI.LinearInterpretation var Int) -> EncM.Matrix Int
-maxNonIdMatrix dim mi = if any (elem (EncM.unit d) . MI.coefficients) (I.interpretations mi) && maxi == EncM.zeroMatrix d d then EncM.unit 1 else maxi
+maxNonIdMatrix dim mi = 
+  if any (elem (EncM.unit d) . Map.elems . MI.coefficients) (Map.elems $ I.interpretations mi) && maxi == EncM.zeroMatrix d d 
+    then EncM.unit 1 
+    else maxi
   where maxi = EncM.maximumMatrix max (d, d) $ Map.map (EncM.maximumMatrix max (d, d) . Map.filter (/= (EncM.unit d)) . MI.coefficients) $ I.interpretations mi
         d    = dim
 
@@ -408,7 +412,7 @@ matrixStrategy dim deg nmiKind ua ur sl = CD.Proc $
 ms a b c d e f = CD.Proc $ NaturalMI a b c d e f
 
 instance CD.SParsable prob NaturalMIKind where
-  parseS = CD.mkEnumParser (undefined :: NaturalMIKind)
+  parseS = P.enum
 
 
 description :: [String]

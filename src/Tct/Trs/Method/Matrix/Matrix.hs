@@ -11,7 +11,7 @@ Stability   :  unstable
 Portability :  unportable
 -}
 
-{-# LANGUAGE ConstraintKinds, DeriveTraversable #-}
+{-# LANGUAGE ConstraintKinds, DeriveTraversable, DeriveFunctor, DeriveFoldable #-}
 
 module Tct.Trs.Method.Matrix.Matrix
   (
@@ -53,10 +53,11 @@ module Tct.Trs.Method.Matrix.Matrix
   ) where
 
 import qualified Data.Foldable as F
+import qualified Data.Traversable as F
 import qualified Tct.Core.Common.SemiRing as SR
 
-newtype Vector a = Vector [a] deriving (Show, Eq, Functor, Foldable, Traversable)
-newtype Matrix a = Matrix [Vector a] deriving (Show, Eq, Functor, Foldable, Traversable)
+newtype Vector a = Vector [a] deriving (Show, Eq, Functor, F.Foldable, F.Traversable)
+newtype Matrix a = Matrix [Vector a] deriving (Show, Eq, Functor, F.Foldable, F.Traversable)
 
 --instance Functor Vector where
 --  fmap f (Vector v) = Vector $ map f v
