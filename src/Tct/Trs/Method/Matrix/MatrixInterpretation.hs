@@ -16,6 +16,7 @@ This module defines matrix interpretations.
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Tct.Trs.Method.Matrix.MatrixInterpretation where
 
@@ -24,6 +25,7 @@ import qualified Data.Map                         as Map
 import qualified Data.Set                         as Set
 import qualified Data.List                        as List
 import qualified Data.Foldable                    as DF
+import qualified Data.Traversable                 as DT
 import qualified Data.Maybe                       as DM
 
 -- imports term-rewriting
@@ -61,7 +63,7 @@ data MatrixInterpretation fun var a =
 data LinearInterpretation var a =
   LInter { coefficients :: Map.Map var (EncM.Matrix a)
          , constant     :: EncM.Vector a
-         } deriving (Show)
+         } deriving (Show,Traversable,Foldable)
 
 -- entries of abstract matrix interpretation matrices
 data MatrixInterpretationEntry fun
@@ -89,6 +91,10 @@ instance PP.Pretty fun => PP.Pretty (MatrixInterpretationEntry fun) where
   pretty MIConstOne = PP.text "one"
 
 type FunMatrixCreate fun a = fun -> Int -> Int -> EncM.Matrix a
+
+
+instance (SMT.Decode m c a) => SMT.Decode m (LinearInterpretation var c) (LinearInterpretation var a) where
+  decode = DT.traverse SMT.decode
 
 data MatrixKind fun
   = UnrestrictedMatrix
@@ -247,15 +253,18 @@ absEdaMatrix f dim k = EncM.Matrix $ map handlerow [1..dim]
 -- | Canonical variable type for abstract linear matrix interpretations.
 newtype SomeIndeterminate = SomeIndeterminate Int deriving (Eq, Ord, Enum)
 
+instance Show SomeIndeterminate where
+  show (SomeIndeterminate i) = 'x' : show i
+
 instance PP.Pretty SomeIndeterminate where
   pretty (SomeIndeterminate i) = PP.char 'x' PP.<> PP.int i
 
 
-abstractInterpretation ::  (Ord fun, Show fun) => MatrixKind fun -> Int -> Sig.Signature fun -> MatrixInterpretation fun SomeIndeterminate (MatrixInterpretationEntry fun)
-abstractInterpretation mkind dim sig = (MInter dim sig . Map.fromList . map (\f -> (f, interpretf f)) . Set.elems . Sig.symbols) sig
+abstractInterpretation ::  (Ord fun, Show fun) => MatrixKind fun -> Int -> (fun,Int) -> LinearInterpretation SomeIndeterminate (MatrixInterpretationEntry fun)
+abstractInterpretation mkind dim (fun,arity) = interpretf fun
   where
     interpretf f = LInter (fcoeffs f) (fconst f)
-    fcoeffs f = Map.fromList (map (\x -> (SomeIndeterminate x, (op f) f dim x)) [1..Sig.arity sig f])
+    fcoeffs f = Map.fromList (map (\x -> (SomeIndeterminate x, (op f) f dim x)) [1..arity])
     fconst f = EncM.Vector $ map (\x -> MIVar False f 0 x 0) [1..dim]
     op f = case mkind of
       UnrestrictedMatrix    -> absStdMatrix
