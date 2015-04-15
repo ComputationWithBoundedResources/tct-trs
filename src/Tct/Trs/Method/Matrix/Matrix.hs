@@ -11,8 +11,6 @@ Stability   :  unstable
 Portability :  unportable
 -}
 
-{-# LANGUAGE ConstraintKinds, DeriveTraversable, DeriveFunctor, DeriveFoldable #-}
-
 module Tct.Trs.Method.Matrix.Matrix
   (
     Vector(..)
@@ -54,7 +52,10 @@ module Tct.Trs.Method.Matrix.Matrix
 
 import qualified Data.Foldable as F
 import qualified Data.Traversable as F
+
+import qualified Tct.Core.Common.Xml as Xml
 import qualified Tct.Core.Common.SemiRing as SR
+
 
 newtype Vector a = Vector [a] deriving (Show, Eq, Functor, F.Foldable, F.Traversable)
 newtype Matrix a = Matrix [Vector a] deriving (Show, Eq, Functor, F.Foldable, F.Traversable)
@@ -221,3 +222,53 @@ maxMatrix amax (Matrix m) (Matrix n) = Matrix $ zipWith (maxVector amax) m n
 maximumMatrix :: (F.Foldable t, SR.SemiRing a)
                 => (a -> a -> a) -> (Int,Int) -> t (Matrix a) -> Matrix a
 maximumMatrix amax dims = F.foldr (maxMatrix amax) (uncurry zeroMatrix dims)
+
+
+instance Xml.Xml (Vector Int) where
+  toXml (Vector cs) = Xml.elt "vector" [ Xml.elt "coefficient" [ Xml.elt "integer" [Xml.int c] ] | c <- cs]
+  toCeTA            = Xml.toXml
+
+instance Xml.Xml (Matrix Int) where
+  toXml mx = let Matrix vs = transpose mx in Xml.elt "matrix" (map Xml.toXml vs)
+  toCeTA   = Xml.toXml
+
+
+-- newtype Vector a = Vector [a] deriving (Show, Eq, Functor, F.Foldable, F.Traversable)
+-- newtype Matrix a = Matrix [Vector a] deriving (Show, Eq, Functor, F.Foldable, F.Traversable)
+
+-- instance PP.Pretty 
+--
+--     tpe = Xml.elt "type"
+--           [ Xml.elt "matrixInterpretation"
+--             [ Xml.elt "domain" [Xml.elt "naturals" []]
+--             , Xml.elt "dimension" [Xml.int dim]
+--             , Xml.elt "strictDimension" [Xml.int (1::Int)]
+--             , Xml.elt "kind"
+--               [ case knd of
+--                  UnrestrictedMatrix -> Xml.elt "unrestricted" []
+--                  ConstructorBased _ mn -> Xml.elt "constructorBased" [Xml.int $ DM.fromMaybe dim mn]
+--                  TriangularMatrix mn -> Xml.elt "triangular" [Xml.int $ DM.fromMaybe dim mn]
+--                  ConstructorEda _ mn -> Xml.elt "constructorEda" [Xml.int $ DM.fromMaybe dim mn]
+--                  EdaMatrix mn -> Xml.elt "constructorEda" [Xml.int $ DM.fromMaybe dim mn]
+--               ]
+--             -- TODO add usable args xml here
+--             ]
+--           ]
+--     inter f li =
+--       Xml.elt "interpret"
+--       [ Xml.elt "symbol" [Xml.toXml f]
+--       , Xml.elt "arity" [Xml.int $ sig `Sig.arity` f]
+--       , xsum $
+--         (xpoly $ xcoeff $ xvec $ constant li) :
+--         [xprod [xpoly $ xcoeff $ xmat m, xvar v] | (v,m) <- Map.toList $ coefficients li]
+--       ]
+--     xpoly p = Xml.elt "polynomial" [p]
+--     xsum = xpoly . Xml.elt "sum"
+--     xprod = xpoly . Xml.elt "product"
+--     xvar (SomeIndeterminate i) = xpoly $ Xml.elt "variable" [Xml.int i]
+--     xcoeff c = Xml.elt "coefficient" [c]
+--     xelt e = xcoeff (Xml.elt "integer" [Xml.int e])
+--     xvec (EncM.Vector vs) = Xml.elt "vector" [xelt e | e <- vs]
+--     xmat mx = let
+--       EncM.Matrix vvs = EncM.transpose mx
+--       in Xml.elt "matrix" [xvec vs | vs <- vvs]

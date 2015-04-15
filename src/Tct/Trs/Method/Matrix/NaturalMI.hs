@@ -83,6 +83,7 @@ instance Show NaturalMIKind where
 
 data MatrixOrder a
   = MatrixOrder { kind_      :: MI.MatrixKind Prob.F
+                , dim_       :: Int
                 , mint_      :: I.InterpretationProof (MI.LinearInterpretation MI.SomeIndeterminate a) (MI.LinearInterpretation Prob.V a)
                 } deriving (Show)
 
@@ -119,7 +120,14 @@ instance PP.Pretty (MatrixOrder Int) where
               ]
 
 instance Xml.Xml (MatrixOrder Int) where
-   toXml order = Xml.elt "instance Xml.Xml MatrixOrder not yet implemented" []
+  toXml order = I.xmlProof (mint_ order) xtype where
+    xtype = Xml.elt "type" [Xml.elt "matrixInterpretation" [xdom, xdim, xsdim]]
+    xdom  = Xml.elt "domain" [Xml.elt "naturals" []]
+    xdim  = Xml.elt "dimension" [ Xml.int (dim_ order)]
+    xsdim = Xml.elt "strictDimension" [ Xml.int (1::Int) ]
+  toCeTA order
+    | True      = Xml.toXml order -- FIXME: MS: add sanity check; ceta supports definitely triangular; does it support algebraic ?
+    | otherwise = Xml.unsupported
 
 
 data NaturalMI = NaturalMI
@@ -374,6 +382,7 @@ entscheide p prob = do
 
     mkOrder (inter, uposs, ufuns) = MatrixOrder
       { kind_ = kind
+      , dim_  = miDimension p
       , mint_ = minter}
       where
         minter = I.InterpretationProof
@@ -428,23 +437,21 @@ nmiKindArg = CD.arg { CD.argName = "miKind" , CD.argDomain = "<miKind>" }
     kinds = map ('*':)  [ show Unrestricted, show Triangular, show Algebraic, show Automaton]
 
 
-dimArg :: CD.Argument 'CD.Optional Int
+dimArg :: CD.Argument 'CD.Required Int
 dimArg = CD.nat { CD.argName = "dimension" , CD.argDomain = "<nat>" }
          `CD.withHelp` ["Specifies the dimension of the matrices used in the interpretation."]
-         `CD.optional` 3
 
-degArg :: CD.Argument 'CD.Optional Int
+degArg :: CD.Argument 'CD.Required Int
 degArg = CD.nat { CD.argName = "degree" , CD.argDomain = "<nat>" }
          `CD.withHelp` ["Specifies the maximal degree of the matrices used in the interpretation."]
-         `CD.optional` 3
 
 
-slArg :: CD.Argument 'CD.Optional (Maybe (TD.ExpressionSelector f v))
+slArg :: (Ord f, Ord v) => CD.Argument 'CD.Optional (Maybe (TD.ExpressionSelector f v))
 slArg = CD.some RS.selectorArg
   `CD.withName` "shift"
   `CD.withHelp`
     [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
-  `CD.optional` Nothing
+  `CD.optional` Just (RS.selAnyOf RS.selStricts)
 
 
 matrixDeclaration = CD.declare "matrix" description

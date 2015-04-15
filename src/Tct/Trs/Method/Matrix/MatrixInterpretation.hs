@@ -88,6 +88,20 @@ instance PP.Pretty fun => PP.Pretty (MatrixInterpretationEntry fun) where
   pretty MIConstZero = PP.text "zero"
   pretty MIConstOne = PP.text "one"
 
+
+instance Xml.Xml (LinearInterpretation SomeIndeterminate Int) where
+  toXml lint = xsum (xcons (constant lint) :map xcoeff (Map.toList $ coefficients lint) )
+    where
+      xpol p = Xml.elt "polynomial" [p]
+      xsum   = xpol . Xml.elt "sum"
+      xmul   = xpol . Xml.elt "product"
+      xelm   = xpol . Xml.elt "coefficient"
+
+      xcons c = xelm [ Xml.toXml c ]
+      xcoeff (v,m) = xmul [ xelm [Xml.toXml m], xvar v]
+      xvar (SomeIndeterminate i) = xpol $ Xml.elt "variable" [Xml.int i]
+    
+
 type FunMatrixCreate fun a = fun -> Int -> Int -> EncM.Matrix a
 
 
