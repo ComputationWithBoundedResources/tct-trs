@@ -180,7 +180,7 @@ instance Xml.Xml DependencyPairsProof where
     WIDP -> Xml.unsupported
     WDP -> 
       Xml.elt "wdpTransformation"
-        [ Xml.elt "compoundSymbols" [ xsymb f i | (f,i) <- Sig.elems (newSignature proof) ]
+        [ Xml.elt "compoundSymbols" [ xsymb f i | (f,i) <- Sig.elems . Sig.filter Prob.isCompoundf $ newSignature proof ]
         , xstrict "WDP", xweak "WDP", xlhss ]
         where xsymb f i = Xml.elt "symbol" [ Xml.toXml f, Xml.elt "arity" [Xml.int i] ]
     DT -> 
