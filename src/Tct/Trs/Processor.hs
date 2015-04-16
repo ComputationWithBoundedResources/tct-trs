@@ -109,14 +109,16 @@ instance T.Processor WithCertification where
     ret <- T.evaluate (onStrategy p) prob
     tmp <- T.tempDirectory `fmap` T.askState
     let
+      pt = T.fromReturn ret
       toRet = case ret of
         T.Abort _    -> T.Abort
         T.Continue _ -> T.Continue
       prover
         | allowPartial p = CeTA.partialProofIO' tmp
+        | T.isOpen pt    = return . Right 
         | otherwise      = CeTA.totalProofIO' tmp
 
-    errM <- prover (T.fromReturn ret)
+    errM <- prover pt 
     either (throwError . userError) (return . toRet) errM
 
 withCertificationStrategy :: Bool -> T.Strategy TrsProblem -> T.Strategy TrsProblem
