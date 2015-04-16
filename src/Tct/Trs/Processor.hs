@@ -50,6 +50,7 @@ import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           as M
 import           Tct.Trs.Method.DP.DPGraph.Trivial               as M
 import           Tct.Trs.Method.DP.UsableRules                   as M
 import           Tct.Trs.Method.InnermostRuleRemoval             as M
+import           Tct.Trs.Method.Matrix.NaturalMI                 as M
 import           Tct.Trs.Method.Poly.NaturalPI                   as M
 
 
@@ -66,6 +67,7 @@ defaultDeclarations =
 
   -- Semantic
   --, T.SD polyDeclaration
+  , T.SD matrixDeclaration
 
   -- DP
   , T.SD dependencyPairsDeclaration

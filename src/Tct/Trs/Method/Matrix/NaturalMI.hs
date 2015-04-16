@@ -282,9 +282,6 @@ monotoneConstraints geqOne = SMT.bigAnd .
   MI.interpretations
 
 
-degree :: NaturalMIKind -> MI.LinearInterpretation MI.SomeIndeterminate Int -> Int
-degree Triangular (MI.LInter lcoeffs _) = maximum $ Map.elems $ Map.map (fst . EncM.mDim) lcoeffs
-degree _ (MI.LInter lcoeffs _) = maximum $ Map.elems $ Map.map EncM.diagonalNonZeros lcoeffs
 
 countDiagonal :: NaturalMIKind -> Int -> (EncM.Matrix Int -> Int)
 countDiagonal Triangular dim = const dim
@@ -327,18 +324,26 @@ diag deg (MI.LInter coeffs _)  = SMT.bigAnd $ Map.map diagEQdeg coeffs
     listOf (EncM.Vector v) = v
     diagEQdeg m =  SMT.bigAdd (listOf $ EncM.diagonalEntries m) SMT..=< deg'
 
+diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
+  where 
+    k ds = do
+      v <- SMT.snvarM'
+      SMT.assert $ (SMT.bigAdd ds SMT..> SMT.zero) SMT..<=> (v SMT..== SMT.one)
+      return v
+    diags = List.transpose $ map diag $ Map.elems (I.interpretations mi)
+    diag  = concatMap (DF.toList . EncM.diagonalEntries) . Map.elems . MI.coefficients
+  
 
-kindConstraints :: MI.MatrixKind Prob.F ->  I.Interpretation Prob.F (MI.LinearInterpretation v SMT.IExpr) -> SMT.Expr
 
 --kindConstraints :: Eq l => MatrixKind -> MI.LinearInterpretation (DioPoly DioVar Int) -> DioFormula l DioVar Int
-kindConstraints MI.UnrestrictedMatrix _ = SMT.top
-kindConstraints (MI.TriangularMatrix Nothing) _ = SMT.top
-kindConstraints (MI.TriangularMatrix (Just deg)) absmi = SMT.bigAnd $ Map.map (diag deg) (I.interpretations absmi)
-kindConstraints (MI.ConstructorBased _  Nothing) _ = SMT.top
-kindConstraints (MI.ConstructorBased cs (Just deg)) absmi = SMT.bigAnd $ Map.map (diag deg) (I.interpretations absmi')
+kindConstraints MI.UnrestrictedMatrix _ = return SMT.top
+kindConstraints (MI.TriangularMatrix Nothing) _ = return SMT.top
+kindConstraints (MI.TriangularMatrix (Just deg)) absmi = diagOnesConstraint deg absmi -- SMT.bigAnd $ Map.map (diag deg) (I.interpretations absmi)
+kindConstraints (MI.ConstructorBased _  Nothing) _ = return SMT.top
+kindConstraints (MI.ConstructorBased cs (Just deg)) absmi = diagOnesConstraint deg absmi' -- SMT.bigAnd $ Map.map (diag deg) (I.interpretations absmi')
   where absmi' = absmi{I.interpretations = filterCs $ I.interpretations absmi}
         filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
-kindConstraints _ _ = SMT.bot
+kindConstraints _ _ = return SMT.bot
 -- kindConstraints (EdaMatrix Nothing) absmi = edaConstraints absmi
 -- kindConstraints (EdaMatrix (Just deg)) absmi = idaConstraints deg absmi
 -- kindConstraints (ConstructorEda cs mdeg) absmi =
@@ -355,7 +360,7 @@ entscheide p prob = do
   res :: SMT.Result (I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate Int), UPEnc.UsablePositions Prob.F, Maybe (UREnc.UsableSymbols Prob.F))
     <- liftIO $ SMT.solveStM SMT.minismt $ do
     (a,b,c) <-  I.orient p prob absi shift (uargs p) (urules p)
-    SMT.assert (kindConstraints kind a)
+    SMT.assert =<< kindConstraints kind a
     return $ SMT.decode (a,b,c)
 
   return $ mkOrder `fmap` res
@@ -396,8 +401,8 @@ entscheide p prob = do
           , I.weakDPs_ = wDPs
           , I.weakTrs_ = wTrs
           }
-        (sDPs,wDPs) = List.partition (uncurry isStrict . snd) (rs $ Prob.dpComponents prob)
-        (sTrs,wTrs) = List.partition (uncurry isStrict . snd) (rs $ Prob.trsComponents prob)
+        (sDPs,wDPs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
+        (sTrs,wTrs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
         rs trs =
           [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
           | r@(RR.Rule lhs rhs) <- Trs.toList trs
@@ -447,11 +452,11 @@ degArg = CD.nat { CD.argName = "degree" , CD.argDomain = "<nat>" }
 
 
 slArg :: (Ord f, Ord v) => CD.Argument 'CD.Optional (Maybe (TD.ExpressionSelector f v))
-slArg = CD.some RS.selectorArg
+slArg = CD.some $ RS.selectorArg
   `CD.withName` "shift"
   `CD.withHelp`
     [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
-  `CD.optional` Just (RS.selAnyOf RS.selStricts)
+  `CD.optional` RS.selAnyOf RS.selStricts
 
 
 matrixDeclaration = CD.declare "matrix" description
