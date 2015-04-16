@@ -311,11 +311,8 @@ maxNonIdMatrix dim mi =
 
 
 isStrict :: MI.LinearInterpretation a Int -> MI.LinearInterpretation a Int -> Bool
-isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = oneGT && allGEQ
-  where
-    allGEQ = and $ zipWith (>=) (listOf lconst) (listOf rconst)
-    oneGT = or $ zipWith (>) (listOf lconst) (listOf rconst)
-    listOf (EncM.Vector v) = v
+isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = allGEQ && EncM.vEntry 1 lconst  > EncM.vEntry 1 rconst
+  where allGEQ = and $ zipWith (>=) (DF.toList lconst) (DF.toList rconst)
 
 diag :: Int -> MI.LinearInterpretation a SMT.IExpr ->  SMT.Expr
 diag deg (MI.LInter coeffs _)  = SMT.bigAnd $ Map.map diagEQdeg coeffs
@@ -378,7 +375,7 @@ entscheide p prob = do
       else MI.TriangularMatrix (Just $ miDegree p)
     toKind Triangular =
       if Prob.isRCProblem prob
-      then MI.ConstructorBased (ProbK.constructors (Prob.startTerms prob) `Set.union` Sig.symbols (Sig.filter Prob.isCompoundf sig)) (Just $ miDegree p)
+      then MI.ConstructorBased (ProbK.constructors (Prob.startTerms prob) `Set.union` Sig.symbols (Sig.filter Prob.isCompoundf sig)) Nothing 
       else MI.TriangularMatrix (Just $ miDegree p)
     toKind Automaton =
       if Prob.isRCProblem prob

@@ -181,16 +181,16 @@ instance Xml.Xml DependencyPairsProof where
     WDP -> 
       Xml.elt "wdpTransformation"
         [ Xml.elt "compoundSymbols" [ xsymb f i | (f,i) <- Sig.elems (newSignature proof) ]
-        , xstrict "WDPs", xweak "WDPs", xlhss ]
+        , xstrict "WDP", xweak "WDP", xlhss ]
         where xsymb f i = Xml.elt "symbol" [ Xml.toXml f, Xml.elt "arity" [Xml.int i] ]
     DT -> 
-      Xml.elt "dtTransformation" [ xstrict "DTs" , xweak "DTs", xlhss ]
+      Xml.elt "dtTransformation" [ xstrict "DT" , xweak "DT", xlhss ]
     where
       ruleWith dp (old,new) = Xml.elt ("ruleWith"++dp) [ Xml.toCeTA old, Xml.toCeTA new ]
       lhss (_, new)       = Xml.toCeTA (R.lhs new)
 
-      xstrict dp = Xml.elt ("strict"++dp) $ map (ruleWith dp) (strictTransformation proof)
-      xweak   dp = Xml.elt ("weak"++dp)   $ map (ruleWith dp) (weakTransformation proof)
+      xstrict dp = Xml.elt ("strict"++dp++"s") $ map (ruleWith dp) (strictTransformation proof)
+      xweak   dp = Xml.elt ("weak"++dp++"s")   $ map (ruleWith dp) (weakTransformation proof)
       xlhss      = Xml.elt "innermostLhss" $ map lhss (strictTransformation proof ++ weakTransformation proof)
 
 

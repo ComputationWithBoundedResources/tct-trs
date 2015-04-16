@@ -48,6 +48,9 @@ dependencyGraph = DPG.dependencyGraph . dpGraph
 congruenceGraph :: Problem f v -> CDG f v
 congruenceGraph = DPG.congruenceGraph . dpGraph
 
+-- TODO: MS: add int to F to handle symbols with different aritites
+-- typeclasses; HasArity, IsCompound, IsDP
+
 -- | Annotated function symbol.
 data AFun f
   = TrsFun f
@@ -57,6 +60,8 @@ data AFun f
 
 newtype F = F (AFun BS.ByteString)
   deriving (Eq, Ord, Show, Typeable)
+
+
 
 markFun :: F -> F
 markFun (F (TrsFun f)) = F (DpFun f)
@@ -266,6 +271,6 @@ instance (Ord f, Ord v, Xml.Xml f, Xml.Xml v) => Xml.Xml (Problem f v) where
       [ Xml.elt "trsInput"
           [ Xml.elt "trs" [Xml.toXml (strictComponents prob)]
           , Xml.toCeTA (strategy prob)
-          , Xml.elt "relativeRules"     [Xml.toCeTA (weakComponents prob)] ]
+          , Xml.elt "relativeRules" [Xml.toCeTA (weakComponents prob)] ]
       , Xml.toCeTA (startTerms prob, signature prob) ]
 
