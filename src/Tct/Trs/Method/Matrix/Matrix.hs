@@ -234,16 +234,16 @@ bigmProduct ms =
   else foldr1 mProduct ms
 
 -- | count the non-zeros in the diagonal of a "Matrix'
-diagonalNonZeros :: (Eq a, SR.SemiRing a) => Matrix a -> Int
+diagonalNonZeros :: Matrix Int -> Int
 diagonalNonZeros m = let
   Vector diag = diagonalEntries m
-  in length $ filter (/= SR.zero) diag
+  in length $ filter (/= 0) diag
 
 -- | count the zeros in the diagonal of a 'Matrix'
-diagonalZeros :: (Eq a, SR.SemiRing a) => Matrix a -> Int
+diagonalZeros :: Matrix Int -> Int
 diagonalZeros m = let
   Vector diag = diagonalEntries m
-  in length $ filter (== SR.zero) diag
+  in length $ filter (== 0) diag
 
 
 
