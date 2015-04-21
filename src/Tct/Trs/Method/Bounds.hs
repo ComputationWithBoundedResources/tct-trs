@@ -33,6 +33,7 @@ import qualified Tct.Core.Common.Pretty             as PP
 import           Tct.Core.Common.SemiRing           as PP (add)
 import qualified Tct.Core.Common.Xml                as Xml
 import qualified Tct.Core.Data                      as T
+import           Tct.Core.Combinators               ((>>>))
 
 import           Tct.Common.ProofCombinators        (ApplicationProof(..))
 
@@ -42,6 +43,7 @@ import qualified Tct.Trs.Data.ProblemKind           as Prob
 import qualified Tct.Trs.Data.Rewriting             as R
 import qualified Tct.Trs.Data.Signature             as Sig
 import qualified Tct.Trs.Data.Trs                   as Trs
+import qualified Tct.Trs.Method.Empty               as E (empty)
 
 import           Tct.Trs.Encoding.Bounds.Automata
 import           Tct.Trs.Encoding.Bounds.Violations
@@ -196,7 +198,7 @@ description =
   , "For non-right-linear problems this processor fails immediately."]
 
 boundsStrategy :: InitialAutomaton -> Enrichment -> T.Strategy TrsProblem
-boundsStrategy i e = T.Proc $ Bounds { initialAutomaton = i, enrichment = e }
+boundsStrategy i e = T.Proc (Bounds { initialAutomaton = i, enrichment = e }) >>> E.empty
 
 boundsDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional InitialAutomaton
