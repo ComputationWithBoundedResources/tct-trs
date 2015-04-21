@@ -4,9 +4,6 @@ module Tct.Trs.Processor
 
   , defaultDeclarations
 
-  , emptyDeclaration
-  , empty
-
   -- * Certification
   , withCertificationDeclaration
   , withCertification
@@ -26,7 +23,6 @@ import           Control.Monad.Error                             (throwError)
 
 import           Tct.Core
 import qualified Tct.Core.Data                                   as T
-import qualified Tct.Core.Processor.Empty                        as E
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Trs as Trs
@@ -49,6 +45,7 @@ import           Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes    as M
 import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           as M
 import           Tct.Trs.Method.DP.DPGraph.Trivial               as M
 import           Tct.Trs.Method.DP.UsableRules                   as M
+import           Tct.Trs.Method.Empty                            as M
 import           Tct.Trs.Method.InnermostRuleRemoval             as M
 import           Tct.Trs.Method.Matrix.NaturalMI                 as M
 import           Tct.Trs.Method.Poly.NaturalPI                   as M
@@ -83,13 +80,6 @@ defaultDeclarations =
   , T.SD simplifyRHSDeclaration
   , T.SD trivialDeclaration
   ]
-
-empty :: T.Strategy TrsProblem
-empty = E.empty Prob.isTrivial
-
-emptyDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
-emptyDeclaration = T.declare "empty" [desc] () empty
-  where desc = "Checks if the the strict components is empty."
 
 
 
