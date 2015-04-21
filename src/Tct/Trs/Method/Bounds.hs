@@ -10,7 +10,7 @@ Maintainer  :  Martin Avanzini <martin.avanzini@uibk.ac.at>,
 Stability   :  unstable
 Portability :  unportable
 
-This module implements the bounds processor.
+This module implements the (relative-) bounds processor.
 -}
 
 module Tct.Trs.Method.Bounds
@@ -22,18 +22,19 @@ module Tct.Trs.Method.Bounds
   ) where
 
 import qualified Data.Map                           as M
-import           Data.Monoid
+import           Data.Monoid                        ((<>))
 import qualified Data.Set                           as S
-import           Data.Typeable
+import           Data.Typeable                      (Typeable)
 
 import qualified Data.Rewriting.Term                as R
 
 import qualified Tct.Core.Common.Parser             as P
 import qualified Tct.Core.Common.Pretty             as PP
+import           Tct.Core.Common.SemiRing           as PP (add)
 import qualified Tct.Core.Common.Xml                as Xml
 import qualified Tct.Core.Data                      as T
 
-import           Tct.Common.ProofCombinators
+import           Tct.Common.ProofCombinators        (ApplicationProof(..))
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem               as Prob
@@ -73,10 +74,10 @@ perSymInitialAutomaton (Prob.AllTerms fs) sign = fromRules [ fromEnum f | f <- f
    where fs' = S.toList fs
 perSymInitialAutomaton (Prob.BasicTerms ds cs) sign = fromRules [ fromEnum f | f <- cs'] $ mk ds' ++ mk cs'
   where
-    fs = S.toList $ ds `S.union` cs
+    fs  = S.toList $ ds `S.union` cs
     cs' = S.toList cs
     ds' = S.toList ds
-    mk roots = concatMap mkBase roots
+    mk  = concatMap mkBase
     mkBase = if null cs' then mkPerSymEmptyRules sign (maximum [ fromEnum f | f <- fs ] + 1) else mkPerSymRules sign cs
 
 instance Show InitialAutomaton where
@@ -84,8 +85,8 @@ instance Show InitialAutomaton where
   show PerSymbol = "perSymbol"
 
 data Bounds = Bounds
-  { initialAutomaton_ :: InitialAutomaton
-  , enrichment_       :: Enrichment }
+  { initialAutomaton :: InitialAutomaton
+  , enrichment       :: Enrichment }
   deriving Show
 
 data GRule f
@@ -100,23 +101,21 @@ data GAutomaton f = GAutomaton
   , transitions_ :: [GRule f] }
   deriving Show
 
-data BoundsProof = BoundsProof Enrichment (GAutomaton F)
+data BoundsProof = BoundsProof
+  { enrichment_ :: Enrichment
+  , automaton_  :: GAutomaton F
+  , strict_     :: Trs F V }
   deriving Show
 
 instance T.Processor Bounds where
   type ProofObject Bounds = ApplicationProof BoundsProof
   type Problem Bounds     = TrsProblem
-  type Forking Bounds     = T.Judgement
 
-  -- FIXME: MS:
-  -- this is wrong in many other cases; 
-  -- a monadic action should always return after computation; otherwise concurrency is not handled correctly
-  -- especially important for computation intensive - non-terminating computations
   solve p prob =  fmap (T.resultToTree p prob) $
     maybe apply (return . T.Fail . Inapplicable) maybeApplicable
     where
-      apply = boundHeight_ automaton `seq` 
-        return (T.Success (T.Judgement) (Applicable proof) (T.judgement $ T.timeUBCert T.linear))
+      apply = boundHeight_ automaton `seq`
+        return $ T.Success (T.toId nprob) (Applicable proof) (flip T.updateTimeUBCert (`add` T.linear) . T.fromId)
       maybeApplicable = Trs.isRightLinear' (strict `Trs.union` weak)
 
       strict       = Prob.strictComponents prob
@@ -124,11 +123,19 @@ instance T.Processor Bounds where
       sig          = Prob.signature prob
       st           = Prob.startTerms prob
 
-      automaton = computeAutomaton sig st strict weak (enrichment_ p) (initialAutomaton_ p)
-      proof = BoundsProof (enrichment_ p) automaton
+      automaton = computeAutomaton sig st strict weak (enrichment p) (initialAutomaton p)
+      nprob = prob
+        { Prob.strictDPs = Trs.empty
+        , Prob.strictTrs = Trs.empty
+        , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` Prob.strictDPs prob
+        , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` Prob.strictTrs prob }
+      proof = BoundsProof
+        { enrichment_ = enrichment p
+        , automaton_  = automaton
+        , strict_     = strict }
 
 computeAutomaton :: (Ord f, Ord v) => Signature f -> StartTerms f -> Trs f v -> Trs f v -> Enrichment -> InitialAutomaton -> GAutomaton f
-computeAutomaton sig st strict weak enrichment initial = toGautomaton $ compatibleAutomaton strict' weak' enrichment $ case initial of
+computeAutomaton sig st strict weak enrich initial = toGautomaton $ compatibleAutomaton strict' weak' enrich $ case initial of
   PerSymbol -> perSymInitialAutomaton  st' sig'
   Minimal   -> minimalInitialAutomaton st' sig'
   where
@@ -136,7 +143,7 @@ computeAutomaton sig st strict weak enrichment initial = toGautomaton $ compatib
       { states_      = states a
       , boundHeight_ = maximum $ 0 : snd `fmap` S.toList (symbols a)
       , finalStates_ = finalStates a
-      , transitions_ = k `fmap` toRules a } 
+      , transitions_ = k `fmap` toRules a }
       where
         k (Collapse (s,l) qs q) = GCollapse (canof s,l) qs q
         k (Epsilon p q)         = GEpsilon p q
@@ -189,7 +196,7 @@ description =
   , "For non-right-linear problems this processor fails immediately."]
 
 boundsStrategy :: InitialAutomaton -> Enrichment -> T.Strategy TrsProblem
-boundsStrategy i e = T.Proc $ Bounds { initialAutomaton_=i, enrichment_=e }
+boundsStrategy i e = T.Proc $ Bounds { initialAutomaton = i, enrichment = e }
 
 boundsDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional InitialAutomaton
@@ -210,44 +217,48 @@ bounds' = T.deflFun boundsDeclaration
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty BoundsProof where
-  pretty (BoundsProof e a) = PP.vcat
-    [ PP.text $ "The problem is " ++ show e ++ "-bounded by " ++ show (boundHeight_ a) ++ "."
+  pretty p = PP.vcat
+    [ PP.text $ "The problem is " ++ show (enrichment_ p) ++ "-bounded by " ++ show (boundHeight_ $ automaton_ p) ++ "."
     , PP.text $ "The enriched problem is compatible with follwoing automaton."
-    , PP.indent 2 $ ppTransitions (transitions_ a) ]
+    , PP.indent 2 $ ppTransitions (transitions_ $ automaton_ p) ]
     where
       ppTransitions = PP.vcat . fmap ppTransition
       ppTransition (GCollapse (f,l) qs q) = PP.pretty f <> PP.char '_' <> PP.int l <> PP.tupled' qs <> ppArrow <> PP.int q
-      ppTransition (GEpsilon p q)         = PP.int p <> ppArrow <> PP.int q
+      ppTransition (GEpsilon q1 q2)         = PP.int q1 <> ppArrow <> PP.int q2
       ppArrow = PP.text " -> "
 
+-- MS: The implementation corresponds to CeTA's relative bounds.
 instance Xml.Xml BoundsProof where
-  toXml (BoundsProof e a) =
-    Xml.elt "bounds"
-      [ Xml.elt "type" [enrichmentToXml e]
-      , Xml.elt "bound"  [Xml.int (boundHeight_ a)]
-      , Xml.elt "finalStates" $ stateToXml `fmap` finalStates_ a
-      , automatonToXml a ]
-    where
-      enrichmentToXml en = flip Xml.elt [] $ case en of
-        Match -> "match"
-        Roof  -> "roof"
-        Top   -> "top"
-      stateToXml q = Xml.elt "state" [Xml.int q]
-      automatonToXml at =
-        Xml.elt "treeAutomaton"
-          [ Xml.elt "finalStates" $ stateToXml `fmap` states_ at
-          , Xml.elt "transitions" $ transition `fmap` transitions_ at ]
-        where
-          transition (GCollapse (f,l) qs q) =
-            Xml.elt "transition"
-              [ Xml.elt "lhs" $
-                  Xml.toXml f
-                  : Xml.elt "height" [Xml.int l]
-                  : stateToXml `fmap` qs
-              , Xml.elt "rhs" [stateToXml q] ]
-          transition (GEpsilon p q) =
-            Xml.elt "transition"
-              [ Xml.elt "lhs" [stateToXml p]
-              , Xml.elt "rhs" [stateToXml q] ]
-  toCeTA = Xml.toXml
+  toXml p = Xml.elt "relativeBounds" [xbounds, xtrs] where
+    xbounds = Xml.elt "bounds"
+        [ Xml.elt "type" [xenrichment (enrichment_ p)]
+        , Xml.elt "bound"  [Xml.int (boundHeight_ $ automaton_ p)]
+        , Xml.elt "finalStates" $ xstate `fmap` finalStates_ (automaton_ p)
+        , xautomaton (automaton_ p) ]
+      where
+        xenrichment en = flip Xml.elt [] $ case en of
+          Match -> "match"
+          Roof  -> "roof"
+          Top   -> "top"
+        xstate q = Xml.elt "state" [Xml.int q]
+        xautomaton at =
+          Xml.elt "treeAutomaton"
+            [ Xml.elt "finalStates" $ xstate `fmap` states_ at
+            , Xml.elt "transitions" $ xtransition `fmap` transitions_ at ]
+          where
+            xtransition (GCollapse (f,l) qs q) =
+              Xml.elt "transition"
+                [ Xml.elt "lhs" $
+                    Xml.toXml f
+                    : Xml.elt "height" [Xml.int l]
+                    : xstate `fmap` qs
+                , Xml.elt "rhs" [xstate q] ]
+            xtransition (GEpsilon q1 q2) =
+              Xml.elt "transition"
+                [ Xml.elt "lhs" [xstate q1]
+                , Xml.elt "rhs" [xstate q2] ]
+    xtrs = Xml.elt "trs" [Xml.toXml (strict_ p)]
+  toCeTA p
+    | enrichment_ p == Top = Xml.unsupported
+    | otherwise            = Xml.toXml p
 
