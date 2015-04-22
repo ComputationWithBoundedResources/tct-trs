@@ -63,10 +63,9 @@ type ExpressionSelector f v = RuleSelector f v (SelectorExpression f v)
 selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
 selectorArg = T.arg { T.argName  = "selector" }
 
--- FIXME: MS something is wrong; only accepts any all
 instance T.SParsable prob (ExpressionSelector Prob.F Prob.V) where
   parseS = P.choice
-    [ P.string (sym1 ++ sym2) >> return (comb prim)| (sym1,comb) <- combs, (sym2,prim) <- prims ]
+    [ P.try $ P.symbol (sym1 ++ sym2) >> return (comb prim) | (sym1,comb) <- combs, (sym2,prim) <- prims ]
     where
       combs =
         [ ("any ", selAnyOf)

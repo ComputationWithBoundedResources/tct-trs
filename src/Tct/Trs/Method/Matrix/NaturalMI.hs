@@ -279,13 +279,10 @@ kindConstraints _ _ = return SMT.bot
 --            -> Prob.TrsProblem
 --            -> CD.TctM (SMT.Result (MatrixOrder Int))
 entscheide p prob = do
-  mto <- (maybe [] (\i -> ["-T:"++show i]) . CD.remainingTime) `fmap` CD.askStatus prob
-  -- mto <- (maybe [] (\i -> ["-t", show i]) . CD.remainingTime) `fmap` CD.askStatus prob
-  -- let as = if miDimension p > 3 then ["-ib", "1", "-ob", "2", "-twostep"] else []
+  mto <- (maybe [] (\i -> ["-t", show i]) . CD.remainingTime) `fmap` CD.askStatus prob
+  let as = if miDimension p > 3 then ["-ib", "1", "-ob", "2", "-twostep"] else []
   res :: SMT.Result (I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate Int), UPEnc.UsablePositions Prob.F, Maybe (UREnc.UsableSymbols Prob.F))
-    <- liftIO $ SMT.solveStM (SMT.z3' $ mto ++ ["-smt2", "-in"]) $ do
-    -- <- liftIO $ SMT.solveStM (SMT.minismt' $ ["-m", "-v2", "-neg"] ++ mto ++ as) $ do
-    -- <- liftIO $ SMT.solveStM SMT.minismt $ do
+    <- liftIO $ SMT.solveStM (SMT.minismt' $ ["-m", "-v2", "-neg"] ++ mto ++ as) $ do
     (a,b,c) <-  I.orient p prob absi shift (uargs p) (urules p)
     SMT.assert =<< kindConstraints kind a
     return $ SMT.decode (a,b,c)

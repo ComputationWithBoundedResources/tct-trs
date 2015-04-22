@@ -91,6 +91,10 @@ data WithCertification =
 -- TODO:
 -- MS: the only way to stop a computation currently is using throwError;
 -- we could extend the Continue type with Stop ?
+
+-- MS:
+-- add: new flag onlyClosed;
+-- or; Total | Partial | TotalClosed
 instance T.Processor WithCertification where
   type ProofObject WithCertification = ()
   type Problem WithCertification     = TrsProblem

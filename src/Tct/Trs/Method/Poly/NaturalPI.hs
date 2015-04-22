@@ -144,12 +144,9 @@ interpretf ebsi = I.interpretTerm interpretFun interpretVar
 --entscheide :: (MonadError e m, MonadIO m) => NaturalPI -> TrsProblem -> m (SMT.Result (PolyOrder Int))
 entscheide :: NaturalPI -> Problem F V -> T.TctM (SMT.Result (PolyOrder Int))
 entscheide p prob = do
-  mto <- (maybe [] (\i -> ["-T:"++show i]) . T.remainingTime) `fmap` T.askStatus prob
-  -- mto <- (maybe [] (\i -> ["-t", show i]) . T.remainingTime) `fmap` T.askStatus prob
+  mto <- (maybe [] (\i -> ["-t", show i]) . T.remainingTime) `fmap` T.askStatus prob
   res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), UPEnc.UsablePositions F, Maybe (UREnc.UsableSymbols F))
-    <- liftIO $ SMT.solveStM (SMT.z3' $ mto ++ ["-smt2", "-in"]) $ SMT.decode `fmap` I.orient p prob absi shift (uargs p) (urules p)
-    -- <- liftIO $ SMT.solveStM (SMT.minismt' $ ["-m", "-v2", "-neg"] ++ mto) $ SMT.decode `fmap` I.orient p prob absi shift (uargs p) (urules p)
-    -- <- liftIO $ SMT.solveStM SMT.minismt $ SMT.decode `fmap` I.orient p prob absi shift (uargs p) (urules p)
+    <- liftIO $ SMT.solveStM (SMT.minismt' $ ["-m", "-v2", "-neg"] ++ mto) $ SMT.decode `fmap` I.orient p prob absi shift (uargs p) (urules p)
   
   return $ mkOrder `fmap` res
   where
