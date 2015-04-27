@@ -27,11 +27,10 @@ import qualified Tct.Core.Data                                   as T
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Trs as Trs
 import qualified Tct.Trs.Data.CeTA                               as CeTA
-import qualified Tct.Trs.Data.Problem                            as Prob
 import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.DependencyGraph                    as DG
-import qualified Tct.Trs.Data.ComplexityPair                    as CP
+-- import qualified Tct.Trs.Data.ComplexityPair                    as CP
 
 import           Tct.Trs.Method.Bounds as M
 import           Tct.Trs.Method.Decompose as M
@@ -63,7 +62,7 @@ defaultDeclarations =
   , T.SD innermostRuleRemovalDeclaration
 
   -- Semantic
-  --, T.SD polyDeclaration
+  , T.SD polyDeclaration
   , T.SD matrixDeclaration
 
   -- DP

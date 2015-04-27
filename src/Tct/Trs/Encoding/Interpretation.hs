@@ -1,28 +1,29 @@
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Tct.Trs.Encoding.Interpretation
   where
 
 
-import Data.Monoid ((<>))
-import Control.Monad (liftM)
+import qualified Data.Set as S (empty)
+import           Control.Monad                      (liftM)
+import qualified Data.Foldable                      as F
 import qualified Data.Map.Strict                    as M
+import           Data.Monoid                        ((<>))
 import qualified Data.Traversable                   as F
-import qualified Data.Foldable                   as F
 
 import qualified Data.Rewriting.Rule                as R
 import           Data.Rewriting.Term                (Term (..))
 
-import qualified Tct.Core.Common.Xml as Xml
-import qualified Tct.Core.Common.Pretty as PP
+import qualified Tct.Core.Data as T
+import qualified Tct.Core.Common.Pretty             as PP
+import qualified Tct.Core.Common.Xml                as Xml
 
 import           Tct.Common.SMT                     as SMT (zero, (.&&), (.==>), (.>))
 import qualified Tct.Common.SMT                     as SMT
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.Signature               as Sig
 import qualified Tct.Trs.Data.Problem               as Prob
 import qualified Tct.Trs.Data.RuleSelector          as RS
+import qualified Tct.Trs.Data.Signature             as Sig
 import qualified Tct.Trs.Data.Trs                   as Trs
 import qualified Tct.Trs.Encoding.ArgumentFiltering as AFEnc
 import qualified Tct.Trs.Encoding.UsablePositions   as UPEnc
@@ -41,9 +42,12 @@ newtype Interpretation f a = Interpretation { interpretations :: M.Map f a }
 instance (SMT.Decode m c a) => SMT.Decode m (Interpretation fun c) (Interpretation fun a) where
   decode (Interpretation m) = Interpretation `liftM` F.traverse SMT.decode m
 
+-- instance (Applicative m, Monad m) => SMT.Decode m (UPEnc.UsablePositions f) (UPEnc.UsablePositions f) where
+--   decode = return
+
 instance (PP.Pretty f, PP.Pretty c)  => PP.Pretty (Interpretation f c) where
   pretty pint = PP.table [(PP.AlignRight, as), (PP.AlignLeft, bs), (PP.AlignLeft,cs)]
-    where 
+    where
       (as,bs,cs) = unzip3 $ map k (M.toList $ interpretations pint)
       k (f,p)    = (PP.text "p" <> PP.parens (PP.pretty f), PP.text " = ", PP.pretty p)
 
@@ -82,6 +86,7 @@ class AbstractInterpretation i where
   addConstant :: i -> C i -> SMT.IExpr -> C i
   gte         :: i -> C i -> C i -> SMT.Expr
 
+type ForceAny = [R.Rule F V] -> SMT.Expr
 
 orient :: AbstractInterpretation i => i
   -> TrsProblem
@@ -89,7 +94,7 @@ orient :: AbstractInterpretation i => i
   -> Shift
   -> Bool -- TODO: MS: Use Types
   -> Bool
-  -> SMT.SolverStM SMT.Expr (Interpretation F (B i), UPEnc.UsablePositions F, Maybe (UREnc.UsableEncoder F))
+  -> SMT.SolverStM SMT.Expr (InterpretationProof a b , (Interpretation F (B i), Maybe (UREnc.UsableEncoder F)), ForceAny)
 orient inter prob absi mselector useUP useUR = do
   SMT.setFormat "QF_NIA"
 
@@ -137,11 +142,11 @@ orient inter prob absi mselector useUP useUR = do
     sOrderConstraints = SMT.bigAnd [ usable r .==> sOrder r | r <- srules ]
       where sOrder r = interpretf (R.lhs r) .>=. (interpretf (R.rhs r) .+. strict r)
 
-    rulesConstraints = forceAny .&& forceSel
+    forceAny rs
+      | null rs   = SMT.bot
+      | otherwise = SMT.bigOr [ usable r .&& strict r .> zero | r <- rs ]
+    rulesConstraints = forceAny srules .&& forceSel
       where
-        forceAny
-          | null srules = SMT.bot
-          | otherwise   = SMT.bigOr [ usable r .&& strict r .> zero | r <- srules ]
         forceSel = case mselector of
           All       -> SMT.bigAnd [ usable r .==> strict r .> zero | r <- srules ]
           Shift sel -> orientSelected (RS.rsSelect sel prob)
@@ -158,7 +163,7 @@ orient inter prob absi mselector useUP useUR = do
   SMT.assert usableRulesConstraints
   SMT.assert filteringConstraints
 
-  return (ebsi, usablePositions, usenc)
+  return (proof usablePositions, (ebsi, usenc), forceAny)
 
   where
     trs    = Prob.allComponents prob
@@ -169,14 +174,42 @@ orient inter prob absi mselector useUP useUR = do
     allowUR = useUR && Prob.isRCProblem prob && Prob.isInnermostProblem prob
     allowAF = allowUR
 
+    proof uposs = InterpretationProof 
+      { sig_       = Prob.signature prob
+      , inter_     = Interpretation M.empty
+      , uargs_     = uposs
+      , ufuns_     = S.empty
+      , shift_     = mselector
+      , strictDPs_ = []
+      , strictTrs_ = []
+      , weakDPs_   = []
+      , weakTrs_   = [] }
+
+toTree :: T.Processor p => p -> T.Problem p -> T.Result p -> T.ProofTree (T.Problem p)
+toTree p prob (T.Fail po)                 = T.NoProgress (T.ProofNode p prob po) (T.Open prob)
+toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) certfn (T.Open `fmap` probs)
+
+newProblem :: TrsProblem -> InterpretationProof a b -> T.Optional T.Id TrsProblem
+newProblem prob proof = case shift_ proof of
+  All     -> T.Null
+  Shift _ -> T.Opt . T.Id $ prob
+    { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
+    , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
+    , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs
+    , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs }
+  where
+    rules = Trs.fromList . fst . unzip
+    sDPs = rules (strictDPs_ proof)
+    sTrs = rules (strictTrs_ proof)
+
 
 
 instance (PP.Pretty a, PP.Pretty b) => PP.Pretty (InterpretationProof a b) where
   pretty proof = PP.vcat
-    [ if uargs_ proof /= UPEnc.fullWithSignature (sig_ proof) 
+    [ if uargs_ proof /= UPEnc.fullWithSignature (sig_ proof)
         then PP.vcat
           [ PP.text "The following argument positions are considered usable:"
-          , PP.indent 2 $ PP.pretty (uargs_ proof) 
+          , PP.indent 2 $ PP.pretty (uargs_ proof)
           , PP.empty ]
         else PP.empty
     , PP.text "Following symbols are considered usable:"
@@ -201,10 +234,10 @@ instance (PP.Pretty a, PP.Pretty b) => PP.Pretty (InterpretationProof a b) where
 
 prettyProof :: (PP.Pretty a, PP.Pretty b) => InterpretationProof a b -> PP.Doc
 prettyProof proof = PP.vcat
-  [ if uargs_ proof /= UPEnc.fullWithSignature (sig_ proof) 
+  [ if uargs_ proof /= UPEnc.fullWithSignature (sig_ proof)
       then PP.vcat
         [ PP.text "The following argument positions are considered usable:"
-        , PP.indent 2 $ PP.pretty (uargs_ proof) 
+        , PP.indent 2 $ PP.pretty (uargs_ proof)
         , PP.empty ]
       else PP.empty
   , PP.text "Following symbols are considered usable:"
@@ -226,17 +259,17 @@ prettyProof proof = PP.vcat
           , (PP.empty   , ppOrd        , PP.pretty rhs)
           , (PP.empty   , PP.text " = ", PP.pretty r)
           , (PP.empty   , PP.empty     , PP.empty) ]
-  
+
 
 xmlProof :: Xml.Xml a => InterpretationProof a b -> Xml.XmlContent -> Xml.XmlContent
-xmlProof proof itype = 
+xmlProof proof itype =
   Xml.elt "ruleShifting"
     [ orderingConstraintProof
     , Xml.elt "trs" [Xml.toXml $ Trs.fromList trs]          -- strict part
     , Xml.elt "usableRules" [Xml.toXml $ Trs.fromList usr]] -- usable part
-    where 
+    where
       orderingConstraintProof =
-        Xml.elt "orderingConstraintProof" 
+        Xml.elt "orderingConstraintProof"
           [ Xml.elt "redPair" [Xml.elt "interpretation" (itype :xinters)]]
       xinters = map xinter . M.toList . interpretations $ inter_ proof
       xinter (f,p) = Xml.elt "interpret"

@@ -23,5 +23,6 @@ cpArg = T.arg
   `T.withHelp`
     [ "This argument the complexity pair to apply." ]
 
-instance P.SParsable TrsProblem ComplexityPair where parseS = cpsParser
+instance P.SParsable TrsProblem ComplexityPair where 
+  parseS = cpsParser
 

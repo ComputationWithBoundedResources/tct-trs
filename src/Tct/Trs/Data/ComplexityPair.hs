@@ -1,7 +1,17 @@
 -- | This module provides an interface to \complexity pair combinators\.
 -- A complexity pair is a special subset of processors that return a complexity pair proof.
 -- A complexity pair combinator is a processor that takes a complexity pair as argument.
-module Tct.Trs.Data.ComplexityPair where
+module Tct.Trs.Data.ComplexityPair
+  (
+    ComplexityPair (..)
+  , ComplexityPairDeclaration (..)
+  , IsComplexityPair (..)
+  , ComplexityPairProof (..)
+
+  , toComplexityPair
+  , someComplexityPair
+  ) where
+
 
 import           Data.Typeable
 
@@ -32,6 +42,13 @@ instance Show ComplexityPair where
 
 -- | Existential type for declarations specifying a Strategy.
 data ComplexityPairDeclaration where
-  CD :: (TrsProblem ~ prob, T.ParsableArgs prob args, T.ArgsInfo args) => 
+  CD :: (TrsProblem ~ prob, T.ParsableArgs prob args, T.ArgsInfo args) =>
     T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
+
+someComplexityPair :: (TrsProblem ~ prob, T.ParsableArgs prob args, T.ArgsInfo args) =>
+  T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
+someComplexityPair = CD
+
+toComplexityPair :: (T.Processor p, IsComplexityPair p) => p -> ComplexityPair
+toComplexityPair = ComplexityPair
 

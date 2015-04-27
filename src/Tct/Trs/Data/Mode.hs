@@ -42,13 +42,7 @@ answering pt = PP.putPretty (answer pt) >> case totalProof pt of
   Left s    -> print s
   Right xml -> Xml.putXml xml
 
-data CC = DCF | DCI | RCF | RCI deriving (Eq, Read)
-
-instance Show CC where
-  show DCF = "DCF"
-  show DCI = "DCI"
-  show RCF = "RCF"
-  show RCI = "RCI"
+data CC = DCF | DCI | RCF | RCI deriving (Eq, Show, Read)
 
 ccProperties :: CC -> Trs F V -> Signature F -> (StartTerms F, Strategy)
 ccProperties cc trs sig = case cc of

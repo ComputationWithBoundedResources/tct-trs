@@ -22,50 +22,58 @@ TODO: describe matrix interpretations
 -}
 
 module Tct.Trs.Method.Matrix.NaturalMI
-where
+  ( matrixDeclaration
+  , matrix
+  , matrix'
+
+  , NaturalMIKind (..)
+  , UsableArgs (..)
+  , UsableRules (..)
+  , Greedy (..)
+  ) where
 
 -- general imports
-import Control.Monad.Error    (throwError, MonadError)
-import Control.Monad.Trans    (liftIO, MonadIO)
-import qualified Data.Map                                   as Map
-import qualified Data.Set                                   as Set
-import qualified Data.List                                  as List
+import           Control.Monad.Trans                        (liftIO)
 import qualified Data.Foldable                              as DF
+import qualified Data.List                                  as List
+import qualified Data.Map                                   as Map
 import qualified Data.Maybe                                 as DM
+import qualified Data.Set                                   as Set
+import qualified Data.Traversable                           as DT
 import qualified Data.Typeable                              as DT
 
 
 -- imports term-rewriting
-import qualified Tct.Trs.Data                               as TD
 import qualified Data.Rewriting.Rule                        as RR (Rule (..))
 import qualified Data.Rewriting.Term                        as RT
+import qualified Tct.Trs.Data                               as TD
 
 -- imports tct-common
-import Tct.Common.SMT ((.>),(.==>),(.<=>),(.==),zero,one)
-import qualified Tct.Common.SMT                             as SMT
 import qualified Tct.Common.ProofCombinators                as PC
+import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.==>), (.>))
+import qualified Tct.Common.SMT                             as SMT
 
 
 -- imports tct-core
-import qualified Tct.Core.Data                              as CD
-import           Tct.Core.Data.Declaration.Parse            ()
 import qualified Tct.Core.Common.Parser                     as P
 import qualified Tct.Core.Common.Pretty                     as PP
-import qualified Tct.Core.Common.Xml                        as Xml
 import qualified Tct.Core.Common.SemiRing                   as SR
+import qualified Tct.Core.Common.Xml                        as Xml
+import qualified Tct.Core.Data                              as CD
+import           Tct.Core.Data.Declaration.Parse            ()
 
 
 -- imports tct-trs
-import qualified Tct.Trs.Data.Arguments                     as Args
+import qualified Tct.Trs.Data.Arguments                     as Arg
+import           Tct.Trs.Data.Arguments                     (UsableArgs (..), UsableRules (..), Greedy (..))
 
 import qualified Tct.Trs.Data.Problem                       as Prob
 import qualified Tct.Trs.Data.ProblemKind                   as ProbK
-import qualified Tct.Trs.Data.Signature                     as Sig
 import qualified Tct.Trs.Data.RuleSelector                  as RS
+import qualified Tct.Trs.Data.Signature                     as Sig
 import qualified Tct.Trs.Data.Trs                           as Trs
-import qualified Tct.Trs.Encoding.UsablePositions           as UPEnc
-import qualified Tct.Trs.Encoding.UsableRules               as UREnc
 import qualified Tct.Trs.Encoding.Interpretation            as I
+import qualified Tct.Trs.Encoding.UsableRules               as UREnc
 import qualified Tct.Trs.Method.Matrix.MatrixInterpretation as MI
 -- should be  Encoding.Matrix
 import qualified Tct.Trs.Method.Matrix.Matrix               as EncM
@@ -81,7 +89,7 @@ data NaturalMIKind
   | Automaton    -- ^ Use automaton techniques to compute induced complexity function.
   | Triangular   -- ^ Use triangular matrices only.
   | Unrestricted -- ^ Put no further restrictions on the interpretations.
-  deriving (DT.Typeable, Bounded, Enum, Eq)
+  deriving (DT.Typeable, Bounded, Enum, Eq, Show)
 
 
 -- | Proof information for matrix Interpretations.
@@ -95,11 +103,12 @@ data MatrixOrder a
 -- | Type of the NatualMI processor. Stores information required to run the matrix interpretation processor
 data NaturalMI = NaturalMI
                  { miDimension :: Int -- ^ dimension of matrices generated for the interpretation
-                 , miDegree :: Int -- ^ maximal allowed degree of the interpretation matrices
-                 , miKind :: NaturalMIKind -- ^ kind of interpretation
-                 , uargs :: Bool -- ^ usable arguments
-                 , urules :: Bool -- ^ usable rules
-                 , selector :: Maybe (TD.ExpressionSelector Prob.F Prob.V)
+                 , miDegree    :: Int -- ^ maximal allowed degree of the interpretation matrices
+                 , miKind      :: NaturalMIKind -- ^ kind of interpretation
+                 , uargs       :: Arg.UsableArgs -- ^ usable arguments
+                 , urules      :: Arg.UsableRules -- ^ usable rules
+                 , selector    :: Maybe (TD.ExpressionSelector Prob.F Prob.V)
+                 , greedy      :: Arg.Greedy
                  } deriving (Show)
 
 -- | Proof type of matrix interpretations
@@ -112,30 +121,18 @@ type SomeLInter a = MI.LinearInterpretation MI.SomeIndeterminate a
 -- functions
 ----------------------------------------------------------------------
 
-newProblem :: Prob.TrsProblem -> MatrixOrder Int -> CD.Optional CD.Id Prob.TrsProblem
-newProblem prob order = case I.shift_ (mint_ order) of
-  I.All     -> CD.Null
-  I.Shift _ -> CD.Opt . CD.Id $ prob
-    { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
-    , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
-    , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs
-    , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs }
-  where
-    rules = Trs.fromList . fst . unzip
-    sDPs = rules (I.strictDPs_ $ mint_ order)
-    sTrs = rules (I.strictTrs_ $ mint_ order)
-
 {- | update the certification (complexity result) depending on the matrix interpretation order.
   -}
-certification :: MatrixOrder Int
-              -> NaturalMI
-              -> CD.Optional CD.Id CD.Certificate
-              -> CD.Certificate
-certification order mi cert = case cert of
+certification ::
+  NaturalMI
+  -> MatrixOrder Int
+  -> CD.Optional CD.Id CD.Certificate
+  -> CD.Certificate
+certification mi order cert = case cert of
   CD.Null         -> CD.timeUBCert bound
   CD.Opt (CD.Id c) -> CD.updateTimeUBCert c (`SR.add` bound)
   where
-    bound = upperbound order mi (I.inter_ $ mint_ order)
+    bound = upperbound mi order (I.inter_ $ mint_ order)
 
 {- | convert an abstract linear interpretation into an SMT interpretation -}
 toSMTLinearInterpretation :: SomeLInter (MI.MatrixInterpretationEntry fun)
@@ -195,11 +192,12 @@ countDiagonal Triangular dim = const dim
 countDiagonal _ _ = EncM.diagonalNonZeros
 
 {- | Counts the degree depending of an interpretation on the matrix kind -}
-upperbound :: MatrixOrder Int
-   -> NaturalMI
-   -> I.Interpretation Prob.F (SomeLInter Int)
-   -> CD.Complexity
-upperbound order mi inter =
+upperbound ::
+  NaturalMI
+  -> MatrixOrder Int
+  -> I.Interpretation Prob.F (SomeLInter Int)
+  -> CD.Complexity
+upperbound mi order inter =
   case kind_ order of
     MI.UnrestrictedMatrix{} -> CD.Exp (Just 1)
     MI.TriangularMatrix{} -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter
@@ -229,12 +227,6 @@ isStrict :: MI.LinearInterpretation a Int
 isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = allGEQ && EncM.vEntry 1 lconst  > EncM.vEntry 1 rconst
   where allGEQ = and $ zipWith (>=) (DF.toList lconst) (DF.toList rconst)
 
-diag :: Int -> MI.LinearInterpretation a SMT.IExpr ->  SMT.Expr
-diag deg (MI.LInter coeffs _)  = SMT.bigAnd $ Map.map diagEQdeg coeffs
-  where
-    deg' = SMT.num deg
-    listOf (EncM.Vector v) = v
-    diagEQdeg m =  SMT.bigAdd (listOf $ EncM.diagonalEntries m) SMT..=< deg'
 
 {- | assert the matrix diagonal to be greather one iff a variable is one -}
 diagOnesConstraint :: Int
@@ -273,26 +265,27 @@ kindConstraints _ _ = return SMT.bot
 --         filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
 
 
-{- | try to orient a problem
-  -}
--- entscheide :: NaturalMI
---            -> Prob.TrsProblem
---            -> CD.TctM (SMT.Result (MatrixOrder Int))
+entscheide :: NaturalMI -> Prob.TrsProblem -> CD.TctM (CD.Return (CD.ProofTree Prob.TrsProblem))
 entscheide p prob = do
-  mto <- (maybe [] (\i -> ["-t", show i]) . CD.remainingTime) `fmap` CD.askStatus prob
-  let as = if miDimension p > 3 then ["-ib", "1", "-ob", "2", "-twostep"] else []
-  res :: SMT.Result (I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate Int), UPEnc.UsablePositions Prob.F, Maybe (UREnc.UsableSymbols Prob.F))
-    <- liftIO $ SMT.solveStM (SMT.minismt' $ ["-m", "-v2", "-neg"] ++ mto ++ as) $ do
-    (a,b,c) <-  I.orient p prob absi shift (uargs p) (urules p)
-    SMT.assert =<< kindConstraints kind a
-    return $ SMT.decode (a,b,c)
+  let
+    orientM = do
+      res@(_, (pint,_), _) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
+      SMT.assertM $ (kindConstraints kind pint)
+      return $ res
+    (ret, encoding)           = SMT.runSolverM orientM SMT.initialState
+    (apint,decoding,forceAny) = ret
+    aorder = MatrixOrder
+      { kind_ = kind
+      , dim_  = miDimension p
+      , mint_ = apint }
 
-  return $ mkOrder `fmap` res
+  toResult `fmap` entscheide1 p aorder encoding decoding forceAny prob
   where
+    toResult pt = if CD.progress pt then CD.Continue pt else CD.Abort pt
 
-    shift = DM.maybe I.All I.Shift (selector p)
-    sig = Prob.signature prob
     absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (miDimension p)) (Sig.toMap sig)
+
+    sig   = Prob.signature prob
     kind = toKind (miKind p)
     -- matrix interpretation kind to matrix kind
     toKind Unrestricted = MI.UnrestrictedMatrix
@@ -309,31 +302,59 @@ entscheide p prob = do
       then MI.ConstructorEda (ProbK.constructors (Prob.startTerms prob) `Set.union` Sig.symbols (Sig.filter Prob.isCompoundf sig)) (Just $ max 1 (miDegree p))
       else MI.EdaMatrix (Just $ max 1 (miDegree p))
 
-    mkOrder (inter, uposs, ufuns) = MatrixOrder
-      { kind_ = kind
-      , dim_  = miDimension p
-      , mint_ = minter}
+    shift = maybe I.All I.Shift (selector p)
+
+
+
+entscheide1 ::
+  NaturalMI
+  -> MatrixOrder c
+  -> SMT.SolverState SMT.Expr
+  -> (I.Interpretation Prob.F (SomeLInter SMT.IExpr), Maybe (UREnc.UsableEncoder Prob.F))
+  -> I.ForceAny
+  -> Prob.TrsProblem
+  -> CD.TctM (CD.ProofTree (Prob.TrsProblem))
+entscheide1 p aorder encoding decoding forceAny prob
+  | Prob.isTrivial prob = return . I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
+  | otherwise           = do
+    res :: SMT.Result (I.Interpretation Prob.F (SomeLInter Int), Maybe (UREnc.UsableSymbols Prob.F))
+      <- liftIO $ SMT.solve SMT.minismt (encoding `assertx` forceAny srules) (SMT.decode decoding)
+    case res of
+      SMT.Sat a
+        | Arg.useGreedy (greedy p) -> fmap CD.flatten $ again `DT.mapM` pt
+        | otherwise                -> return pt
+
+        where
+          pt    = I.toTree p prob $ CD.Success (I.newProblem prob (mint_ order)) (PC.Applicable $ PC.Order order) (certification p order)
+          order = mkOrder a
+
+      _ -> return $ I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
       where
-        minter = I.InterpretationProof
-          { I.sig_ = sig
-          , I.inter_ = inter
-          , I.uargs_ = uposs
-          , I.ufuns_ = maybe Set.empty UREnc.runUsableSymbols ufuns
-          , I.shift_ = shift
+        again = entscheide1 p aorder encoding decoding forceAny
+
+        assertx st e = st {SMT.asserts = e: SMT.asserts st}
+        srules = Trs.toList $ Prob.strictComponents prob
+
+        mkOrder (inter, ufuns) = aorder { mint_ = mkInter (mint_ aorder) inter ufuns }
+        mkInter aproof inter ufuns = aproof
+          { I.inter_     = inter
+          , I.ufuns_     = maybe Set.empty UREnc.runUsableSymbols ufuns
           , I.strictDPs_ = sDPs
           , I.strictTrs_ = sTrs
-          , I.weakDPs_ = wDPs
-          , I.weakTrs_ = wTrs
-          }
-        (sDPs,wDPs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
-        (sTrs,wTrs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
-        rs trs =
-          [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
-          | r@(RR.Rule lhs rhs) <- Trs.toList trs
-          , isUsable ufuns r]
+          , I.weakDPs_   = wDPs
+          , I.weakTrs_   = wTrs }
+          where
 
-        isUsable Nothing _ = True
-        isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
+
+          (sDPs,wDPs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
+          (sTrs,wTrs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
+          rs trs =
+            [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
+            | r@(RR.Rule lhs rhs) <- Trs.toList trs
+            , isUsable ufuns r]
+
+          isUsable Nothing _ = True
+          isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
 
 
 ----------------------------------------------------------------------
@@ -342,33 +363,31 @@ entscheide p prob = do
 
 
 {- | create options/ configuration  for the NaturalMI strategy -}
-matrixStrategy :: Int -> Int -> NaturalMIKind -> Bool -> Bool
+matrixStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector Prob.F Prob.V)
+               -> Arg.Greedy
                -> CD.Strategy Prob.TrsProblem
-matrixStrategy dim deg nmiKind ua ur sl = CD.Proc $
+matrixStrategy dim deg nmiKind ua ur sl gr = CD.Proc $
   NaturalMI { miDimension = dim
             , miDegree = deg
             , miKind = nmiKind
             , uargs = ua
             , urules = ur
             , selector = sl
+            , greedy = gr
             }
-
 
 
 {- | describes the strategy -}
 description :: [String]
-description =  [ "description of the matrix interpretation processor: TODO"
-               ]
+description =  [ "description of the matrix interpretation processor: TODO"               ]
 
 {- | argument for the NaturalMIKind -}
-nmiKindArg :: CD.Argument 'CD.Optional NaturalMIKind
-nmiKindArg = CD.arg { CD.argName = "miKind" , CD.argDomain = "<miKind>" }
-             `CD.withHelp` (help:kinds)
-             `CD.optional` Triangular
-  where
-    help = "Specifies the kind of the matrix interpretation. <shape> is one of:"
-    kinds = map ('*':)  [ show Unrestricted, show Triangular, show Algebraic, show Automaton]
+nmiKindArg :: CD.Argument 'CD.Required NaturalMIKind
+nmiKindArg = CD.arg 
+  `CD.withName` "miKind"
+  `CD.withDomain` fmap show [(minBound :: NaturalMIKind)..]
+  `CD.withHelp`  ["Specifies the kind of the matrix interpretation."]
 
 {- | dimension argument -}
 dimArg :: CD.Argument 'CD.Required Int
@@ -380,30 +399,50 @@ degArg :: CD.Argument 'CD.Required Int
 degArg = CD.nat { CD.argName = "degree" , CD.argDomain = "<nat>" }
          `CD.withHelp` ["Specifies the maximal degree of the matrices used in the interpretation."]
 
-
 {- | rule selctor argument -}
-slArg :: (Ord f, Ord v) => CD.Argument 'CD.Optional (Maybe (TD.ExpressionSelector f v))
+slArg :: (Ord f, Ord v) => CD.Argument 'CD.Required (Maybe (TD.ExpressionSelector f v))
 slArg = CD.some $ RS.selectorArg
   `CD.withName` "shift"
   `CD.withHelp`
     [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
-  `CD.optional` RS.selAnyOf RS.selStricts
+
+args ::
+  ( CD.Argument 'CD.Optional Int
+  , CD.Argument 'CD.Optional Int
+  , CD.Argument 'CD.Optional NaturalMIKind
+  , CD.Argument 'CD.Optional Arg.UsableArgs
+  , CD.Argument 'CD.Optional Arg.UsableRules
+  , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V))
+  , CD.Argument 'CD.Optional Arg.Greedy )
+args =
+  ( dimArg          `CD.optional` 1
+  , degArg          `CD.optional` 1
+  , nmiKindArg      `CD.optional` Algebraic
+  , Arg.usableArgs  `CD.optional` Arg.UArgs
+  , Arg.usableRules `CD.optional` Arg.URules
+  , slArg           `CD.optional` Just (RS.selAnyOf RS.selStricts)
+  , Arg.greedy      `CD.optional` Arg.Greedy )
 
 {- | declare the matrix strategy -}
 matrixDeclaration :: CD.Declaration (
-  '[ CD.Argument 'CD.Required Int
-   , CD.Argument 'CD.Required Int
+  '[ CD.Argument 'CD.Optional Int
+   , CD.Argument 'CD.Optional Int
    , CD.Argument 'CD.Optional NaturalMIKind
-   , CD.Argument 'CD.Optional Bool
-   , CD.Argument 'CD.Optional Bool
+   , CD.Argument 'CD.Optional Arg.UsableArgs
+   , CD.Argument 'CD.Optional Arg.UsableRules
    , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V))
-     ] CD.:-> CD.Strategy Prob.TrsProblem)
-matrixDeclaration = CD.declare "matrix" description
-                    ( dimArg, degArg, nmiKindArg, Args.uaArg `CD.optional` True,
-                    Args.urArg `CD.optional` True, slArg)
-                    matrixStrategy
+   , CD.Argument 'CD.Optional Arg.Greedy
+  ] CD.:-> CD.Strategy Prob.TrsProblem)
+matrixDeclaration = CD.declare "matrix" description args matrixStrategy
 
+matrix :: CD.Strategy Prob.TrsProblem
+matrix = CD.deflFun matrixDeclaration
 
+matrix' :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
+               -> Maybe (TD.ExpressionSelector Prob.F Prob.V)
+               -> Arg.Greedy
+               -> CD.Strategy Prob.TrsProblem
+matrix' = CD.declFun matrixDeclaration
 
 
 ----------------------------------------------------------------------
@@ -476,63 +515,18 @@ instance CD.Processor NaturalMI where
   {- | Decides whether applying the NaturalMI processor makes progress or not -}
   solve p prob
     | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
-    | otherwise           = do
-        res <- entscheide p prob
-        case res of
-         SMT.Sat order
-           | progressing nprob -> toProof $ CD.Success nprob (PC.Applicable $ PC.Order order)
-                                  (certification order p)
-           | otherwise -> throwError $ userError "natrualmi: sat but no progress ?.?"
-           where nprob = newProblem prob order
-         _ -> toProof $ CD.Fail (PC.Applicable PC.Incompatible)
-        where
-         toProof = return . CD.resultToTree p prob
-         progressing CD.Null = True
-         progressing (CD.Opt (CD.Id nprob)) = Prob.progressUsingSize prob nprob
+    | otherwise           = entscheide p prob
 
 
 ----------------------------------------------------------------------
 -- other instances
 ----------------------------------------------------------------------
 
-instance Show NaturalMIKind where
-  show Algebraic    = "algebraic"
-  show Triangular   = "triangular"
-  show Automaton    = "automaton"
-  show Unrestricted = "nothing"
-
 
 instance PP.Pretty (MatrixOrder Int) where
   pretty order = PP.vcat
     [ PP.text "We apply a matrix interpretation of kind " PP.<> PP.pretty (kind_ order) PP.<> PP.char ':'
-    , if I.uargs_ mint /= UPEnc.fullWithSignature (I.sig_ mint)
-      then PP.vcat
-           [ PP.text "The following argument positions are considered usable:"
-           , PP.indent 2 $ PP.pretty (I.uargs_ mint)
-           , PP.empty]
-      else PP.empty
-    , PP.text "Following symbols are considered usable:"
-    , PP.indent 2 $ PP.set (map PP.pretty . Set.toList $ I.ufuns_ mint)
-    , PP.text "TcT has computed the following interpretation:"
-    , PP.indent 2 (PP.pretty (mint_ order))
-    , PP.empty
-    , PP.text "Following rules are strictly oriented:"
-    , ppOrder (PP.text " > ") (I.strictDPs_ mint ++ I.strictTrs_ mint)
-    , PP.text ""
-    , PP.text "Following rules are (at-least) weakly oriented:"
-    , ppOrder (PP.text " >= ") (I.weakDPs_ mint ++ I.weakTrs_ mint)
-    ]
-    where
-      mint = mint_ order
-      ppOrder ppOrd rs = PP.table [(PP.AlignRight, as), (PP.AlignLeft, bs), (PP.AlignLeft, cs)]
-        where
-          (as,bs,cs) = unzip3 $ concatMap ppRule rs
-          ppRule (RR.Rule l r,(lhs, rhs)) =
-            [ (PP.pretty l, PP.text " = ", PP.pretty lhs)
-            , (PP.empty   , ppOrd        , PP.pretty rhs)
-            , (PP.empty   , PP.text " = ", PP.pretty r)
-            , (PP.empty   , PP.empty     , PP.empty)
-              ]
+    , PP.pretty $ I.prettyProof (mint_ order) ]
 
 instance Xml.Xml (MatrixOrder Int) where
   toXml order = I.xmlProof (mint_ order) xtype where
@@ -544,6 +538,6 @@ instance Xml.Xml (MatrixOrder Int) where
     | True      = Xml.toXml order -- FIXME: MS: add sanity check; ceta supports definitely triangular; does it support algebraic ?
     | otherwise = Xml.unsupported
 
-
 instance CD.SParsable prob NaturalMIKind where
   parseS = P.enum
+

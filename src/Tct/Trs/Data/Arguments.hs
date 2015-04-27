@@ -1,5 +1,25 @@
 -- | This interface provides common declaration arguments.
-module Tct.Trs.Data.Arguments where
+module Tct.Trs.Data.Arguments 
+  (
+  HasSelection (..)
+
+  , HasUsableArgs (..)
+  , UsableArgs (..)
+  , usableArgs
+  , useUsableArgs
+
+  , HasUsableRules (..)
+  , UsableRules (..)
+  , usableRules
+  , useUsableRules
+
+  , HasGreedy (..)
+  , Greedy (..)
+  , greedy
+  , useGreedy
+
+  , HasKind (..)
+  ) where
 
 
 import           Data.Typeable
@@ -15,11 +35,7 @@ class HasSelection p where
   withSelection :: p -> ExpressionSelector F V -> p
 
 data UsableArgs = UArgs | NoUargs
-  deriving (Bounded, Enum, Eq, Typeable)
-
-instance Show UsableArgs where
-  show UArgs   = "uargs"
-  show NoUargs = "nouargs"
+  deriving (Bounded, Enum, Eq, Typeable, Show)
 
 instance T.SParsable prob UsableArgs where
   parseS = P.enum
@@ -27,12 +43,19 @@ instance T.SParsable prob UsableArgs where
 class HasUsableArgs p where
   withUsableArgs :: p -> UsableArgs -> p
 
-data UsableRules = URules | NoURules
-  deriving (Bounded, Enum, Eq, Typeable)
+usableArgs :: T.Argument 'T.Required UsableArgs
+usableArgs = T.arg
+  `T.withName` "uargs"
+  `T.withHelp`
+    [ "This argument specifies whether usable arguments are computed (if applicable)"
+    , "in order to relax the monotonicity constraints on the interpretation."]
+  `T.withDomain` fmap show [(minBound :: UsableArgs)..]
 
-instance Show UsableRules where
-  show URules   = "urules"
-  show NoURules = "nourules"
+useUsableArgs :: UsableArgs -> Bool
+useUsableArgs = (UArgs==)
+
+data UsableRules = URules | NoURules
+  deriving (Bounded, Enum, Eq, Typeable, Show)
 
 instance T.SParsable prob UsableRules where
   parseS = P.enum
@@ -40,33 +63,37 @@ instance T.SParsable prob UsableRules where
 class HasUsableRules p where
   withUsableRules :: p -> UsableRules -> p
 
--- uaArg :: T.Argument 'T.Required UsableArgs
--- uaArg = T.arg
---   `T.withName` "uargs"
---   `T.withHelp`
---     [ "This argument specifies whether usable arguments are computed (if applicable)"
---     , "in order to relax the monotonicity constraints on the interpretation."]
---   `T.withDomain` fmap show [(minBound :: UsableArgs)..]
---
--- urArg :: T.Argument 'T.Required UsableRules
--- urArg = T.arg
---   `T.withName` "urules"
---   `T.withHelp`
---     [ "This argument specifies whether usable rules modulo argument filtering is applied"
---     , "in order to decrease the number of rules that have to be orient. "]
---   `T.withDomain` fmap show [(minBound :: UsableRules)..]
-
-uaArg :: T.Argument 'T.Required Bool
-uaArg = T.bool
-  `T.withName` "uargs"
-  `T.withHelp`
-    [ "This argument specifies whether usable arguments are computed (if applicable)"
-    , "in order to relax the monotonicity constraints on the interpretation."]
-
-urArg :: T.Argument 'T.Required Bool
-urArg = T.bool
+usableRules :: T.Argument 'T.Required UsableRules
+usableRules = T.arg
   `T.withName` "urules"
   `T.withHelp`
     [ "This argument specifies whether usable rules modulo argument filtering is applied"
     , "in order to decrease the number of rules that have to be orient. "]
+  `T.withDomain` fmap show [(minBound :: UsableRules)..]
+
+useUsableRules :: UsableRules -> Bool
+useUsableRules = (URules==)
+
+data Greedy = Greedy | NoGreedy
+  deriving (Bounded, Enum, Eq, Typeable, Show)
+
+instance T.SParsable prob Greedy where
+  parseS = P.enum
+
+class HasGreedy p where
+  withGreedy :: p -> Greedy -> p
+
+greedy :: T.Argument 'T.Required Greedy
+greedy = T.arg
+  `T.withName` "greedy"
+  `T.withHelp`
+    [ "This argument specifies whether to be greedy." ]
+  `T.withDomain` fmap show [(minBound :: UsableRules)..]
+
+useGreedy :: Greedy -> Bool
+useGreedy = (Greedy==)
+
+class HasKind p where
+  type (Kind p)
+  withKind :: p -> Kind p -> p
 
