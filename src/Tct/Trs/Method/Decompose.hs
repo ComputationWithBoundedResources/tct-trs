@@ -94,15 +94,18 @@ mkProbs prob compfn dps trs = (rProb, sProb)
       , Prob.weakTrs   = sTrs `Trs.union` Prob.weakTrs prob
       , Prob.weakDPs   = sDps `Trs.union` Prob.weakDPs prob }
 
-    sProb = Prob.sanitise $ case compfn of
-      Add -> prob
-        { Prob.strictTrs  = sTrs
-        , Prob.strictDPs  = sDps
-        , Prob.weakTrs    = rTrs `Trs.union` Prob.weakTrs prob
-        , Prob.weakDPs    = rDps `Trs.union` Prob.weakDPs prob }
-      _ -> prob
-        { Prob.strictTrs  = sTrs
-        , Prob.strictDPs  = sDps }
+    sProb = Prob.sanitise $ 
+      if isAdditive compfn 
+        then prob
+          { Prob.strictTrs  = sTrs
+          , Prob.strictDPs  = sDps
+          , Prob.weakTrs    = rTrs `Trs.union` Prob.weakTrs prob
+          , Prob.weakDPs    = rDps `Trs.union` Prob.weakDPs prob }
+        else prob 
+          { Prob.strictTrs  = sTrs
+          , Prob.strictDPs  = sDps }
+
+    isAdditive c = c == Add || c == RelativeAdd
 
 
 
