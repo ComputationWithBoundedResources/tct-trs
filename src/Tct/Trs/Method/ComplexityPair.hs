@@ -14,7 +14,7 @@ import Tct.Trs.Data.ComplexityPair
 cps :: [ComplexityPairDeclaration]
 cps = []--[ CD $ polyDeclarationCP ]
 
-cpsParser :: P.SParser TrsProblem ComplexityPair
+cpsParser :: P.SParser TrsProblem TrsProblem ComplexityPair
 cpsParser = P.choice ((\(CD d) -> P.decl d) `fmap` cps)
 
 cpArg :: T.Argument 'T.Required ComplexityPair
@@ -23,6 +23,6 @@ cpArg = T.arg
   `T.withHelp`
     [ "This argument the complexity pair to apply." ]
 
-instance P.SParsable TrsProblem ComplexityPair where 
+instance P.SParsable TrsProblem TrsProblem ComplexityPair where 
   parseS = cpsParser
 

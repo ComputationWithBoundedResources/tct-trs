@@ -73,7 +73,8 @@ progress = not . Trs.null . notUsable_
 
 instance T.Processor UsableRules where
   type ProofObject UsableRules = ApplicationProof UsableRulesProof
-  type Problem UsableRules     = TrsProblem
+  type I UsableRules           = TrsProblem
+  type O UsableRules           = TrsProblem
 
   solve p prob                          = return . T.resultToTree p prob $
     maybe usables (T.Fail . Inapplicable) (Prob.isDPProblem' prob)
@@ -117,12 +118,12 @@ instance Xml.Xml UsableRulesProof where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-usableRulesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+usableRulesDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 usableRulesDeclaration = T.declare "usableRules" description () (T.Proc UsableRules) where
   description =
     [ "This processor restricts the strict- and weak-rules to usable rules with"
     ,"respect to the dependency pairs." ]
 
-usableRules :: T.Strategy TrsProblem
+usableRules :: TrsStrategy
 usableRules = T.declFun usableRulesDeclaration
 

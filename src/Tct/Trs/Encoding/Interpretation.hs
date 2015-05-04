@@ -185,7 +185,7 @@ orient inter prob absi mselector useUP useUR = do
       , weakDPs_   = []
       , weakTrs_   = [] }
 
-toTree :: T.Processor p => p -> T.Problem p -> T.Result p -> T.ProofTree (T.Problem p)
+toTree :: (T.Processor p, T.I p ~ T.O p) => p -> T.I p -> T.Result p -> T.ProofTree (T.O p)
 toTree p prob (T.Fail po)                 = T.NoProgress (T.ProofNode p prob po) (T.Open prob)
 toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) certfn (T.Open `fmap` probs)
 

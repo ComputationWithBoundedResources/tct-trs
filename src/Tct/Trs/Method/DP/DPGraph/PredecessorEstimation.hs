@@ -82,7 +82,8 @@ data PredecessorEstimationProof
 
 instance T.Processor (PredecessorEstimation) where
   type ProofObject PredecessorEstimation = ApplicationProof PredecessorEstimationProof
-  type Problem PredecessorEstimation     = TrsProblem
+  type I PredecessorEstimation           = TrsProblem
+  type O PredecessorEstimation           = TrsProblem
 
   solve p prob = T.resultToTree p prob <$>
     maybe estimate  (return . T.Fail . Inapplicable) (Prob.isDPProblem' prob)
@@ -134,7 +135,8 @@ data PredecessorEstimationCP = PredecessorEstimationCP
 
 instance T.Processor PredecessorEstimationCP where
   type ProofObject PredecessorEstimationCP = ApplicationProof PredecessorEstimationProof
-  type Problem PredecessorEstimationCP     = TrsProblem
+  type I PredecessorEstimationCP           = TrsProblem
+  type O PredecessorEstimationCP           = TrsProblem
   type Forking PredecessorEstimationCP     = T.Pair
 
   solve p prob =
@@ -152,8 +154,9 @@ instance T.Processor PredecessorEstimationCP where
 
         cpproof <- CP.solveComplexityPair cp rs prob
         case cpproof of
-          T.Abort _      -> return . T.resultToTree p prob $ T.Fail (Applicable PredecessorEstimationFail)
-          T.Continue cpp -> mkProof cpp
+            T.Continue cpp -> mkProof cpp
+            T.Abort _      -> return . T.resultToTree p prob $ T.Fail (Applicable PredecessorEstimationFail)
+            T.Flop         -> return T.Flop
 
         where
           snub = S.toList . S.fromList
@@ -226,38 +229,38 @@ selArg = RS.selectorArg
 
 --- ** Predecessor Estimation ----------------------------------------------------------------------------------------
 
-predecessorEstimationStrategy :: ExpressionSelector F V -> T.Strategy TrsProblem
+predecessorEstimationStrategy :: ExpressionSelector F V -> TrsStrategy
 predecessorEstimationStrategy rs = T.Proc $ PredecessorEstimation { onSelection = rs }
 
 predecessorEstimationDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V) ]
-   T.:-> T.Strategy TrsProblem )
+   T.:-> TrsStrategy )
 predecessorEstimationDeclaration =
   T.declare "predecessorEstimation" description (T.OneTuple selArg) predecessorEstimationStrategy
 
-predecessorEstimation :: ExpressionSelector F V -> T.Strategy TrsProblem
+predecessorEstimation :: ExpressionSelector F V -> TrsStrategy
 predecessorEstimation = T.declFun predecessorEstimationDeclaration
 
-predecessorEstimation' :: T.Strategy TrsProblem
+predecessorEstimation' :: TrsStrategy
 predecessorEstimation' = T.deflFun predecessorEstimationDeclaration
 
 
 --- ** Predecessor Estimation CP -------------------------------------------------------------------------------------
 
-predecessorEstimationCPStrategy :: ExpressionSelector F V -> ComplexityPair -> T.Strategy TrsProblem
+predecessorEstimationCPStrategy :: ExpressionSelector F V -> ComplexityPair -> TrsStrategy
 predecessorEstimationCPStrategy rs cp = T.Proc $ PredecessorEstimationCP { onSelectionCP = rs, withComplexityPair = cp }
 
 predecessorEstimationCPDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Required ComplexityPair ]
-   T.:-> T.Strategy TrsProblem )
+   T.:-> TrsStrategy )
 predecessorEstimationCPDeclaration =
   T.declare "predecessorEstimationCP" description (selArg, CP.cpArg) predecessorEstimationCPStrategy
 
-predecessorEstimationCP :: ExpressionSelector F V -> ComplexityPair -> T.Strategy TrsProblem
+predecessorEstimationCP :: ExpressionSelector F V -> ComplexityPair -> TrsStrategy
 predecessorEstimationCP = T.declFun predecessorEstimationCPDeclaration
 
-predecessorEstimationCP' :: ComplexityPair -> T.Strategy TrsProblem
+predecessorEstimationCP' :: ComplexityPair -> TrsStrategy
 predecessorEstimationCP' = T.deflFun predecessorEstimationCPDeclaration
 
 

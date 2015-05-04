@@ -74,7 +74,8 @@ type NaturalPIProof = OrientationProof (PolyOrder Int)
 
 instance T.Processor NaturalPI where
   type ProofObject NaturalPI = ApplicationProof NaturalPIProof
-  type Problem NaturalPI     = TrsProblem
+  type I NaturalPI           = TrsProblem
+  type O NaturalPI           = TrsProblem
   type Forking NaturalPI     = T.Optional T.Id
 
   solve p prob
@@ -268,14 +269,14 @@ polyDeclaration :: T.Declaration (
    , T.Argument 'T.Optional Arg.UsableRules 
    , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) 
    , T.Argument 'T.Optional Arg.Greedy ]
-   T.:-> T.Strategy TrsProblem )
+   T.:-> TrsStrategy )
 polyDeclaration = T.declare "poly" description args (T.Proc `comp5` polyProcessor)
 
 
-poly :: T.Strategy TrsProblem
+poly :: TrsStrategy
 poly = T.deflFun polyDeclaration
 
-poly' :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> T.Strategy TrsProblem
+poly' :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
 poly' = T.declFun polyDeclaration
 
 

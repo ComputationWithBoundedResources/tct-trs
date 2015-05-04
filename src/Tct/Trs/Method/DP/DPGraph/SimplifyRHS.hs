@@ -54,7 +54,8 @@ data SimplifyRHSProof
 
 instance T.Processor SimplifyRHS where
   type ProofObject SimplifyRHS = ApplicationProof SimplifyRHSProof
-  type Problem SimplifyRHS     = TrsProblem
+  type I SimplifyRHS           = TrsProblem
+  type O SimplifyRHS           = TrsProblem
 
   solve p prob =  return . T.resultToTree p prob $
     maybe simpRHS (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
@@ -93,7 +94,7 @@ instance T.Processor SimplifyRHS where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-simplifyRHSDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+simplifyRHSDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 simplifyRHSDeclaration = T.declare "simplifyRHS" desc () (T.Proc SimplifyRHS) where
   desc =
     [ "Simplify right hand sides of dependency pairs by removing marked subterms "
@@ -106,7 +107,7 @@ simplifyRHSDeclaration = T.declare "simplifyRHS" desc () (T.Proc SimplifyRHS) wh
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
-simplifyRHS :: T.Strategy TrsProblem
+simplifyRHS :: TrsStrategy
 simplifyRHS = T.declFun simplifyRHSDeclaration
 
 

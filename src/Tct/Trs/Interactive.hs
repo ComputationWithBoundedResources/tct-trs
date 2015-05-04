@@ -17,10 +17,10 @@ import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem as Prob
 
 
-loadX :: T.TctMode TrsProblem o -> FilePath -> (TrsProblem -> TrsProblem) -> IO ()
+loadX :: T.TctMode TrsProblem TrsProblem o -> FilePath -> (TrsProblem -> TrsProblem) -> IO ()
 loadX tm f k = load tm f >> modifyProblem k >> state
 
-loadDC, loadIDC, loadRC, loadIRC :: T.TctMode TrsProblem o -> FilePath -> IO ()
+loadDC, loadIDC, loadRC, loadIRC :: T.TctMode TrsProblem TrsProblem o -> FilePath -> IO ()
 loadDC tm f  = loadX tm f (Prob.toDC . Prob.toFull)
 loadIDC tm f = loadX tm f (Prob.toDC . Prob.toInnermost)
 loadRC tm f  = loadX tm f (Prob.toRC . Prob.toFull)

@@ -111,7 +111,8 @@ data BoundsProof = BoundsProof
 
 instance T.Processor Bounds where
   type ProofObject Bounds = ApplicationProof BoundsProof
-  type Problem Bounds     = TrsProblem
+  type I Bounds           = TrsProblem
+  type O Bounds           = TrsProblem
 
   solve p prob =  fmap (T.resultToTree p prob) $
     maybe apply (return . T.Fail . Inapplicable) maybeApplicable
@@ -185,10 +186,10 @@ enrichmentArg = T.arg
     [ "The employed enrichment." ]
   `T.withDomain` fmap show [(minBound :: Enrichment)..]
 
-instance T.SParsable prob InitialAutomaton where
+instance T.SParsable i i InitialAutomaton where
   parseS = P.enum
 
-instance T.SParsable prob Enrichment where
+instance T.SParsable i i Enrichment where
   parseS = P.enum
 
 description :: [String]
@@ -197,22 +198,22 @@ description =
   , "that induces linear derivational- and runtime-complexity for right-linear problems."
   , "For non-right-linear problems this processor fails immediately."]
 
-boundsStrategy :: InitialAutomaton -> Enrichment -> T.Strategy TrsProblem
+boundsStrategy :: InitialAutomaton -> Enrichment -> TrsStrategy
 boundsStrategy i e = T.Proc (Bounds { initialAutomaton = i, enrichment = e }) >>> E.empty
 
 boundsDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional InitialAutomaton
    , T.Argument 'T.Optional Enrichment ]
-   T.:-> T.Strategy TrsProblem )
+   T.:-> TrsStrategy )
 boundsDeclaration = T.declare "bounds" description (iArg, eArg) boundsStrategy
   where
     iArg = initialAutomatonArg `T.optional` Minimal
     eArg = enrichmentArg `T.optional` Match
 
-bounds :: InitialAutomaton -> Enrichment -> T.Strategy TrsProblem
+bounds :: InitialAutomaton -> Enrichment -> TrsStrategy
 bounds = T.declFun boundsDeclaration
 
-bounds' :: T.Strategy TrsProblem
+bounds' :: TrsStrategy
 bounds' = T.deflFun boundsDeclaration
 
 

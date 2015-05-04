@@ -53,8 +53,8 @@ import qualified Tct.Trs.Data.Trs             as Trs
 
 data DecomposeDG = DecomposeDG
   { onSelection :: ExpressionSelector F V
-  , onUpper     :: Maybe (T.Strategy TrsProblem)
-  , onLower     :: Maybe (T.Strategy TrsProblem)
+  , onUpper     :: Maybe TrsStrategy
+  , onLower     :: Maybe TrsStrategy
   } deriving Show
 
 data DecomposeDGProof
@@ -71,7 +71,8 @@ certfn (T.Pair (c1,c2)) = zero { T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.tim
 
 instance T.Processor DecomposeDG where
   type ProofObject DecomposeDG = ApplicationProof DecomposeDGProof
-  type Problem DecomposeDG     = TrsProblem
+  type I DecomposeDG     = TrsProblem
+  type O DecomposeDG     = TrsProblem
   type Forking DecomposeDG     = T.Pair
 
   solve p prob = do
@@ -82,11 +83,15 @@ instance T.Processor DecomposeDG where
         | not (any isCut unselectedNodes) = failx (Applicable $ DecomposeDGFail "no rule was cut")
         | prob `isSubsetDP` lowerProb     = failx (Applicable $ DecomposeDGFail "lower component not simpler")
         | otherwise                       = do
-          lowerProof <- T.fromReturn `fmap` mapply (onLower p) lowerProb
-          upperProof <- T.fromReturn `fmap` mapply (onUpper p) upperProb
+          lowerProof <- mapply (onLower p) lowerProb
+          upperProof <- mapply (onUpper p) upperProb
           -- TODO: MS: what is the desired behaviour; currently we just ignore if they make any progress
           -- tct2 description states a similar behaviour; but the tct2 implementation requires that the processors suceeds
-          return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (lowerProof, upperProof))
+          case (lowerProof,upperProof) of
+            (T.Flop, _) -> failx (Applicable $ DecomposeDGFail "lower strategy floped")
+            (_, T.Flop) -> failx (Applicable $ DecomposeDGFail "upper strategy floped")
+            (lpt, rpt)  ->
+              return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn lpt, T.fromReturn rpt))
         where
           failx              = return . T.resultToTree p prob . T.Fail
           mapply s pr        = maybe (return . T.Continue $ T.Open pr) (flip T.evaluate pr) s
@@ -166,7 +171,7 @@ decomposeDGselect = RS.selAllOf (RS.selFromDG f) { RS.rsName = "below first cut 
                     , i /= j
                     , m2 `notElem` ms ]
 
-decomposeDGProcessor :: ExpressionSelector F V -> Maybe (T.Strategy TrsProblem) -> Maybe (T.Strategy TrsProblem)
+decomposeDGProcessor :: ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy
   -> DecomposeDG
 decomposeDGProcessor sel st1 st2 = DecomposeDG
   { onSelection = sel
@@ -195,13 +200,13 @@ selArg = RS.selectorArg
     [ "Determines the strict rules of the selected upper conguence rules." ]
   `T.optional` decomposeDGselect
 
-upperArg :: T.Argument 'T.Optional (Maybe (T.Strategy prob))
+upperArg :: T.Argument 'T.Optional (Maybe TrsStrategy)
 upperArg = T.some T.strat
   `T.withName` "onUpper"
   `T.withHelp` ["Use this processor to solve the upper component."]
   `T.optional` Nothing
 
-lowerArg :: T.Argument 'T.Optional (Maybe (T.Strategy prob))
+lowerArg :: T.Argument 'T.Optional (Maybe TrsStrategy)
 lowerArg = T.some T.strat
   `T.withName` "onLower"
   `T.withHelp` ["Use this processor to solve the lower component."]
@@ -209,24 +214,24 @@ lowerArg = T.some T.strat
 
 decomposeDGProcDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem))
-   , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem)) ]
+   , T.Argument 'T.Optional (Maybe TrsStrategy)
+   , T.Argument 'T.Optional (Maybe TrsStrategy) ]
   T.:-> DecomposeDG)
 decomposeDGProcDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) decomposeDGProcessor
 
 
 decomposeDGProc :: 
-  ExpressionSelector F V -> Maybe (T.Strategy TrsProblem) -> Maybe (T.Strategy TrsProblem) 
-  -> (DecomposeDG -> DecomposeDG) -> T.Strategy TrsProblem
+  ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy
+  -> (DecomposeDG -> DecomposeDG) -> TrsStrategy
 decomposeDGProc sel st1 st2 f = T.Proc . f $ T.declFun decomposeDGProcDeclaration sel st1 st2
 
-decomposeDGProc' :: (DecomposeDG -> DecomposeDG) -> T.Strategy TrsProblem
+decomposeDGProc' :: (DecomposeDG -> DecomposeDG) -> TrsStrategy
 decomposeDGProc' f = T.Proc . f $ T.deflFun decomposeDGProcDeclaration
 
-solveUpperWith :: T.Strategy TrsProblem -> DecomposeDG -> DecomposeDG
+solveUpperWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
 solveUpperWith st p = p{ onUpper=Just st } 
 
-solveLowerWith :: T.Strategy TrsProblem -> DecomposeDG -> DecomposeDG
+solveLowerWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
 solveLowerWith st p = p{ onLower=Just st } 
 
 selectLowerBy :: ExpressionSelector F V -> DecomposeDG -> DecomposeDG
@@ -246,16 +251,15 @@ selectLowerBy sel p = p{ onSelection=sel }
 -- by those processors.
 decomposeDGDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem))
-   , T.Argument 'T.Optional (Maybe (T.Strategy TrsProblem)) ]
-  T.:-> T.Strategy TrsProblem)
+   , T.Argument 'T.Optional (Maybe TrsStrategy)
+   , T.Argument 'T.Optional (Maybe TrsStrategy) ]
+  T.:-> TrsStrategy)
 decomposeDGDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) (\x y z -> T.Proc (decomposeDGProcessor x y z))
 
-decomposeDG :: ExpressionSelector F V -> Maybe (T.Strategy TrsProblem) -> Maybe (T.Strategy TrsProblem) 
-  -> T.Strategy TrsProblem
+decomposeDG :: ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy -> TrsStrategy
 decomposeDG = T.declFun decomposeDGDeclaration
 
-decomposeDG' :: T.Strategy TrsProblem
+decomposeDG' :: TrsStrategy
 decomposeDG' = T.deflFun decomposeDGDeclaration
 
 

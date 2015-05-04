@@ -40,7 +40,8 @@ data RemoveHeadsProof
 
 instance T.Processor RemoveHeads where
   type ProofObject RemoveHeads = ApplicationProof RemoveHeadsProof
-  type Problem RemoveHeads     = TrsProblem
+  type I RemoveHeads           = TrsProblem
+  type O RemoveHeads           = TrsProblem
 
   solve p prob =  T.resultToTree p prob <$>
     maybe remhead (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
@@ -71,11 +72,11 @@ instance T.Processor RemoveHeads where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-removeHeadsDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+removeHeadsDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 removeHeadsDeclaration = T.declare "removeHeads" desc () (T.Proc RemoveHeads)
   where desc = ["Removes roots from the dependency graph that lead to starting terms only."]
 
-removeHeads :: T.Strategy TrsProblem
+removeHeads :: TrsStrategy
 removeHeads = T.declFun removeHeadsDeclaration
 
 

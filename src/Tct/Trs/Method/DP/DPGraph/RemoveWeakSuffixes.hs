@@ -41,7 +41,8 @@ data RemoveWeakSuffixesProof
 
 instance T.Processor RemoveWeakSuffixes where
   type ProofObject RemoveWeakSuffixes = ApplicationProof RemoveWeakSuffixesProof
-  type Problem RemoveWeakSuffixes     = TrsProblem
+  type I RemoveWeakSuffixes           = TrsProblem
+  type O RemoveWeakSuffixes           = TrsProblem
 
   -- an scc in the congruence graph is considered weak if all rules in the scc are weak
   -- compute maximal weak suffix bottom-up
@@ -86,7 +87,7 @@ instance T.Processor RemoveWeakSuffixes where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-removeWeakSuffixesDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+removeWeakSuffixesDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 removeWeakSuffixesDeclaration = T.declare "removeWeakSuffixes" desc () (T.Proc RemoveWeakSuffixes) where
   desc =
     [ "Removes trailing paths that do not need to be oriented."
@@ -98,7 +99,7 @@ removeWeakSuffixesDeclaration = T.declare "removeWeakSuffixes" desc () (T.Proc R
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
-removeWeakSuffixes :: T.Strategy TrsProblem
+removeWeakSuffixes :: TrsStrategy
 removeWeakSuffixes = T.declFun removeWeakSuffixesDeclaration
 
 

@@ -34,7 +34,8 @@ data TrivialProof
 
 instance T.Processor Trivial where
   type ProofObject Trivial = ApplicationProof TrivialProof
-  type Problem Trivial     = TrsProblem
+  type I Trivial           = TrsProblem
+  type O Trivial           = TrsProblem
 
   solve p prob = return . T.resultToTree p prob $
     maybe cyclic (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
@@ -58,13 +59,13 @@ instance T.Processor Trivial where
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
-trivialDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+trivialDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 trivialDeclaration = T.declare "trivial" desc () (T.Proc Trivial) where
   desc =
     [ "Checks wether the DP problem is trivial, i.e. the dependency graph contains no loops."
     , "Only applicable if the strict component is empty."]
 
-trivial :: T.Strategy TrsProblem
+trivial :: TrsStrategy
 trivial = T.declFun trivialDeclaration
 
 

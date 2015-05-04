@@ -366,7 +366,7 @@ entscheide1 p aorder encoding decoding forceAny prob
 matrixStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector Prob.F Prob.V)
                -> Arg.Greedy
-               -> CD.Strategy Prob.TrsProblem
+               -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
 matrixStrategy dim deg nmiKind ua ur sl gr = CD.Proc $
   NaturalMI { miDimension = dim
             , miDegree = deg
@@ -432,16 +432,16 @@ matrixDeclaration :: CD.Declaration (
    , CD.Argument 'CD.Optional Arg.UsableRules
    , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V))
    , CD.Argument 'CD.Optional Arg.Greedy
-  ] CD.:-> CD.Strategy Prob.TrsProblem)
+  ] CD.:-> CD.Strategy Prob.TrsProblem Prob.TrsProblem)
 matrixDeclaration = CD.declare "matrix" description args matrixStrategy
 
-matrix :: CD.Strategy Prob.TrsProblem
+matrix :: CD.Strategy Prob.TrsProblem Prob.TrsProblem
 matrix = CD.deflFun matrixDeclaration
 
 matrix' :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector Prob.F Prob.V)
                -> Arg.Greedy
-               -> CD.Strategy Prob.TrsProblem
+               -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
 matrix' = CD.declFun matrixDeclaration
 
 
@@ -509,7 +509,8 @@ instance I.AbstractInterpretation NaturalMI where
 
 instance CD.Processor NaturalMI where
   type ProofObject NaturalMI = PC.ApplicationProof NaturalMIProof
-  type Problem NaturalMI     = Prob.TrsProblem
+  type I NaturalMI           = Prob.TrsProblem
+  type O NaturalMI           = Prob.TrsProblem
   type Forking NaturalMI     = CD.Optional CD.Id
 
   {- | Decides whether applying the NaturalMI processor makes progress or not -}
@@ -538,6 +539,6 @@ instance Xml.Xml (MatrixOrder Int) where
     | True      = Xml.toXml order -- FIXME: MS: add sanity check; ceta supports definitely triangular; does it support algebraic ?
     | otherwise = Xml.unsupported
 
-instance CD.SParsable prob NaturalMIKind where
+instance CD.SParsable i i NaturalMIKind where
   parseS = P.enum
 

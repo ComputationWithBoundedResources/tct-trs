@@ -50,7 +50,7 @@ import           Tct.Trs.Method.Matrix.NaturalMI                 as M
 import           Tct.Trs.Method.Poly.NaturalPI                   as M
 
 
-defaultDeclarations :: [T.StrategyDeclaration TrsProblem]
+defaultDeclarations :: [T.StrategyDeclaration TrsProblem TrsProblem]
 defaultDeclarations =
   [ T.SD emptyDeclaration
   , T.SD withCertificationDeclaration
@@ -85,7 +85,7 @@ defaultDeclarations =
 --- * withCertification ----------------------------------------------------------------------------------------------
 
 data WithCertification =
-  WithCertification { allowPartial :: Bool, onStrategy :: T.Strategy TrsProblem } deriving Show
+  WithCertification { allowPartial :: Bool, onStrategy :: TrsStrategy } deriving Show
 
 -- TODO:
 -- MS: the only way to stop a computation currently is using throwError;
@@ -96,37 +96,41 @@ data WithCertification =
 -- or; Total | Partial | TotalClosed
 instance T.Processor WithCertification where
   type ProofObject WithCertification = ()
-  type Problem WithCertification     = TrsProblem
+  type I WithCertification     = TrsProblem
+  type O WithCertification     = TrsProblem
 
   solve p prob = do
     ret <- T.evaluate (onStrategy p) prob
     tmp <- T.tempDirectory `fmap` T.askState
-    let
-      pt = T.fromReturn ret
-      toRet = case ret of
-        T.Abort _    -> T.Abort
-        T.Continue _ -> T.Continue
-      prover
-        | allowPartial p = CeTA.partialProofIO' tmp
-        | T.isOpen pt    = return . Right 
-        | otherwise      = CeTA.totalProofIO' tmp
+    errM <- case ret of
+      T.Flop        -> return (Left "Flop")
+      rpt
+        | allowPartial p            -> CeTA.partialProofIO' tmp pt
+        | T.isOpen pt -> return (Right pt)
+        | otherwise                 -> CeTA.totalProofIO' tmp pt
+        where pt = T.fromReturn rpt
 
-    errM <- prover pt 
+    let
+      toRet = case ret of
+        T.Continue _ -> T.Continue
+        T.Abort _    -> T.Abort
+        T.Flop       -> const T.Flop
+
     either (throwError . userError) (return . toRet) errM
 
-withCertificationStrategy :: Bool -> T.Strategy TrsProblem -> T.Strategy TrsProblem
+withCertificationStrategy :: Bool -> TrsStrategy -> TrsStrategy
 withCertificationStrategy b st = T.Proc $ WithCertification { allowPartial=b, onStrategy=st }
 
-withCertification :: Bool -> T.Strategy TrsProblem -> T.Strategy TrsProblem
+withCertification :: Bool -> TrsStrategy -> TrsStrategy
 withCertification = T.declFun withCertificationDeclaration
 
-withCertification' :: T.Strategy TrsProblem -> T.Strategy TrsProblem
+withCertification' :: TrsStrategy -> TrsStrategy
 withCertification' = T.deflFun withCertificationDeclaration
 
 withCertificationDeclaration :: T.Declaration(
   '[T.Argument 'T.Optional Bool
-   , T.Argument 'T.Required (T.Strategy TrsProblem)]
-   T.:-> T.Strategy TrsProblem)
+   , T.Argument 'T.Required TrsStrategy]
+   T.:-> TrsStrategy)
 withCertificationDeclaration = T.declare "withCertification" [desc] (apArg, T.strat) withCertificationStrategy
   where
     desc = "This processor "
@@ -140,7 +144,7 @@ withCertificationDeclaration = T.declare "withCertification" [desc] (apArg, T.st
 
 
 -- | Fast simplifications based on dependency graph analysis.
-dpsimps :: T.Strategy TrsProblem
+dpsimps :: TrsStrategy
 dpsimps = force $
   try cleanSuffix
   >>> te removeHeads
@@ -153,7 +157,7 @@ dpsimps = force $
 -- decomposes dependency pairs into two independent sets, in the sense that these DPs
 -- constitute unconnected sub-graphs of the dependency graph. Applies 'cleanSuffix' on the resulting sub-problems,
 -- if applicable.
-decomposeIndependent :: T.Strategy TrsProblem
+decomposeIndependent :: TrsStrategy
 decomposeIndependent =
   decomposeProc' (decomposeBy (RS.selAllOf RS.selIndependentSG))
   >>> try simplifyRHS
@@ -161,7 +165,7 @@ decomposeIndependent =
 
 -- | Similar to 'decomposeIndependent', but in the computation of the independent sets,
 -- dependency pairs above cycles in the dependency graph are not taken into account.
-decomposeIndependentSG :: T.Strategy TrsProblem
+decomposeIndependentSG :: TrsStrategy
 decomposeIndependentSG =
   decompose (RS.selAllOf RS.selCycleIndependentSG) RelativeAdd
   >>> try simplifyRHS
@@ -170,7 +174,7 @@ decomposeIndependentSG =
 -- | Use 'predecessorEstimationOn' and 'removeWeakSuffixes' to remove leafs from the dependency graph.
 -- If successful, right-hand sides of dependency pairs are simplified ('simplifyRHS')
 -- and usable rules are re-computed ('usableRules').
-cleanSuffix :: T.Strategy TrsProblem
+cleanSuffix :: TrsStrategy
 cleanSuffix = force $
   te (predecessorEstimation sel)
   >>> try (removeWeakSuffixes >>> try (simplifyRHS >>> try usableRules))

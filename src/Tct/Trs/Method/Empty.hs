@@ -11,10 +11,10 @@ import qualified Tct.Core.Data as T
 import qualified Tct.Trs.Data.Problem as Prob
 import Tct.Trs.Data
 
-empty :: T.Strategy TrsProblem
+empty :: TrsStrategy
 empty = E.empty Prob.isTrivial
 
-emptyDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+emptyDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 emptyDeclaration = T.declare "empty" [desc] () empty
   where desc = "Checks if the the strict components is empty."
 

@@ -35,7 +35,8 @@ data InnermostRuleRemovalProof
 
 instance T.Processor InnermostRuleRemoval where
   type ProofObject InnermostRuleRemoval = ApplicationProof InnermostRuleRemovalProof
-  type Problem InnermostRuleRemoval     = TrsProblem
+  type I InnermostRuleRemoval           = TrsProblem
+  type O InnermostRuleRemoval           = TrsProblem
 
   solve p prob = T.resultToTree p prob <$>
     maybe irr (return . T.Fail . Inapplicable) (Prob.isInnermostProblem' prob)
@@ -64,10 +65,10 @@ description =
   [ "This processor removes rules 'f(l_1,...,l_n) -> r' for which l_i (1 <= i <=n) is not a normal form."
   , "The processor applies only to innermost problems." ]
 
-innermostRuleRemovalDeclaration :: T.Declaration ('[] T.:-> T.Strategy TrsProblem)
+innermostRuleRemovalDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 innermostRuleRemovalDeclaration = T.declare "InnermostRuleRemoval" description () (T.Proc InnermostRuleRemoval)
 
-innermostRuleRemoval :: T.Strategy TrsProblem
+innermostRuleRemoval :: TrsStrategy
 innermostRuleRemoval = T.declFun innermostRuleRemovalDeclaration
 
 

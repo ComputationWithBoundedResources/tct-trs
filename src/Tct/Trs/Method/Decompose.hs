@@ -135,8 +135,9 @@ progress DecomposeFail = False
 
 instance T.Processor Decompose where
   type ProofObject Decompose = ApplicationProof DecomposeProof
-  type Problem Decompose = TrsProblem
-  type Forking Decompose = T.Pair
+  type I Decompose           = TrsProblem
+  type O Decompose           = TrsProblem
+  type Forking Decompose     = T.Pair
 
   solve p@Decompose{..} prob = return . T.resultToTree p prob $
     maybe decomposition (T.Fail . Inapplicable) maybeApplicable
@@ -219,16 +220,16 @@ decomposeProcDeclaration :: T.Declaration (
    T.:-> Decompose )
 decomposeProcDeclaration = T.declare "decompose" desc (selArg, bndArg) decomposeProcessor
 
-decomposeProc :: ExpressionSelector F V -> DecomposeBound -> (Decompose -> Decompose) -> T.Strategy TrsProblem
+decomposeProc :: ExpressionSelector F V -> DecomposeBound -> (Decompose -> Decompose) -> TrsStrategy
 decomposeProc sel b f = T.Proc . f $ T.declFun decomposeProcDeclaration sel b
 
-decomposeProc' :: (Decompose -> Decompose) -> T.Strategy TrsProblem
+decomposeProc' :: (Decompose -> Decompose) -> TrsStrategy
 decomposeProc' f = T.Proc . f $ T.deflFun decomposeProcDeclaration
 
 decomposeDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional DecomposeBound ] 
-   T.:-> T.Strategy TrsProblem)
+   T.:-> TrsStrategy)
 decomposeDeclaration = T.declare "decompose" desc (selArg, bndArg) (\x y -> T.Proc (decomposeProcessor x y ))
 
 decomposeBy :: ExpressionSelector F V -> Decompose -> Decompose
@@ -238,10 +239,10 @@ combineBy :: DecomposeBound -> Decompose -> Decompose
 combineBy bnd p = p{ withBound=bnd }
 
 
-decompose :: ExpressionSelector F V -> DecomposeBound -> T.Strategy TrsProblem
+decompose :: ExpressionSelector F V -> DecomposeBound -> TrsStrategy
 decompose = T.declFun decomposeDeclaration
 
-decompose' :: T.Strategy TrsProblem
+decompose' :: TrsStrategy
 decompose' = T.deflFun decomposeDeclaration
 
 
@@ -254,7 +255,7 @@ boundArg = T.arg { T.argName = "allow", T.argDomain = "<bound>"} `T.withHelp` he
       , "Consequently, this argument also determines the shape of (S)."
       , "<bound> is one of " ++ show [Add, RelativeAdd, RelativeMul, RelativeComp] ]
 
-instance T.SParsable prob DecomposeBound where
+instance T.SParsable i i DecomposeBound where
   parseS = P.choice
     [ P.symbol (show Add) >> return Add
     , P.symbol (show RelativeAdd) >> return RelativeAdd

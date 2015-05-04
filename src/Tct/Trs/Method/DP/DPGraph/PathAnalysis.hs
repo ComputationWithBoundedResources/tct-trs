@@ -62,7 +62,8 @@ data PathAnalysisProof
 
 instance T.Processor PathAnalysis where
   type ProofObject PathAnalysis = ApplicationProof PathAnalysisProof
-  type Problem PathAnalysis     = TrsProblem
+  type I PathAnalysis           = TrsProblem
+  type O PathAnalysis           = TrsProblem
   type Forking PathAnalysis     = []
 
   solve p prob =  return . T.resultToTree p prob $
@@ -133,10 +134,10 @@ walkFromQ cdg root = walkFromQ' [] Prob.emptyRuleSet root where
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-pathAnalysisStrategy :: Bool -> T.Strategy TrsProblem
+pathAnalysisStrategy :: Bool -> TrsStrategy
 pathAnalysisStrategy b = T.Proc $ PathAnalysis { onlyLinear=b }
 
-pathAnalysisDeclaration :: T.Declaration ('[T.Argument 'T.Optional Bool] T.:-> T.Strategy TrsProblem)
+pathAnalysisDeclaration :: T.Declaration ('[T.Argument 'T.Optional Bool] T.:-> TrsStrategy)
 pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) pathAnalysisStrategy
   where
     desc = ["This processor implements path-analysis as described in the dependency pair paper."]
@@ -145,10 +146,10 @@ pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) path
       `T.withHelp` ["If this flag is set, linear path analysis is employed."]
       `T.optional` True
 
-pathAnalysis :: Bool -> T.Strategy TrsProblem
+pathAnalysis :: Bool -> TrsStrategy
 pathAnalysis = T.declFun pathAnalysisDeclaration
 
-pathAnalysis' :: T.Strategy TrsProblem
+pathAnalysis' :: TrsStrategy
 pathAnalysis' = T.deflFun pathAnalysisDeclaration
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

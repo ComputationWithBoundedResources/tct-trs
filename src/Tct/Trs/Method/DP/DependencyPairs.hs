@@ -109,7 +109,8 @@ data DependencyPairsProof = DependencyPairsProof
 
 instance T.Processor DependencyPairs where
   type ProofObject DependencyPairs = ApplicationProof DependencyPairsProof
-  type Problem DependencyPairs     = TrsProblem
+  type I DependencyPairs           = TrsProblem
+  type O DependencyPairs           = TrsProblem
 
   solve p prob                 = return . T.resultToTree p prob $
     maybe dp (T.Fail . Inapplicable) maybeApplicable
@@ -202,25 +203,25 @@ dpKindArg = T.arg
   `T.withHelp`  ["Specifies preferred kind of dependency pairs. Overrides to wdp for non-innermost problems."]
   `T.withDomain` fmap show [(minBound :: DPKind)..]
 
-instance T.SParsable prob DPKind where
+instance T.SParsable i i DPKind where
   parseS = P.enum
 
 description :: [String]
 description = ["Applies the (weak) dependency pairs transformation."]
 
-dependencyPairsDeclaration :: T.Declaration ('[T.Argument 'T.Optional DPKind] T.:-> T.Strategy TrsProblem)
+dependencyPairsDeclaration :: T.Declaration ('[T.Argument 'T.Optional DPKind] T.:-> TrsStrategy)
 dependencyPairsDeclaration = T.declare "dependencyPairs" description (T.OneTuple dpArg) (T.Proc . DependencyPairs)
   where dpArg = dpKindArg `T.optional` WIDP
 
-dependencyPairs :: T.Strategy TrsProblem
+dependencyPairs :: TrsStrategy
 dependencyPairs = T.deflFun dependencyPairsDeclaration
 
-dependencyPairs' :: DPKind -> T.Strategy TrsProblem
+dependencyPairs' :: DPKind -> TrsStrategy
 dependencyPairs' = T.declFun dependencyPairsDeclaration
 
-weakDependencyPairs :: T.Strategy TrsProblem
+weakDependencyPairs :: TrsStrategy
 weakDependencyPairs = dependencyPairs' WIDP
 
-dependencyTuples :: T.Strategy TrsProblem
+dependencyTuples :: TrsStrategy
 dependencyTuples = dependencyPairs' DT
 

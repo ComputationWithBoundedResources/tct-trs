@@ -1,6 +1,7 @@
 module Tct.Trs.Data.Mode
   (
   Problem (..)
+  , TrsMode
   , trsMode
   , CC
   ) where
@@ -12,7 +13,8 @@ import           Tct.Core.Common.Error      (TctError (..))
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml (putXml)
 import           Tct.Core.Main
-import           Tct.Core.Processor.Simple  (failing)
+import qualified Tct.Core.Data as T
+import           Tct.Core.Processor.Failing (failing)
 
 import qualified Data.Rewriting.Problem     as R
 
@@ -25,7 +27,9 @@ import qualified Tct.Trs.Data.Trs           as Trs
 import           Tct.Trs.Processor          (defaultDeclarations)
 
 
-trsMode :: TctMode TrsProblem CC
+type TrsMode = TctMode TrsProblem TrsProblem CC
+
+trsMode :: TrsMode
 trsMode = TctMode
   { modeId              = "trs"
   , modeParser          = parser
@@ -36,11 +40,14 @@ trsMode = TctMode
   , modeModifyer        = modifyer
   , modeAnswer          = answering }
 
-answering :: ProofTree TrsProblem -> IO ()
-answering pt = PP.putPretty (answer pt) >> case totalProof pt of
--- answering pt = PP.putPretty (answer pt) >> case partialProof pt of
-  Left s    -> print s
-  Right xml -> Xml.putXml xml
+-- TODO: MS: options for total or partial proof output
+answering :: CC -> T.Return (ProofTree TrsProblem) -> IO ()
+answering _ ret = case ret of
+  T.Flop -> putStrLn "Flop`"
+  r    -> PP.putPretty (answer pt) >> case totalProof pt of
+    Left s    -> print s
+    Right xml -> Xml.putXml xml
+    where pt = T.fromReturn r
 
 data CC = DCF | DCI | RCF | RCI deriving (Eq, Show, Read)
 
@@ -67,7 +74,7 @@ options = option $ eopt
   `withHelpDoc` PP.text "RCF - runtime complexity"
   `withDefault` RCF
 
-modifyer :: TrsProblem -> CC -> TrsProblem
-modifyer p cc = p { startTerms = ts, strategy = st }
+modifyer :: CC -> TrsProblem -> TrsProblem
+modifyer cc p = p { startTerms = ts, strategy = st }
   where (ts,st) = ccProperties cc (allComponents p) (signature p)
 

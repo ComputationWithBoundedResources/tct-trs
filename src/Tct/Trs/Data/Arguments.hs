@@ -37,7 +37,7 @@ class HasSelection p where
 data UsableArgs = UArgs | NoUargs
   deriving (Bounded, Enum, Eq, Typeable, Show)
 
-instance T.SParsable prob UsableArgs where
+instance T.SParsable i i UsableArgs where
   parseS = P.enum
 
 class HasUsableArgs p where
@@ -57,7 +57,7 @@ useUsableArgs = (UArgs==)
 data UsableRules = URules | NoURules
   deriving (Bounded, Enum, Eq, Typeable, Show)
 
-instance T.SParsable prob UsableRules where
+instance T.SParsable i i UsableRules where
   parseS = P.enum
 
 class HasUsableRules p where
@@ -77,7 +77,7 @@ useUsableRules = (URules==)
 data Greedy = Greedy | NoGreedy
   deriving (Bounded, Enum, Eq, Typeable, Show)
 
-instance T.SParsable prob Greedy where
+instance T.SParsable i i Greedy where
   parseS = P.enum
 
 class HasGreedy p where
