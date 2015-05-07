@@ -60,7 +60,7 @@ import qualified Tct.Core.Common.Pretty                     as PP
 import qualified Tct.Core.Common.SemiRing                   as SR
 import qualified Tct.Core.Common.Xml                        as Xml
 import qualified Tct.Core.Data                              as CD
-import           Tct.Core.Data.Declaration.Parse            ()
+import           Tct.Core.Parse            ()
 
 
 -- imports tct-trs

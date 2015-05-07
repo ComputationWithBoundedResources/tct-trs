@@ -88,8 +88,8 @@ instance T.Processor DecomposeDG where
           -- TODO: MS: what is the desired behaviour; currently we just ignore if they make any progress
           -- tct2 description states a similar behaviour; but the tct2 implementation requires that the processors suceeds
           case (lowerProof,upperProof) of
-            (T.Flop, _) -> failx (Applicable $ DecomposeDGFail "lower strategy floped")
-            (_, T.Flop) -> failx (Applicable $ DecomposeDGFail "upper strategy floped")
+            (T.Halt _, _) -> failx (Applicable $ DecomposeDGFail "lower strategy floped")
+            (_, T.Halt _) -> failx (Applicable $ DecomposeDGFail "upper strategy floped")
             (lpt, rpt)  ->
               return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn lpt, T.fromReturn rpt))
         where

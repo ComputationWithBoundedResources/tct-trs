@@ -32,7 +32,7 @@ import qualified Data.Rewriting.Term                 as R
 import qualified Tct.Core.Common.Pretty              as PP
 import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Data                       as T
-import           Tct.Core.Data.Declaration.Parse     ()
+import           Tct.Core.Parse     ()
 
 import qualified Tct.Common.Polynomial               as P
 import           Tct.Common.PolynomialInterpretation (Shape)

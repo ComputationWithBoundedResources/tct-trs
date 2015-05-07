@@ -1,23 +1,27 @@
--- | This interface provides common declaration arguments.
-module Tct.Trs.Data.Arguments 
+-- | This interface provides common arguments.
+module Tct.Trs.Data.Arguments
   (
   HasSelection (..)
 
+  -- * Usable Arguments
   , HasUsableArgs (..)
   , UsableArgs (..)
   , usableArgs
   , useUsableArgs
 
+  -- * Usable Rules
   , HasUsableRules (..)
   , UsableRules (..)
   , usableRules
   , useUsableRules
 
+  -- * Greedy
   , HasGreedy (..)
   , Greedy (..)
   , greedy
   , useGreedy
 
+  -- * Kind
   , HasKind (..)
   ) where
 
@@ -54,6 +58,7 @@ usableArgs = T.arg
 useUsableArgs :: UsableArgs -> Bool
 useUsableArgs = (UArgs==)
 
+
 data UsableRules = URules | NoURules
   deriving (Bounded, Enum, Eq, Typeable, Show)
 
@@ -74,6 +79,7 @@ usableRules = T.arg
 useUsableRules :: UsableRules -> Bool
 useUsableRules = (URules==)
 
+
 data Greedy = Greedy | NoGreedy
   deriving (Bounded, Enum, Eq, Typeable, Show)
 
@@ -92,6 +98,7 @@ greedy = T.arg
 
 useGreedy :: Greedy -> Bool
 useGreedy = (Greedy==)
+
 
 class HasKind p where
   type (Kind p)

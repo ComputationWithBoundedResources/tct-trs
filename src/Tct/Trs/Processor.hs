@@ -103,18 +103,18 @@ instance T.Processor WithCertification where
     ret <- T.evaluate (onStrategy p) prob
     tmp <- T.tempDirectory `fmap` T.askState
     errM <- case ret of
-      T.Flop        -> return (Left "Flop")
+      T.Halt _ -> return (Left "Halt")
       rpt
-        | allowPartial p            -> CeTA.partialProofIO' tmp pt
-        | T.isOpen pt -> return (Right pt)
-        | otherwise                 -> CeTA.totalProofIO' tmp pt
+        | allowPartial p -> CeTA.partialProofIO' tmp pt
+        | T.isOpen pt    -> return (Right pt)
+        | otherwise      -> CeTA.totalProofIO' tmp pt
         where pt = T.fromReturn rpt
 
     let
       toRet = case ret of
         T.Continue _ -> T.Continue
         T.Abort _    -> T.Abort
-        T.Flop       -> const T.Flop
+        T.Halt pt    -> const (T.Halt pt)
 
     either (throwError . userError) (return . toRet) errM
 

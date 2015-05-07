@@ -113,7 +113,7 @@ totalProof pt = toDoc <$> totalProofM1 pt <*> subProblem pt
 --- * io -------------------------------------------------------------------------------------------------------------
 
 proofIO :: MonadIO m => FilePath -> (l -> Either CertFail XmlDocument) -> Proof -> l -> m (Either String l)
-proofIO tmpDir prover allowPartial p = 
+proofIO tmpDir prover allowPartial p =
   case prover p of
     Left err -> return $ Left (show err)
     Right xml       ->
@@ -126,7 +126,7 @@ proofIO tmpDir prover allowPartial p =
           ExitSuccess   -> case lines stdout of
             "CERTIFIED <complexityProof>" :_ -> Right p
             _                                -> Left stdout
-  where 
+  where
     args = if allowPartial == PartialProof then ("--allow-assumptions":) else id
     withFile = E.bracket (openTempFile tmpDir "ceta") (hClose . snd) . uncurry
 

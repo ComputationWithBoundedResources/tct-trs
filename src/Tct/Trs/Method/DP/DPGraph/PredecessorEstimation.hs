@@ -156,7 +156,7 @@ instance T.Processor PredecessorEstimationCP where
         case cpproof of
             T.Continue cpp -> mkProof cpp
             T.Abort _      -> return . T.resultToTree p prob $ T.Fail (Applicable PredecessorEstimationFail)
-            T.Flop         -> return T.Flop
+            T.Halt pt      -> return (T.Halt pt)
 
         where
           snub = S.toList . S.fromList
