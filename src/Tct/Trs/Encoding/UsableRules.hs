@@ -26,6 +26,7 @@ import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem           as Prob
 import qualified Tct.Trs.Data.ProblemKind       as Prob
 import qualified Tct.Trs.Data.Trs               as Trs
+import qualified Tct.Trs.Data.Signature         as Sig
 
 
 --- * usable rules ---------------------------------------------------------------------------------------------------
@@ -51,7 +52,7 @@ usableEncoder prob = UsableEncoder initialfs `liftM` mapping
   where
     mapping = M.fromAscList `liftM` F.mapM atom (S.toAscList $ defs `S.difference` initialfs)
     atom f  = SMT.bvarM' >>= \v -> return (f,v)
-    defs    = Trs.definedSymbols (Prob.allComponents prob)
+    defs    = Sig.defineds (Prob.signature prob)
     initialfs =
       case Prob.startTerms prob of
         Prob.AllTerms fs -> fs

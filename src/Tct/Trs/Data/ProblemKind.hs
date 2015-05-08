@@ -1,7 +1,14 @@
-module Tct.Trs.Data.ProblemKind where
+-- | This module provides flags for the problem type.
+module Tct.Trs.Data.ProblemKind 
+  (
+    StartTerms (..)
+  , isStartTerm
+  , mapStartTerms
+  , Strategy (..)
+  ) where
 
 
-import Data.Monoid
+import           Data.Monoid
 import qualified Data.Set               as S
 
 import qualified Data.Rewriting.Term    as R
@@ -12,33 +19,29 @@ import qualified Tct.Core.Common.Xml    as Xml
 import           Tct.Trs.Data.Signature (Signature, Symbols, restrictSignature)
 
 
+-- | Defineds the start terms.
 data StartTerms f
   = AllTerms
-    { alls :: Symbols f }
+    { alls         :: Symbols f }
   | BasicTerms
     { defineds     :: Symbols f
     , constructors :: Symbols f }
   deriving (Show, Eq)
 
+-- | Checks wether a given term is a start term.
 isStartTerm :: Ord f => StartTerms f -> R.Term f v -> Bool
 isStartTerm AllTerms{} _         = True
 isStartTerm (BasicTerms ds cs) t = case t of
   (R.Var _)    -> True
   (R.Fun f ts) -> f `S.member` ds && all (`S.member` cs) (concatMap R.funs ts)
 
-isBasicTerms :: StartTerms f -> Bool
-isBasicTerms BasicTerms{} = True
-isBasicTerms _            = False
 
 mapStartTerms :: Ord f' => (f -> f') -> StartTerms f -> StartTerms f'
 mapStartTerms f (AllTerms fs)      = AllTerms (f `S.map` fs)
 mapStartTerms f (BasicTerms ds cs) = BasicTerms (f `S.map` ds) (f `S.map` cs)
 
-data Strategy
-  = Innermost
-  | Outermost
-  | Full
-  deriving (Show, Eq)
+-- | Defineds the rewriting Strategy.
+data Strategy = Innermost | Outermost | Full deriving (Show, Eq)
 
 
 --- * proof data -----------------------------------------------------------------------------------------------------
@@ -60,7 +63,6 @@ instance Xml.Xml Strategy where
     Outermost -> Xml.elt "strategy" [Xml.elt "outermost" []]
     Full      -> Xml.empty
 
--- MS: restrictSignature is necessary for CeTA unknown proofs ? really ?
 instance (Xml.Xml f, Ord f) => Xml.Xml (StartTerms f, Signature f) where
   toXml (st,sig) = case st of
     (AllTerms fs)      -> Xml.elt "derivationalComplexity" [Xml.toXml $ restrictSignature sig fs]

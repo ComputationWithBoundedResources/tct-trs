@@ -1,21 +1,23 @@
 -- This module contains some useful functions (yet) not available in rewriting library
 module Tct.Trs.Data.Rewriting where
 
-import Data.Traversable as F
-import Control.Applicative
-import Control.Monad.State.Strict
-import Data.Maybe
+
+import           Control.Applicative
 import           Control.Arrow               ((&&&))
+import           Control.Monad.State.Strict
+import           Data.Maybe
 import qualified Data.Set                    as S
+import           Data.Traversable            as F
 
 import           Data.Rewriting.CriticalPair (CP (..))
 import qualified Data.Rewriting.CriticalPair as R
 import           Data.Rewriting.Rule         (Rule)
 import qualified Data.Rewriting.Rule         as R
 import qualified Data.Rewriting.Rules        as RS
+import qualified Data.Rewriting.Substitution as S
 import           Data.Rewriting.Term         (Term (..))
 import qualified Data.Rewriting.Term         as T
-import qualified Data.Rewriting.Substitution as S
+
 
 tvars :: Ord v => Term f v -> S.Set v
 tvars = S.fromList . T.vars
@@ -118,7 +120,7 @@ icapM lhss (T.Fun f ts) = do
 -- qcapM :: (Ord f, Ord v1, Ord v2)
 --   => [R.Term f v1] -> [R.Term f v1]
 --   -> [R.Term f (Fresh v2)] -> R.Term f (Fresh v2) -> State Int (R.Term f (Fresh v2))
--- qcapM rsLhss qsLhss ss = qcapM' 
+-- qcapM rsLhss qsLhss ss = qcapM'
 --   where
 --     allqnf = S.fromList rsLhss `S.isSubsetOf` S.fromList qsLhss
 --

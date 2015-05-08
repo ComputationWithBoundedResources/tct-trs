@@ -84,7 +84,7 @@ instance T.Processor SimplifyRHS where
             , Prob.weakDPs   = toTrs weaks
             , Prob.signature = foldr updateCompound (Prob.signature prob) simplified }
             where
-              updateCompound (R.Rule _ (R.Fun f rs)) acc = Sig.alter (const . Just $ length rs) f acc
+              updateCompound (R.Rule _ (R.Fun f rs)) acc = Sig.setArity (length rs) f acc
               updateCompound _ acc                       = acc
 
           proof = SimplifyRHSProof

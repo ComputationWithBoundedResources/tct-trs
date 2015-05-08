@@ -23,12 +23,7 @@ import qualified Tct.Trs.Data.Trs             as Trs
 import           Tct.Trs.Data.Signature       (Signature)
 import qualified Tct.Trs.Data.Signature       as Sig
 
--- FIXME: properly update dpGraphs when rule shifting, prdecessor estimation...
--- | The problem type.
--- FIXME:
--- there is a problem with certification when giving startTerms;
--- check should they be "sanitised"; also for the signature ?
--- the signature should contain symbols of rules and startterms
+
 data Problem f v = Problem
   { startTerms :: StartTerms f
   , strategy   :: Strategy
@@ -85,6 +80,7 @@ instance Xml.Xml F where
   toXml (F (ComFun f)) = Xml.elt "name" [Xml.text $ 'c':show f]
   toCeTA = Xml.toXml
 
+
 newtype V = V BS.ByteString
   deriving (Eq, Ord, Show, Typeable)
 
@@ -114,6 +110,8 @@ sanitiseSignature prob = prob
     restrictST (AllTerms fs)      = AllTerms (fs `S.intersection` allfs)
     restrictST (BasicTerms ds cs) = BasicTerms (ds `S.intersection` allfs) (cs `S.intersection` allfs)
 
+-- FIXME: MS: add sanity check of symbols;
+-- we use a wrapper for distinguishing dp/com symbols; but pretty printing can still fail if a symbols c_1 or f# exists
 fromRewriting :: R.Problem String String -> TrsProblem
 fromRewriting prob = Problem
   { startTerms   = case R.startTerms prob of
@@ -136,9 +134,12 @@ fromRewriting prob = Problem
     sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)
     wTrs = Trs.fromList . map toFun $ R.weakRules (R.rules prob)
     trs  = sTrs `Trs.union` wTrs
+
     sig  = Trs.signature trs
-    defs = Trs.definedSymbols trs
-    cons = Trs.constructorSymbols sig defs
+    defs = Sig.defineds sig
+    cons = Sig.constructors sig
+
+
 
 toInnermost :: Problem f v -> Problem f v
 toInnermost prob = prob { strategy = Innermost }
@@ -147,16 +148,15 @@ toFull :: Problem f v -> Problem f v
 toFull prob = prob { strategy = Full }
 
 toDC :: (Ord f, Ord v) => Problem f v -> Problem f v
-toDC prob = prob { startTerms = AllTerms (defs `S.union` cons) }
-  where
-    defs = Trs.definedSymbols (allComponents prob)
-    cons = Trs.constructorSymbols (signature prob) defs
+toDC prob = case startTerms prob of
+  AllTerms{}       -> prob
+  BasicTerms ds cs -> prob { startTerms = AllTerms (ds `S.union` cs) }
 
 toRC :: (Ord f, Ord v) => Problem f v -> Problem f v
-toRC prob = prob { startTerms = BasicTerms defs cons }
-  where
-    defs = Trs.definedSymbols (allComponents prob)
-    cons = Trs.constructorSymbols (signature prob) defs
+toRC prob = case startTerms prob of
+  BasicTerms{} -> prob
+  AllTerms fs  -> prob { startTerms = BasicTerms (fs `S.intersection` ds) (fs `S.intersection` cs) }
+  where (ds,cs) = (Sig.defineds $ signature prob, Sig.constructors $ signature prob)
 
 progressUsingSize :: Problem f v -> Problem f v -> Bool
 progressUsingSize p1 p2 =
@@ -178,7 +178,7 @@ startComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
 startComponents prob = case st of
   AllTerms{}   -> k (trsComponents prob)
   BasicTerms{} -> k (dpComponents prob)
-  where 
+  where
     st = startTerms prob
     k  = Trs.filter (isStartTerm st . R.lhs)
 
@@ -247,7 +247,7 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
     , PP.indent 2 $ PP.pretty (strictTrs prob)
     , PP.text "Weak Rules:"
     , PP.indent 2 $ PP.pretty (weakDPs prob)
-    , PP.indent 2 $ PP.pretty (weakTrs prob) 
+    , PP.indent 2 $ PP.pretty (weakTrs prob)
     , PP.text "Signature:"
     , PP.indent 2 $ PP.pretty (signature prob)
     , PP.text "Kind:"

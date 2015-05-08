@@ -14,8 +14,6 @@ import           Control.Applicative         ((<|>))
 import           Control.Monad.State.Strict
 import qualified Data.Traversable            as F
 import           Data.Typeable
-
-import qualified Data.Map                    as M
 import qualified Data.Set                    as S
 
 import qualified Data.Rewriting.Rule         as R
@@ -34,9 +32,6 @@ import qualified Tct.Trs.Data.Signature      as Sig
 import qualified Tct.Trs.Data.Trs            as Trs
 
 
--- FIXME:
--- MS Compound Symbols should have identifier component
--- it is necessary to compute a fresh symbol for pretty printing only
 
 data DPKind = WDP | WIDP | DT
   deriving (Eq, Enum, Bounded, Typeable)
@@ -128,15 +123,14 @@ instance T.Processor DependencyPairs where
 
       (stricts, weaks) = flip evalState 0 $ do
         let
-          defineds = Trs.definedSymbols (Prob.allComponents prob)
+          defineds = Sig.defineds (Prob.signature prob)
           dpsOf    = dependencyPairsOf dpKind defineds
         ss <- dpsOf (Prob.strictTrs prob)
         ws <- dpsOf (Prob.weakTrs prob)
         return (ss,ws)
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks
-      nsig = unite [Prob.signature prob, Trs.signature sDPs, Trs.signature wDPs]
-        where unite = Sig.fromMap . M.unions . map Sig.toMap
+      nsig = foldr1 Sig.union [Prob.signature prob, Trs.signature sDPs, Trs.signature wDPs]
       nprob = Prob.sanitiseDPGraph $ prob
         { Prob.startTerms = Prob.BasicTerms (Prob.markFun `S.map` Prob.defineds starts) (Prob.constructors starts)
         , Prob.signature  = nsig

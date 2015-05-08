@@ -1,93 +1,147 @@
+-- | This module provides term rewriting signatures. This module is intended to be imported qualified.
 module Tct.Trs.Data.Signature
   ( Signature
-  , toMap
-  , fromMap
-  , onSignature
-  , alter
   , Symbols
-  , arity
-  , positions
+  , toMap
+  , mkSignature
+
+  -- * queries
   , symbols
   , elems
+  , arity
+  , positions
+  , constructors
+  , defineds
+
+  -- * updates
+  , setArity
+  , union
+  , map
   , filter
   , partition
   , restrictSignature
   ) where
 
 
+import qualified Data.Map.Strict        as M
+import           Data.Maybe             (fromMaybe)
+import qualified Data.Set               as S
+import           Prelude                hiding (filter, map)
+import qualified Prelude                as P (map)
+
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml    as Xml
 
 
-import qualified Data.Map.Strict        as M
-import           Data.Maybe             (fromMaybe)
-import qualified Data.Set               as S
-import           Prelude                hiding (filter)
-
-
--- TODO: MS:
--- functionsymbol should have arity, otherwise ambigious
--- maybe a set for constructor and defined symbols?
-
-newtype Signature f = Signature (M.Map f Int)
-  deriving (Eq, Ord, Show)
-
--- | Returns a signature from a map.
-toMap :: Signature f -> M.Map f Int
-toMap (Signature m) = m
-
--- | Returns a signature from a map.
-fromMap :: M.Map f Int -> Signature f
-fromMap = Signature
-
-onSignature :: (M.Map f Int -> M.Map f2 Int) -> Signature f -> Signature f2
-onSignature f = fromMap . f . toMap
-
-alter :: Ord f => (Maybe Int -> Maybe Int) -> f -> Signature f -> Signature f
-alter f k = onSignature (M.alter f k)
+-- MS: The arity of a function symbol is stored as an attibute in the signature.
+-- This is diffent than distinguishing DP/Compound symbols. Wich are encoded in the symbol itself.
+-- Maybe the arity should also be encoded; in Combination with a class HasArity?
 
 type Symbols f = S.Set f
 
--- | Returns the arity of a symbol.
-arity :: Ord f => Signature f ->  f -> Int
-arity sig f = err `fromMaybe` M.lookup f (toMap sig)
-  where err = error "Signature: symbol not found "
+-- MS: extensions and modifications should check that following property holds.
 
--- | Returns the positions of a symbol. By convention [1..arity f].
-positions :: Ord f => Signature f ->  f -> [Int]
-positions sig f = err `fromMaybe` (M.lookup f (toMap sig) >>= \ar -> return [1..ar])
-  where err = error "Signature: symbol not found"
+-- | The signature type. Assumes an ordering on the symbols @f@; viz. the informations necessary to distinguish
+-- function symbols (eg. dependencyPair) are encoded in @f@.
+-- Following properties hold for all build and update functions.
+--
+-- prop> symbols sig == defineds_ sig `S.union` constructors_ sig
+-- prop> defineds_ sig `S.intersection` constructors_ sig == S.empty
+data Signature f = Signature
+  { signature_    :: M.Map f Int
+  , defineds_     :: Symbols f
+  , constructors_ :: Symbols f }
+  deriving (Eq, Ord, Show)
 
--- | Returns a set of symbols.
+-- | Returns a map associating function symbols to its arity.
+toMap :: Signature f -> M.Map f Int
+toMap = signature_
+
+-- | Returns a Signature given a pair of (defined symbols, constructor symbols).
+-- Returns an error if the symbol sets are not distinct.
+mkSignature :: Ord f => (M.Map f Int, M.Map f Int) -> Signature f
+mkSignature (ds,cs) = Signature
+  { signature_    = M.unionWith err ds cs
+  , defineds_     = M.keysSet ds
+  , constructors_ = M.keysSet cs }
+  where err _ _ = error "Symbol already defined."
+
+
+--- * queries --------------------------------------------------------------------------------------------------------
+
+-- | Returns the set of symbols.
 symbols :: Signature f -> Symbols f
-symbols = M.keysSet . toMap
+symbols = M.keysSet . signature_
+
+-- | Returns the constructor symbols.
+constructors :: Signature f -> Symbols f
+constructors = constructors_
+
+-- | Returns the defined symbols
+defineds :: Signature f -> Symbols f
+defineds = defineds_
 
 -- | Returns function symbols together with their arity.
 elems :: Signature f -> [(f, Int)]
 elems = M.assocs . toMap
 
+-- | Returns the arity of a symbol.
+arity :: Ord f => Signature f ->  f -> Int
+arity sig f = err `fromMaybe` M.lookup f (signature_ sig)
+  where err = error "Signature: symbol not found "
+
+-- | Returns the positions of a symbol. By convention we start with index @1@.
+-- 
+-- positions sig f = [1..arity sig f].
+positions :: Ord f => Signature f ->  f -> [Int]
+positions sig f = err `fromMaybe` (M.lookup f (signature_ sig) >>= \ar -> return [1..ar])
+  where err = error "Signature: symbol not found"
+
+
+--- * update ---------------------------------------------------------------------------------------------------------
+
+-- | Modifies the arity of a Symbol.
+setArity :: Ord f => Int -> f -> Signature f -> Signature f
+setArity i f sig = sig { signature_ = M.alter (const $ Just i) f (signature_ sig) }
+
+-- | Maps over the symbols.
+--
+-- prop> f `S.elems` (defineds sig) <=> (k f) `S.elems` (defineds $ map k sig)
+map :: Ord f2 => (f1 -> f2) -> Signature f1 -> Signature f2
+map f sig = Signature
+  { signature_    = M.mapKeys f (signature_ sig)
+  , defineds_     = S.map f (defineds_ sig)
+  , constructors_ = S.map f (constructors_ sig) }
+
+-- | Computes the union of two singatures. Throws an error if @f1 == f2@ and @arity f1 /= arity f2@, for any @f1@ in
+-- the first signature and @f2@ in the second signature.
+union :: Ord f => Signature f -> Signature f -> Signature f
+union sig1 sig2 = Signature
+  { signature_    = M.unionWith err1 (signature_ sig1) (signature_ sig2)
+  , defineds_     = defineds_ sig1 `S.union` defineds_ sig2
+  , constructors_ = constructors_ sig1 `S.union` constructors_ sig2 }
+  where err1 ar1 ar2 = if ar1 == ar2 then ar1 else error "Tct.Trs.Data.Signature.union: same symbol with different arities"
+
 -- | Filter function symbols.
 filter :: (f -> Bool) -> Signature f -> Signature f
-filter g = onSignature (M.filterWithKey k)
-  where k f _ = g f
+filter g sig = Signature
+  { signature_    = M.filterWithKey (\f _ -> g f) (signature_ sig)
+  , defineds_     = S.filter g (defineds_ sig)
+  , constructors_ = S.filter g (constructors_ sig) }
 
 -- | Partition function symbols.
 partition :: (f -> Bool) -> Signature f -> (Signature f, Signature f)
-partition g = both fromMap . M.partitionWithKey k . toMap
-  where 
-    k f _        = g f
-    both f (a,b) = (f a, f b)
+partition g sig = (filter g sig, filter (not . g) sig)
 
 -- | Restrict the signature wrt. to a set of symbols.
 restrictSignature :: Ord f => Signature f -> Symbols f -> Signature f
-restrictSignature sig fs = onSignature (M.filterWithKey k) sig
-  where k f _ = f `S.member` fs
+restrictSignature sig fs = filter (`S.member` fs) sig
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty f => PP.Pretty (Signature f) where
-  pretty = PP.set . map k . elems
+  pretty = PP.set . P.map k . elems
     where k (f,i) = PP.tupled [PP.pretty f, PP.int i]
 
 instance Xml.Xml f => Xml.Xml (Signature f) where

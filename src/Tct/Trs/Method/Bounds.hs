@@ -162,7 +162,7 @@ computeAutomaton sig st strict weak enrich initial = toGautomaton $ compatibleAu
     strict' = Trs.map rcano strict
     weak'   = Trs.map rcano weak
     st'     = Prob.mapStartTerms fcano st
-    sig'    = Sig.fromMap . M.mapKeys fcano $ Sig.toMap sig
+    sig'    = Sig.map fcano sig
 
 
 --- * instances ------------------------------------------------------------------------------------------------------

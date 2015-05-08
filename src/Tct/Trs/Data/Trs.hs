@@ -19,9 +19,10 @@ module Tct.Trs.Data.Trs
   , toList, toAscList, fromList
   , funs
 
+  -- , definedSymbols
+  -- , constructorSymbols
+  , symbols
   , signature
-  , definedSymbols
-  , constructorSymbols
 
   , member
   , isSubset
@@ -37,8 +38,8 @@ module Tct.Trs.Data.Trs
 
 
 import qualified Data.Foldable          as F
-import qualified Data.Map.Strict        as M
 import qualified Data.Set               as S
+import qualified Data.Map               as M
 import           Data.Typeable
 import           Prelude                hiding (concat, filter, map, null)
 
@@ -69,17 +70,18 @@ data SelectorExpression f v
   deriving (Show, Typeable)
 
 
-funs :: (Ord f, Ord v) => Trs f v -> Sig.Symbols f
+funs :: Ord f => Trs f v -> S.Set f
 funs (TrsT rs) = S.foldl k S.empty rs
   where k acc = S.union acc . S.fromList . R.funs
 
 -- FIXME:
 -- does not check if symbols occur with different arrities ie f/2, f/1
-signature :: Ord f => Trs f v -> Sig.Signature f
-signature rules = Sig.fromMap $ foldl k M.empty (toList rules)
-  where
-    k m (R.Rule l r) = M.unions [m, fa l, fa r]
-    fa t = M.fromList (T.funs $ T.withArity t)
+-- signature :: Ord f => Trs f v -> Sig.Signature f
+-- signature rules = Sig.fromMap $ foldl k M.empty (toList rules)
+--   where
+--     k m (R.Rule l r) = M.unions [m, fa l, fa r]
+--     fa t = M.fromList (T.funs $ T.withArity t)
+
 
 map :: (Ord f2, Ord v2) => (Rule f1 v1 -> Rule f2 v2) -> Trs f1 v1 -> Trs f2 v2
 map k = fromList . fmap k . toList
@@ -93,15 +95,28 @@ toAscList (TrsT rs) = S.toAscList rs
 fromList :: (Ord f, Ord v) => [Rule f v] -> Trs f v
 fromList = TrsT . S.fromList
 
-definedSymbols :: (Ord f, Ord v) => Trs f v -> Sig.Symbols f
+definedSymbols :: Ord f => Trs f v -> S.Set f
 definedSymbols (TrsT rs) = S.foldr ofRule S.empty rs
   where
     ofRule (R.Rule l _) = ofTerm l
     ofTerm (T.Fun f _)  = (f `S.insert`)
     ofTerm _            = id
 
-constructorSymbols :: Ord f => Sig.Signature f -> Sig.Symbols f -> Sig.Symbols f
-constructorSymbols sig defineds = Sig.symbols sig `S.difference` defineds
+-- constructorSymbols :: Ord f => Trs f v -> S.Set f 
+-- constructorSymbols trs = funs trs `S.difference` definedSymbols trs
+
+symbols :: (Ord f, Ord v) => Trs f v -> (M.Map f Int, M.Map f Int)
+symbols trs = (toMap ds, toMap $ funs trs' `S.difference` ds)
+  where 
+    trs' = map (\(R.Rule l r) -> R.Rule (T.withArity l) (T.withArity r)) trs
+    ds           = definedSymbols trs'
+
+    toMap        = foldr insert M.empty . S.toAscList
+    insert (k,a) = M.insertWith err k a
+    err          = error "Tct.Trs.Data.Trs: Symbol already defined with different arity."
+
+signature :: (Ord f, Ord v) => Trs f v -> Sig.Signature f
+signature = Sig.mkSignature . symbols
 
 
 lift1 :: (RuleSet f v -> a) -> Trs f v -> a

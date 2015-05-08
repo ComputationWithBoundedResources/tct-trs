@@ -7,7 +7,6 @@ module Tct.Trs.Data.Mode
 
 
 import           Control.Applicative
-import qualified Data.Set                   as S
 
 import           Tct.Core.Common.Error      (TctError (..))
 import qualified Tct.Core.Common.Pretty     as PP
@@ -20,10 +19,6 @@ import qualified Data.Rewriting.Problem     as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Data.ProblemKind
-import           Tct.Trs.Data.Signature     (Signature)
-import           Tct.Trs.Data.Trs           (Trs)
-import qualified Tct.Trs.Data.Trs           as Trs
 import           Tct.Trs.Processor          (defaultDeclarations)
 
 
@@ -68,8 +63,7 @@ options = TrsOptions
 
 -- | Sets complexity problem.
 modifyer :: TrsOptions -> TrsProblem -> TrsProblem
-modifyer (TrsOptions cc _) p = p { startTerms = ts, strategy = st }
-  where (ts,st) = ccProperties cc (allComponents p) (signature p)
+modifyer (TrsOptions cc _) = updateCC cc
 
 -- | CeTA (partial proof output)
 answering :: TrsOptions -> T.Return (ProofTree TrsProblem) -> IO ()
@@ -109,14 +103,10 @@ readCP cp
   | cp == show PartialProof = return PartialProof
   | otherwise               = fail $ "Tct.Trs.Data.Mode:" ++ cp
 
-ccProperties :: CC -> Trs F V -> Signature F -> (StartTerms F, Strategy)
-ccProperties cc trs sig = case cc of
-  DC  -> (AllTerms fs,          Full)
-  DCI -> (AllTerms fs,          Innermost)
-  RC  -> (BasicTerms defs cons, Full)
-  RCI -> (BasicTerms defs cons, Innermost)
-  where
-    fs   = defs `S.union` cons
-    defs = Trs.definedSymbols trs
-    cons = Trs.constructorSymbols sig defs
+updateCC :: CC -> TrsProblem -> TrsProblem
+updateCC cc = case cc of
+  DC  -> toDC . toFull
+  DCI -> toDC . toInnermost
+  RC  -> toRC . toFull
+  RCI -> toRC . toInnermost
 
