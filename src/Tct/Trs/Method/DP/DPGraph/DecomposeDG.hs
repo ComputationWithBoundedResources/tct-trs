@@ -122,11 +122,11 @@ instance T.Processor DecomposeDG where
             sepRule (R.Rule l r) = [ R.Rule l r ]
 
           -- TODO: proper dp graph update
-          upperProb = Prob.sanitise $ prob
+          upperProb = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = unselectedStrictDPs
             , Prob.weakDPs   = unselectedWeakDPs }
 
-          lowerProb = Prob.sanitise $ prob
+          lowerProb = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = selectedStrictDPs
             , Prob.weakDPs   = extension `Trs.union` selectedWeakDPs }
 

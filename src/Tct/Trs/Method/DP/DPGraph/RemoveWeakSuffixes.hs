@@ -77,7 +77,7 @@ instance T.Processor RemoveWeakSuffixes where
           wdgLabTail = fmap theRule `fmap` concatMap (theSCC . lookupNodeLabel' cdg) cdgTail
 
           (wdgTail, rs) = unzip wdgLabTail
-          nprob = Prob.sanitiseSignature $ prob
+          nprob = prob
             { Prob.weakDPs   = Prob.weakDPs prob `Trs.difference` Trs.fromList rs
             , Prob.dpGraph   = DependencyGraph
               { dependencyGraph = wdg `removeNodes` wdgTail

@@ -79,7 +79,7 @@ instance T.Processor SimplifyRHS where
           (stricts,weaks) = L.partition fst elims
           toTrs rs        = Trs.fromList [ r | (_,(r1, mr2)) <- rs, let r = r1 `fromMaybe` mr2]
           simplified      = [ r | (_,(_, Just r)) <- elims ]
-          nprob = Prob.sanitiseSignature $ prob
+          nprob = prob
             { Prob.strictDPs = toTrs stricts
             , Prob.weakDPs   = toTrs weaks
             , Prob.signature = foldr updateCompound (Prob.signature prob) simplified }

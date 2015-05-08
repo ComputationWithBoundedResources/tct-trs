@@ -66,7 +66,7 @@ instance T.Processor RemoveInapplicable where
           lunreachable = withNodeLabels' wdg unreachable
 
           rs = snd $ unzip lreachable
-          nprob = Prob.sanitise $ prob
+          nprob = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = Trs.fromList [ theRule r| r <- rs, isStrict r ]
             , Prob.weakTrs   = Trs.fromList [ theRule r| r <- rs, not (isStrict r) ]}
 

@@ -46,7 +46,7 @@ instance T.Processor Trivial where
         where
           cdg = Prob.congruenceGraph prob
 
-          nprob = Prob.sanitiseSignature $ prob
+          nprob = prob
             { Prob.strictDPs = Trs.empty
             , Prob.weakDPs   = Trs.empty
             , Prob.dpGraph   = DG.empty }

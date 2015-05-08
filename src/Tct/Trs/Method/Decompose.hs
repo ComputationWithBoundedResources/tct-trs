@@ -88,13 +88,13 @@ mkProbs prob compfn dps trs = (rProb, sProb)
     sDps = Prob.strictDPs prob `Trs.difference` rDps
     sTrs = Prob.strictTrs prob `Trs.difference` rTrs
 
-    rProb = Prob.sanitise $ prob
+    rProb = Prob.sanitiseDPGraph $ prob
       { Prob.strictDPs = rDps
       , Prob.strictTrs = rTrs
       , Prob.weakTrs   = sTrs `Trs.union` Prob.weakTrs prob
       , Prob.weakDPs   = sDps `Trs.union` Prob.weakDPs prob }
 
-    sProb = Prob.sanitise $ 
+    sProb = Prob.sanitiseDPGraph $ 
       if isAdditive compfn 
         then prob
           { Prob.strictTrs  = sTrs

@@ -61,7 +61,7 @@ instance T.Processor RemoveHeads where
             | otherwise          = error "Tct.Trs.Method.DP.DPGraph.RemoveHeads: not a compound symbol."
 
           (ns,rs) = Trs.fromList `fmap` unzip heads
-          nprob = Prob.sanitiseSignature $ prob
+          nprob = prob
             { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` rs
             , Prob.weakDPs   = Prob.weakDPs prob `Trs.difference` rs
             , Prob.dpGraph   = let ndgraph = wdg `removeNodes` ns in DependencyGraph

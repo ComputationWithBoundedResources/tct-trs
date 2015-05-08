@@ -89,7 +89,7 @@ instance T.Processor UsableRules where
         { usable_    = usable
         , notUsable_ = Prob.allComponents prob `Trs.difference` usable }
 
-      nprob = Prob.sanitise $ prob
+      nprob = Prob.sanitiseDPGraph $ prob
         { Prob.strictDPs = Prob.strictDPs prob `Trs.intersect` usable
         , Prob.weakDPs   = Prob.weakDPs   prob `Trs.intersect` usable
         , Prob.strictTrs = Prob.strictTrs prob `Trs.intersect` usable
