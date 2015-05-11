@@ -58,12 +58,6 @@ instance T.Processor WithCertification where
 withCertificationStrategy :: TotalProof -> ClosedProof -> TrsStrategy -> TrsStrategy
 withCertificationStrategy t c st = T.Proc $ WithCertification { total_ = t, closed_ = c, onStrategy_ = st }
 
-withCertification :: TotalProof -> ClosedProof -> TrsStrategy -> TrsStrategy
-withCertification = T.declFun withCertificationDeclaration
-
-withCertification' :: TrsStrategy -> TrsStrategy
-withCertification' = T.deflFun withCertificationDeclaration
-
 withCertificationDeclaration :: T.Declaration(
   '[ T.Argument 'T.Optional TotalProof
    , T.Argument 'T.Optional ClosedProof
@@ -82,4 +76,11 @@ withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, c
       `T.withHelp` ["This argument specifies wether certficiation should only be invoked on closed proof trees."]
       `T.optional` OpenProof
       `T.withDomain` fmap show [(minBound :: ClosedProof)..]
+
+withCertification :: TrsStrategy -> TrsStrategy
+withCertification = T.deflFun withCertificationDeclaration
+
+withCertification' :: TotalProof -> ClosedProof -> TrsStrategy -> TrsStrategy
+withCertification' = T.declFun withCertificationDeclaration
+
 

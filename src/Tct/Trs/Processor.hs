@@ -140,7 +140,7 @@ toDP =
       | Prob.isInnermostProblem prob = decomposeIndependentSG
       | otherwise                    = linearPathAnalysis
 
-    wgOnUsable = failing -- weightgap `wgOn` Weightgap.WgOnTrs
+    wgOnUsable = failing -- TODO: weightgap `wgOn` Weightgap.WgOnTrs
 
 -- | Tries to remove leafs in the congruence graph,
 -- by (i) orienting using predecessor extimation and the given processor,

@@ -1,28 +1,32 @@
-module Tct.Trs.Method.ComplexityPair where
+-- | This module collects declarations for /Complexity Pairs/.
+module Tct.Trs.Method.ComplexityPair
+  ( complexityPairDeclarations
+  , complexityPairArg
+  ) where
 
-import qualified Tct.Core.Data as T
-import qualified Tct.Core.Data as P (SParser, SParsable(..))
-import qualified Tct.Core.Common.Parser as P
-import qualified Tct.Core.Parse as P
 
-import Tct.Trs.Data (TrsProblem)
-import Tct.Trs.Data.ComplexityPair
--- import Tct.Trs.Method.Poly.NaturalPI (polyDeclarationCP)
+import qualified Tct.Core.Common.Parser        as P
+import qualified Tct.Core.Data                 as T
+import qualified Tct.Core.Data                 as P (SParsable (..), SParser)
+import qualified Tct.Core.Parse                as P
 
---- * Complexity Pair Instances --------------------------------------------------------------------------------------
+import           Tct.Trs.Data                  (TrsProblem)
+import           Tct.Trs.Data.ComplexityPair
+import           Tct.Trs.Method.Poly.NaturalPI (polyCPDeclaration)
 
-cps :: [ComplexityPairDeclaration]
-cps = []--[ CD $ polyDeclarationCP ]
+
+complexityPairDeclarations :: [ComplexityPairDeclaration]
+complexityPairDeclarations = [ someComplexityPair polyCPDeclaration ]
 
 cpsParser :: P.SParser TrsProblem TrsProblem ComplexityPair
-cpsParser = P.choice ((\(CD d) -> P.declaration d) `fmap` cps)
+cpsParser = P.choice ((\(CD d) -> P.declaration d) `fmap` complexityPairDeclarations)
 
-cpArg :: T.Argument 'T.Required ComplexityPair
-cpArg = T.arg
+complexityPairArg :: T.Argument 'T.Required ComplexityPair
+complexityPairArg = T.arg
   `T.withName` "complexityPair"
   `T.withHelp`
     [ "This argument the complexity pair to apply." ]
 
-instance P.SParsable TrsProblem TrsProblem ComplexityPair where 
+instance P.SParsable TrsProblem TrsProblem ComplexityPair where
   parseS = cpsParser
 

@@ -10,12 +10,11 @@ module Tct.Trs.Method.Poly.NaturalPI
   , UsableRules (..)
   , Greedy (..)
 
-  -- * Processor Interface
-  , polyProcDeclaration
-  , polyProc
-
   -- * Complexity Pair
-  -- , polyCPDeclaration
+  , polyCPDeclaration
+  , polyCP
+  , polyCP'
+
   ) where
 
 
@@ -45,9 +44,8 @@ import qualified Tct.Common.SMT                      as SMT
 import           Tct.Trs.Data
 import           Tct.Trs.Data.Arguments              (Greedy (..), UsableArgs (..), UsableRules (..))
 import qualified Tct.Trs.Data.Arguments              as Arg
--- import qualified Tct.Trs.Data.ComplexityPair         as CP
+import qualified Tct.Trs.Data.ComplexityPair         as CP
 import qualified Tct.Trs.Data.Problem                as Prob
-import qualified Tct.Trs.Data.ProblemKind            as Prob
 import qualified Tct.Trs.Data.RuleSelector           as RS
 import qualified Tct.Trs.Data.Signature              as Sig
 import qualified Tct.Trs.Data.Trs                    as Trs
@@ -91,7 +89,7 @@ certification order cert = case cert of
 instance I.AbstractInterpretation NaturalPI where
   type (A NaturalPI) = P.PView (PI.CoefficientVar F) PI.SomeIndeterminate
   type (B NaturalPI) = P.Polynomial SMT.IExpr PI.SomeIndeterminate
-  type (C NaturalPI) = P.Polynomial SMT.IExpr V 
+  type (C NaturalPI) = P.Polynomial SMT.IExpr V
 
   encode _ = P.fromViewWithM enc where
     enc c
@@ -127,25 +125,25 @@ entscheide p prob = do
       { kind_ = kind
       , pint_ = apint }
 
-  toResult `fmap` entscheide1 p aorder encoding decoding forceAny prob 
+  toResult `fmap` entscheide1 p aorder encoding decoding forceAny prob
   where
     toResult pt = if T.progress pt then T.Continue pt else T.Abort pt
 
     sig   = Prob.signature prob
     kind  =
       if Prob.isRCProblem prob
-        then PI.ConstructorBased (shape p) (Prob.constructors (Prob.startTerms prob) `S.union` Sig.symbols (Sig.filter Prob.isCompoundf sig))
+        then PI.ConstructorBased (shape p) (Sig.constructors sig)
         else PI.Unrestricted (shape p)
     absi  = I.Interpretation $ M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
     shift = maybe I.All I.Shift (selector p)
 
-entscheide1 :: 
-  NaturalPI 
-  -> PolyOrder c 
+entscheide1 ::
+  NaturalPI
+  -> PolyOrder c
   -> SMT.SolverState SMT.Expr
   -> (I.Interpretation F (PI.SomePolynomial SMT.IExpr), Maybe (UREnc.UsableEncoder F))
   -> I.ForceAny
-  -> Problem F V 
+  -> Problem F V
   -> T.TctM (T.ProofTree (Problem F V))
 entscheide1 p aorder encoding decoding forceAny prob
   | Prob.isTrivial prob = return . I.toTree p prob $ T.Fail (Applicable Incompatible)
@@ -158,16 +156,16 @@ entscheide1 p aorder encoding decoding forceAny prob
         | Arg.useGreedy (greedy p) -> fmap T.flatten $ again `F.mapM` pt
         | otherwise                -> return pt
 
-        where 
+        where
           pt    = I.toTree p prob $ T.Success (I.newProblem prob (pint_ order)) (Applicable $ Order order) (certification order)
           order = mkOrder a
 
       _ -> return $ I.toTree p prob $ T.Fail (Applicable Incompatible)
       where
         again = entscheide1 p aorder encoding decoding forceAny
-        
+
         assertx st e = st {SMT.asserts = e: SMT.asserts st}
-        srules = Trs.toList $ Prob.strictComponents prob 
+        srules = Trs.toList $ Prob.strictComponents prob
 
         mkOrder (inter, ufuns) = aorder { pint_ = mkInter (pint_ aorder) inter ufuns }
         mkInter aproof inter ufuns = aproof
@@ -189,90 +187,43 @@ entscheide1 p aorder encoding decoding forceAny prob
 
           isUsable Nothing _                = True
           isUsable (Just fs) (R.Rule lhs _) = either (const False) (`S.member` UREnc.runUsableSymbols fs) (R.root lhs)
-    
+
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
 description :: [String]
 description =  [ "This processor tries to find a polynomial interpretation and shifts strict oriented rules to the weak components." ]
 
-selectorArg :: T.Argument 'T.Required (Maybe (ExpressionSelector f v))
-selectorArg = T.some RS.selectorArg 
+selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
+selectorArg = RS.selectorArg
   `T.withName` "shift"
-  `T.withHelp`
-    [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
-
-comp5 :: (s -> t) -> (t1 -> t2 -> t3 -> t4 -> t5 -> s) -> t1 -> t2 -> t3 -> t4 -> t5 -> t
-comp5 f g a b c d e = f $ g a b c d e
-
-
-
-
-polyProcessor :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> NaturalPI
-polyProcessor sh ua ur sl gr = NaturalPI
-  { shape    = sh
-  , uargs    = ua
-  , urules   = ur
-  , selector = sl 
-  , greedy   = gr }
-
-instance Arg.HasKind NaturalPI where
-  type (Kind NaturalPI) = PI.Shape
-  withKind p a = p { shape = a }  
-
-instance Arg.HasUsableArgs NaturalPI where
-  withUsableArgs p a = p { uargs = a }  
-
-instance Arg.HasUsableRules NaturalPI where
-  withUsableRules p a = p { urules = a }  
-
-instance Arg.HasSelection NaturalPI where
-  withSelection p a = p { selector = Just a }  
-
-instance Arg.HasGreedy NaturalPI where
-  withGreedy p a = p { greedy = a }  
-
-
-args ::
-  ( T.Argument 'T.Optional PI.Shape
-  , T.Argument 'T.Optional Arg.UsableArgs
-  , T.Argument 'T.Optional Arg.UsableRules
-  , T.Argument 'T.Optional (Maybe (ExpressionSelector F V))
-  , T.Argument 'T.Optional Arg.Greedy)
-args = 
-  ( PI.shapeArg `T.optional` PI.Linear 
-  , Arg.usableArgs `T.optional` Arg.UArgs
-  , Arg.usableRules `T.optional` Arg.URules
-  , selectorArg `T.optional` Just (RS.selAnyOf RS.selStricts)
-  , Arg.greedy `T.optional` Arg.Greedy )
-
---- ** processor -----------------------------------------------------------------------------------------------------
-
-polyProcDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional PI.Shape 
-   , T.Argument 'T.Optional Arg.UsableArgs
-   , T.Argument 'T.Optional Arg.UsableRules 
-   , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) 
-   , T.Argument 'T.Optional Arg.Greedy ]
-   T.:-> NaturalPI)
-polyProcDeclaration = T.declare "poly" description args polyProcessor
-
-polyProc :: NaturalPI
-polyProc = T.deflFun polyProcDeclaration
+  `T.withHelp` [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
 
 
 --- ** strategy ------------------------------------------------------------------------------------------------------
 
+polyStrategy :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
+polyStrategy sh ua ur sl gr = T.Proc $ NaturalPI
+  { shape    = sh
+  , uargs    = ua
+  , urules   = ur
+  , selector = sl
+  , greedy   = gr }
 
 polyDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional PI.Shape 
+  '[ T.Argument 'T.Optional PI.Shape
    , T.Argument 'T.Optional Arg.UsableArgs
-   , T.Argument 'T.Optional Arg.UsableRules 
-   , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) 
+   , T.Argument 'T.Optional Arg.UsableRules
+   , T.Argument 'T.Optional (Maybe (ExpressionSelector F V))
    , T.Argument 'T.Optional Arg.Greedy ]
    T.:-> TrsStrategy )
-polyDeclaration = T.declare "poly" description args (T.Proc `comp5` polyProcessor)
-
+polyDeclaration = T.declare "poly" description args polyStrategy where
+  args =
+    ( PI.shapeArg `T.optional` PI.Linear
+    , Arg.usableArgs `T.optional` Arg.UArgs
+    , Arg.usableRules `T.optional` Arg.URules
+    , T.some selectorArg `T.optional` Just (RS.selAnyOf RS.selStricts)
+    , Arg.greedy `T.optional` Arg.Greedy )
 
 poly :: TrsStrategy
 poly = T.deflFun polyDeclaration
@@ -283,20 +234,43 @@ poly' = T.declFun polyDeclaration
 
 --- ** complexity pair -----------------------------------------------------------------------------------------------
 
--- instance IsComplexityPair NaturalPI where
---   solveComplexityPair p sel prob = do
---     -- MS: TODO: generalise solve function returning prooftree+compleixtypairProof
---     ret <- T.evaluate (T.Proc p{selector=Just sel}) prob
---     return $ error "not yet implemented"
---
--- polyCPDeclaration :: T.Declaration (
---   '[ T.Argument 'T.Optional PI.Shape 
---    , T.Argument 'T.Optional Arg.UsableArgs
---    , T.Argument 'T.Optional Arg.UsableRules 
---    , T.Argument 'T.Optional (Maybe (ExpressionSelector F V)) 
---    , T.Argument 'T.Optional Arg.Greedy ]
---    T.:-> ComplexityPair )
--- polyCPDeclaration = T.declare "poly" description args (CP.toComplexityPair `comp5` polyProcessor)
+instance IsComplexityPair NaturalPI where
+  solveComplexityPair p sel prob = fmap toResult `fmap` T.evaluate (T.Proc p{selector=Just sel, greedy=NoGreedy}) prob
+    where
+      toResult pt = case T.open pt of
+        [nprob] -> CP.ComplexityPairProof
+          { CP.result = pt
+          , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
+          , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
+        _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
+
+polyProcessorCP :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ExpressionSelector F V -> ComplexityPair
+polyProcessorCP sh ua ur sl = CP.toComplexityPair $ NaturalPI
+  { shape    = sh
+  , uargs    = ua
+  , urules   = ur
+  , selector = Just sl
+  , greedy   = NoGreedy }
+
+polyCPDeclaration :: T.Declaration (
+  '[ T.Argument 'T.Optional PI.Shape
+   , T.Argument 'T.Optional Arg.UsableArgs
+   , T.Argument 'T.Optional Arg.UsableRules
+   , T.Argument 'T.Required (ExpressionSelector F V) ]
+   T.:-> ComplexityPair )
+polyCPDeclaration = T.declare "poly" description argsCP polyProcessorCP
+  where
+    argsCP =
+      ( PI.shapeArg `T.optional` PI.Linear
+      , Arg.usableArgs `T.optional` Arg.UArgs
+      , Arg.usableRules `T.optional` Arg.URules
+      , selectorArg )
+
+polyCP :: ExpressionSelector F V -> ComplexityPair
+polyCP = T.deflFun polyCPDeclaration
+
+polyCP' :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ExpressionSelector F V -> ComplexityPair
+polyCP' = T.declFun polyCPDeclaration
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

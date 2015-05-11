@@ -291,16 +291,19 @@ entscheide p prob = do
     toKind Unrestricted = MI.UnrestrictedMatrix
     toKind Algebraic =
       if Prob.isRCProblem prob
-      then MI.ConstructorBased (ProbK.constructors (Prob.startTerms prob) `Set.union` Sig.symbols (Sig.filter Prob.isCompoundf sig)) (Just $ miDegree p)
-      else MI.TriangularMatrix (Just $ miDegree p)
+      then MI.ConstructorBased cs md
+      else MI.TriangularMatrix Nothing
     toKind Triangular =
       if Prob.isRCProblem prob
-      then MI.ConstructorBased (ProbK.constructors (Prob.startTerms prob) `Set.union` Sig.symbols (Sig.filter Prob.isCompoundf sig)) Nothing
-      else MI.TriangularMatrix (Just $ miDegree p)
+      then MI.ConstructorBased cs Nothing
+      else MI.TriangularMatrix Nothing
     toKind Automaton =
       if Prob.isRCProblem prob
-      then MI.ConstructorEda (ProbK.constructors (Prob.startTerms prob) `Set.union` Sig.symbols (Sig.filter Prob.isCompoundf sig)) (Just $ max 1 (miDegree p))
-      else MI.EdaMatrix (Just $ max 1 (miDegree p))
+      then MI.ConstructorEda cs md
+      else MI.EdaMatrix md
+
+    cs = Sig.constructors sig
+    md = Just $ max 1 (miDegree p)
 
     shift = maybe I.All I.Shift (selector p)
 

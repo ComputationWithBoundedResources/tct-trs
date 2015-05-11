@@ -12,7 +12,7 @@ Here @pre(R#)@, is defined as the union of all direct predecessors of all rules 
 We compute @S1#@ from a 'ExpressionSelector' sucht that @pre(S1#)@ is a subset of @S2#@, ie., all predeccessors occur
 in the strict components.
 -}
--- MS: TODO:
+-- MS:
 -- the subproof for predecessor estimation cp is currently stored as closed left branch (using assumption)
 -- good: normally printed; (partially) certificable
 -- bad: the (generic) proof output is a bit awkward
@@ -52,7 +52,6 @@ import qualified Tct.Trs.Data.RuleSelector     as RS
 import qualified Tct.Trs.Data.Trs              as Trs
 
 import qualified Tct.Trs.Method.ComplexityPair as CP
-
 
 
 data Selected = Selected
@@ -255,7 +254,7 @@ predecessorEstimationCPDeclaration :: T.Declaration (
    , T.Argument 'T.Required ComplexityPair ]
    T.:-> TrsStrategy )
 predecessorEstimationCPDeclaration =
-  T.declare "predecessorEstimationCP" description (selArg, CP.cpArg) predecessorEstimationCPStrategy
+  T.declare "predecessorEstimationCP" description (selArg, CP.complexityPairArg) predecessorEstimationCPStrategy
 
 predecessorEstimationCP :: ExpressionSelector F V -> ComplexityPair -> TrsStrategy
 predecessorEstimationCP = T.declFun predecessorEstimationCPDeclaration
