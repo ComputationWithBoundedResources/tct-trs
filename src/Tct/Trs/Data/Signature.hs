@@ -39,8 +39,6 @@ import qualified Tct.Core.Common.Xml    as Xml
 
 type Symbols f = S.Set f
 
--- MS: extensions and modifications should check that following property holds.
-
 -- | The signature type. Assumes an ordering on the symbols @f@; viz. the informations necessary to distinguish
 -- function symbols (eg. dependencyPair) are encoded in @f@.
 -- Following properties hold for all build and update functions.
@@ -64,7 +62,7 @@ mkSignature (ds,cs) = Signature
   { signature_    = M.unionWith err ds cs
   , defineds_     = M.keysSet ds
   , constructors_ = M.keysSet cs }
-  where err _ _ = error "Symbol already defined."
+  where err _ _ = error "Tct.Trs.Data.Signature.mkSignature: symbol already defined."
 
 
 --- * queries --------------------------------------------------------------------------------------------------------
@@ -102,8 +100,8 @@ positions sig f = err `fromMaybe` (M.lookup f (signature_ sig) >>= \ar -> return
 
 -- | Modifies the arity of a Symbol.
 setArity :: Ord f => Int -> f -> Signature f -> Signature f
-setArity i f sig = sig { signature_ = M.alter (const $ Just i) f (signature_ sig) }
-
+setArity i f sig = sig { signature_ = M.alter k f (signature_ sig) }
+  where k = maybe (error "Tct.Trs.Data.Signature.setArity: undefined symbol.") (const $ Just i)
 -- | Maps over the symbols.
 --
 -- prop> f `S.elems` (defineds sig) <=> (k f) `S.elems` (defineds $ map k sig)

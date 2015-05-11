@@ -74,15 +74,6 @@ funs :: Ord f => Trs f v -> S.Set f
 funs (TrsT rs) = S.foldl k S.empty rs
   where k acc = S.union acc . S.fromList . R.funs
 
--- FIXME:
--- does not check if symbols occur with different arrities ie f/2, f/1
--- signature :: Ord f => Trs f v -> Sig.Signature f
--- signature rules = Sig.fromMap $ foldl k M.empty (toList rules)
---   where
---     k m (R.Rule l r) = M.unions [m, fa l, fa r]
---     fa t = M.fromList (T.funs $ T.withArity t)
-
-
 map :: (Ord f2, Ord v2) => (Rule f1 v1 -> Rule f2 v2) -> Trs f1 v1 -> Trs f2 v2
 map k = fromList . fmap k . toList
 
@@ -197,10 +188,10 @@ isNonSizeIncreasing' trs = note (not $ isNonSizeIncreasing trs) " some rule is s
 isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is duplicating"
 
 
--- * pretty printing --
+--- * proof data -----------------------------------------------------------------------------------------------------
+
 ppTrs :: (PP.Pretty f, PP.Pretty v) => Trs f v -> PP.Doc
-ppTrs = F.foldl k PP.empty
-  where k doc rs = doc PP.<$$> PP.pretty rs
+ppTrs = PP.vcat . fmap PP.pretty . toList
 
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
   pretty = ppTrs

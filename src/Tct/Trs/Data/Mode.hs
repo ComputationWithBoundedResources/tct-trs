@@ -48,17 +48,17 @@ options = TrsOptions
     `withArgLong` "complexity"
     `withCropped` 'c'
     `withHelpDoc` PP.listing
-      [ (PP.text "dc"  , PP.text "derivational complexity")
-      , (PP.text "dci" , PP.text "derivational complexity innermost")
-      , (PP.text "rc"  , PP.text "runtime complexity")
-      , (PP.text "rci" , PP.text "runtime complexity innermost") ]
+      [ (PP.text (show DC)  , PP.text "derivational complexity")
+      , (PP.text (show DCI) , PP.text "derivational complexity innermost")
+      , (PP.text (show RC)  , PP.text "runtime complexity")
+      , (PP.text (show RCI) , PP.text "runtime complexity innermost") ]
     `withDefault` RCI)
   <*> option' readCP (eopt
       `withArgLong` "proofOutput"
       `withCropped` 'p'
       `withHelpDoc` PP.listing
-        [ (PP.text "totalProof"   , PP.text "outputs the answer and then the CeTA proof")
-        , (PP.text "partialProof" , PP.text "outputs the answer and then the CeTA (partial) proof") ]
+        [ (PP.text (show TotalProof)   , PP.text "outputs the answer and then the CeTA proof")
+        , (PP.text (show PartialProof) , PP.text "outputs the answer and then the CeTA (partial) proof") ]
       `withDefault` TotalProof)
 
 -- | Sets complexity problem.
@@ -88,8 +88,8 @@ readCC :: Monad m => String -> m CC
 readCC cc
   | cc == show DC  = return DC
   | cc == show DCI = return DCI
-  | cc == show DC  = return DC
-  | cc == show DCI = return DCI
+  | cc == show RC  = return RC
+  | cc == show RCI = return RCI
   | otherwise      =  fail $ "Tct.Trs.Data.Mode.readCC: " ++ cc
 
 data CP = TotalProof | PartialProof deriving Eq

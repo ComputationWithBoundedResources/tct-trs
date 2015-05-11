@@ -3,6 +3,7 @@ module Tct.Trs.Method.DP.DPGraph.PathAnalysis
   ( pathAnalysisDeclaration
   , pathAnalysis
   , pathAnalysis'
+  , linearPathAnalysis
   ) where
 
 -- notes:
@@ -151,6 +152,10 @@ pathAnalysis = T.declFun pathAnalysisDeclaration
 
 pathAnalysis' :: TrsStrategy
 pathAnalysis' = T.deflFun pathAnalysisDeclaration
+
+linearPathAnalysis :: TrsStrategy
+linearPathAnalysis = pathAnalysisStrategy True
+
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
