@@ -20,6 +20,7 @@ module Tct.Trs.Data.Signature
   , filter
   , partition
   , restrictSignature
+  , restrictToSignature
   ) where
 
 
@@ -102,6 +103,7 @@ positions sig f = err `fromMaybe` (M.lookup f (signature_ sig) >>= \ar -> return
 setArity :: Ord f => Int -> f -> Signature f -> Signature f
 setArity i f sig = sig { signature_ = M.alter k f (signature_ sig) }
   where k = maybe (error "Tct.Trs.Data.Signature.setArity: undefined symbol.") (const $ Just i)
+
 -- | Maps over the symbols.
 --
 -- prop> f `S.elems` (defineds sig) <=> (k f) `S.elems` (defineds $ map k sig)
@@ -134,6 +136,10 @@ partition g sig = (filter g sig, filter (not . g) sig)
 -- | Restrict the signature wrt. to a set of symbols.
 restrictSignature :: Ord f => Signature f -> Symbols f -> Signature f
 restrictSignature sig fs = filter (`S.member` fs) sig
+
+-- | Restrict a set of symbols to the signature.
+restrictToSignature :: Ord f => Signature f -> Symbols f -> Symbols f
+restrictToSignature sig fs = symbols sig `S.intersection` fs
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

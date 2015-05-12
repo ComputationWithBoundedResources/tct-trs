@@ -13,10 +13,13 @@ import qualified Tct.Core.Parse                as P
 import           Tct.Trs.Data                  (TrsProblem)
 import           Tct.Trs.Data.ComplexityPair
 import           Tct.Trs.Method.Poly.NaturalPI (polyCPDeclaration)
+import           Tct.Trs.Method.Matrix.NaturalMI (matrixCPDeclaration)
 
 
 complexityPairDeclarations :: [ComplexityPairDeclaration]
-complexityPairDeclarations = [ someComplexityPair polyCPDeclaration ]
+complexityPairDeclarations = 
+  [ someComplexityPair polyCPDeclaration
+  , someComplexityPair matrixCPDeclaration ]
 
 cpsParser :: P.SParser TrsProblem TrsProblem ComplexityPair
 cpsParser = P.choice ((\(CD d) -> P.declaration d) `fmap` complexityPairDeclarations)

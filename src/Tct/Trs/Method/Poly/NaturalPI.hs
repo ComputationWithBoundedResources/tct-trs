@@ -18,6 +18,7 @@ module Tct.Trs.Method.Poly.NaturalPI
   ) where
 
 
+import Data.Maybe (fromMaybe)
 import           Control.Monad.Trans                 (liftIO)
 import qualified Data.List                           as L
 import qualified Data.Map.Strict                     as M
@@ -112,7 +113,8 @@ instance I.AbstractInterpretation NaturalPI where
 interpretf :: (Show c, Show fun, SemiRing c, Eq c, Ord fun, Ord var) => I.Interpretation fun (PI.SomePolynomial c) -> R.Term fun var -> P.Polynomial c var
 interpretf ebsi = I.interpretTerm interpretFun interpretVar
   where
-    interpretFun f = P.substituteVariables (I.interpretations ebsi M.! f) . M.fromList . zip PI.indeterminates
+    interpretFun f = P.substituteVariables (I.interpretations ebsi `k` f) . M.fromList . zip PI.indeterminates
+      where k m g = error ("NaturalPI.interpretf: " ++ show g) `fromMaybe` M.lookup g m
     interpretVar v = P.variable v
 
 entscheide :: NaturalPI -> TrsProblem -> T.TctM (T.Return (T.ProofTree TrsProblem))
@@ -244,32 +246,30 @@ instance IsComplexityPair NaturalPI where
           , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
         _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
 
-polyProcessorCP :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ExpressionSelector F V -> ComplexityPair
-polyProcessorCP sh ua ur sl = CP.toComplexityPair $ NaturalPI
+polyProcessorCP :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
+polyProcessorCP sh ua ur = CP.toComplexityPair $ NaturalPI
   { shape    = sh
   , uargs    = ua
   , urules   = ur
-  , selector = Just sl
+  , selector = Nothing
   , greedy   = NoGreedy }
 
 polyCPDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional PI.Shape
    , T.Argument 'T.Optional Arg.UsableArgs
-   , T.Argument 'T.Optional Arg.UsableRules
-   , T.Argument 'T.Required (ExpressionSelector F V) ]
+   , T.Argument 'T.Optional Arg.UsableRules ]
    T.:-> ComplexityPair )
-polyCPDeclaration = T.declare "poly" description argsCP polyProcessorCP
+polyCPDeclaration = T.declare "polyCP" description argsCP polyProcessorCP
   where
     argsCP =
       ( PI.shapeArg `T.optional` PI.Linear
       , Arg.usableArgs `T.optional` Arg.UArgs
-      , Arg.usableRules `T.optional` Arg.URules
-      , selectorArg )
+      , Arg.usableRules `T.optional` Arg.URules )
 
-polyCP :: ExpressionSelector F V -> ComplexityPair
+polyCP :: ComplexityPair
 polyCP = T.deflFun polyCPDeclaration
 
-polyCP' :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ExpressionSelector F V -> ComplexityPair
+polyCP' :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
 polyCP' = T.declFun polyCPDeclaration
 
 

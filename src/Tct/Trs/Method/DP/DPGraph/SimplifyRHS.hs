@@ -33,16 +33,6 @@ import qualified Tct.Trs.Data.Signature       as Sig
 import qualified Tct.Trs.Data.Trs             as Trs
 
 
-{-
-Simplify RHS;
-
-let l#->com(r1#, ..., rn#) in S# U W#, ri# is removable if there exists no outgoing edge from l#->com(r1#, ..., rn#) labeled with i
-
-<simp(S#)/simp(W#) U W, Q, T@> : f
-<S#/W# U W, Q, T@> : f
-
--}
-
 data SimplifyRHS = SimplifyRHS deriving Show
 
 data SimplifyRHSProof
@@ -66,9 +56,14 @@ instance T.Processor SimplifyRHS where
         where
           wdg = Prob.dependencyGraph prob
 
+          -- FIXME: MS: this is not optimal; 
+          -- I assumed that all my rhs have compound symbols after the DP transformation; this is not true after the decomposeDG transformation.
+          -- We can now have rhs of length one which are removed; ie which should be replaced with fresh compound symbols.
+          -- Either make sure that we have the appropriate format or introduce fresh compound symbols here
           elims = [ (isStrict cn, (r, elimRule n r)) | (n,cn) <- lnodes wdg, let r = theRule cn ]
           elimRule n (R.Rule l (R.Fun f rs))
-            | not (Prob.isCompoundf f) = error "SimplifyRHS.elim: not a compound symbol."
+            | not (Prob.isCompoundf f) = Nothing
+            -- | not (Prob.isCompoundf f) = error $ "SimplifyRHS.elim: not a compound symbol: " ++ show f
             | otherwise                = if length rs' == length rs then Nothing else Just $ R.Rule l (R.Fun f rs')
             where
               rs'   = [ ri | (i,ri) <- zip [1..] rs, i `elem` succs]
@@ -79,7 +74,7 @@ instance T.Processor SimplifyRHS where
           (stricts,weaks) = L.partition fst elims
           toTrs rs        = Trs.fromList [ r | (_,(r1, mr2)) <- rs, let r = r1 `fromMaybe` mr2]
           simplified      = [ r | (_,(_, Just r)) <- elims ]
-          nprob = prob
+          nprob = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = toTrs stricts
             , Prob.weakDPs   = toTrs weaks
             , Prob.signature = foldr updateCompound (Prob.signature prob) simplified }

@@ -113,7 +113,7 @@ instance T.Processor DependencyPairs where
       dp = T.Success (T.toId nprob) (Applicable nproof) T.fromId
       maybeApplicable =
         Prob.isRCProblem' prob
-        <|> Prob.note (not . Trs.null $ Prob.dpComponents prob) " already containts dependency paris"
+        <|> Prob.note (not . Trs.null $ Prob.dpComponents prob) " already contains dependency paris"
         -- <|> if useTuples then Prob.isInnermostProblem' prob else Nothing
 
       dpKind
@@ -121,16 +121,19 @@ instance T.Processor DependencyPairs where
         | otherwise                            = WDP
       useTuples = isTuples dpKind
 
+      sig      = Prob.signature prob
+      defineds = Sig.defineds sig
+
       (stricts, weaks) = flip evalState 0 $ do
         let
-          defineds = Sig.defineds (Prob.signature prob)
           dpsOf    = dependencyPairsOf dpKind defineds
         ss <- dpsOf (Prob.strictTrs prob)
         ws <- dpsOf (Prob.weakTrs prob)
         return (ss,ws)
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks
-      nsig = foldr1 Sig.union [Prob.signature prob, Trs.signature sDPs, Trs.signature wDPs]
+      nsig = unions [sig, Sig.map Prob.markFun (Sig.restrictSignature sig defineds), Trs.signature sDPs, Trs.signature wDPs]
+        where unions = foldr1 Sig.union
       nprob = Prob.sanitiseDPGraph $ prob
         { Prob.startTerms = Prob.BasicTerms (Prob.markFun `S.map` Prob.defineds starts) (Prob.constructors starts)
         , Prob.signature  = nsig

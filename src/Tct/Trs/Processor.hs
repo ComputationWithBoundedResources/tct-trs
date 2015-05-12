@@ -3,6 +3,11 @@ module Tct.Trs.Processor
 
   , defaultDeclarations
 
+  , (>>!)
+  , (>>!!)
+  , successive
+  , whenNonTrivial
+
   -- * Strategies
   , dpsimps
   , decomposeIndependent
@@ -23,7 +28,8 @@ import qualified Tct.Trs.Data.Problem                            as Prob
 import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.Trs                                as Trs
--- import qualified Tct.Trs.Data.ComplexityPair                    as CP
+
+import qualified Tct.Trs.Method.ComplexityPair                   as CP
 
 import           Tct.Trs.Method.Bounds                           as M
 import           Tct.Trs.Method.Decompose                        as M
@@ -72,12 +78,30 @@ defaultDeclarations =
   , T.SD removeWeakSuffixesDeclaration
   , T.SD simplifyRHSDeclaration
   , T.SD trivialDeclaration
+
+  -- Simplifications
+  , T.SD $ T.strategy "dpsimps"                () dpsimps
+  , T.SD $ T.strategy "cleanSuffix"            () cleanSuffix
+  , T.SD $ T.strategy "decomposeIndependent"   () decomposeIndependent
+  , T.SD $ T.strategy "decomposeIndependentSG" () decomposeIndependentSG
+  , T.SD $ T.strategy "toDP"                   () toDP
+  , T.SD $ T.strategy "removeLeaf"             (OneTuple CP.complexityPairArg) removeLeaf
   ]
 
 
+(>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
+s1 >>! s2 = s1 >>> try empty >>> s2
 
---- * instances ------------------------------------------------------------------------------------------------------
+(>>!!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
+s1 >>!! s2 = s1 >>> try empty >||> s2
 
+successive :: [TrsStrategy] -> TrsStrategy
+successive = chainWith (try empty)
+
+whenNonTrivial :: TrsStrategy -> TrsStrategy
+whenNonTrivial st = withProblem $ \p -> when (not $ Prob.isTrivial p) st
+
+--- * simplifications ------------------------------------------------------------------------------------------------
 
 -- | Fast simplifications based on dependency graph analysis.
 dpsimps :: TrsStrategy

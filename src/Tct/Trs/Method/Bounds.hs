@@ -21,6 +21,7 @@ module Tct.Trs.Method.Bounds
   , Enrichment (..)
   ) where
 
+import Data.Maybe (fromMaybe)
 import qualified Data.Map                           as M
 import           Data.Monoid                        ((<>))
 import qualified Data.Set                           as S
@@ -151,7 +152,9 @@ computeAutomaton sig st strict weak enrich initial = toGautomaton $ compatibleAu
         k (Collapse (s,l) qs q) = GCollapse (canof s,l) qs q
         k (Epsilon p q)         = GEpsilon p q
 
-    (fcano, canof) = ((fm M.!), (rm M.!))
+    find m f = error ("Bounds.cano: not found:") `fromMaybe` M.lookup f m
+
+    (fcano, canof) = (find fm, find rm)
       where
         fs = M.keys $ Sig.toMap sig
         fm = M.fromList $ zip fs [Symbol 1..]

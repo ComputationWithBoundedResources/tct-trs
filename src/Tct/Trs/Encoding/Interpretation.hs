@@ -3,6 +3,7 @@ module Tct.Trs.Encoding.Interpretation
   where
 
 
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as S (empty)
 import           Control.Monad                      (liftM)
 import qualified Data.Foldable                      as F
@@ -104,7 +105,8 @@ orient inter prob absi mselector useUP useUR = do
   let
     usablePositions = UPEnc.usableArgsWhereApplicable prob (Prob.isDTProblem prob) useUP
     monotoneConstraints =
-      SMT.bigAnd [ setMonotone inter (interpretations ebsi M.! f) is | (f,is)  <- UPEnc.usablePositions usablePositions ]
+      SMT.bigAnd [ setMonotone inter (interpretations ebsi `find` f) is | (f,is)  <- UPEnc.usablePositions usablePositions ]
+        where find m f = error ("Interpretation.monotonConstraints: not found:" ++ show f) `fromMaybe` M.lookup f m
 
   -- encode usable rules modulo argument filtering
   usenc <- if allowUR then Just `liftM` UREnc.usableEncoder prob else return Nothing
@@ -131,7 +133,8 @@ orient inter prob absi mselector useUP useUR = do
   strictVarEncoder <- M.fromList `fmap` F.mapM (\r -> SMT.nvarM' >>= \v -> return (r,v)) rules
 
   let
-    strict = (strictVarEncoder M.!)
+    find f = error "Interpretation.strictVar: not found" `fromMaybe` M.lookup f strictVarEncoder
+    strict = find
 
     interpretf = interpret inter ebsi
     (.>=.) = gte inter
@@ -142,6 +145,7 @@ orient inter prob absi mselector useUP useUR = do
     sOrderConstraints = SMT.bigAnd [ usable r .==> sOrder r | r <- srules ]
       where sOrder r = interpretf (R.lhs r) .>=. (interpretf (R.rhs r) .+. strict r)
 
+    -- MS: TODO: the greedy component should work on the expression selector; so we could express eg selAnyOf $ selRules `inter` selStricts 
     forceAny rs
       | null rs   = SMT.bot
       | otherwise = SMT.bigOr [ usable r .&& strict r .> zero | r <- rs ]

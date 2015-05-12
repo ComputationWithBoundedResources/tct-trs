@@ -26,6 +26,11 @@ module Tct.Trs.Method.Matrix.NaturalMI
   , matrix
   , matrix'
 
+  , matrixCPDeclaration
+  , matrixCP
+  , matrixCP'
+
+
   , NaturalMIKind (..)
   , UsableArgs (..)
   , UsableRules (..)
@@ -67,8 +72,8 @@ import           Tct.Core.Parse            ()
 import qualified Tct.Trs.Data.Arguments                     as Arg
 import           Tct.Trs.Data.Arguments                     (UsableArgs (..), UsableRules (..), Greedy (..))
 
+import qualified Tct.Trs.Data.ComplexityPair as CP
 import qualified Tct.Trs.Data.Problem                       as Prob
-import qualified Tct.Trs.Data.ProblemKind                   as ProbK
 import qualified Tct.Trs.Data.RuleSelector                  as RS
 import qualified Tct.Trs.Data.Signature                     as Sig
 import qualified Tct.Trs.Data.Trs                           as Trs
@@ -78,6 +83,8 @@ import qualified Tct.Trs.Method.Matrix.MatrixInterpretation as MI
 -- should be  Encoding.Matrix
 import qualified Tct.Trs.Method.Matrix.Matrix               as EncM
 
+
+import Debug.Trace
 
 ----------------------------------------------------------------------
 -- data types
@@ -521,6 +528,54 @@ instance CD.Processor NaturalMI where
   solve p prob
     | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
     | otherwise           = entscheide p prob
+
+
+
+--- ** complexity pair -----------------------------------------------------------------------------------------------
+
+
+instance CP.IsComplexityPair NaturalMI where
+  solveComplexityPair p sel prob = fmap toResult `fmap` CD.evaluate (CD.Proc p{selector=Just sel, greedy=Greedy}) prob
+    where
+      toResult pt = case CD.open pt of
+        [nprob] -> CP.ComplexityPairProof
+          { CP.result = traceShow "abc" $ traceShow (show $ CD.open pt) pt
+          , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
+          , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
+        _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
+
+matrixComplexityPair :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules -> CP.ComplexityPair
+matrixComplexityPair dim deg nmiKind ua ur = CP.toComplexityPair $
+  NaturalMI { miDimension = dim
+            , miDegree = deg
+            , miKind = nmiKind
+            , uargs = ua
+            , urules = ur
+            , selector = Nothing
+            , greedy = NoGreedy
+            }
+
+matrixCPDeclaration :: CD.Declaration (
+  '[ CD.Argument 'CD.Optional Int
+   , CD.Argument 'CD.Optional Int
+   , CD.Argument 'CD.Optional NaturalMIKind
+   , CD.Argument 'CD.Optional Arg.UsableArgs
+   , CD.Argument 'CD.Optional Arg.UsableRules ]
+  CD.:-> CP.ComplexityPair )
+matrixCPDeclaration = CD.declare "matrixCP" description argsCP matrixComplexityPair
+  where
+    argsCP =
+      ( dimArg          `CD.optional` 1
+      , degArg          `CD.optional` 1
+      , nmiKindArg      `CD.optional` Algebraic
+      , Arg.usableArgs  `CD.optional` Arg.UArgs
+      , Arg.usableRules `CD.optional` Arg.URules )
+
+matrixCP :: CP.ComplexityPair
+matrixCP = CD.deflFun matrixCPDeclaration
+
+matrixCP' :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules -> CP.ComplexityPair
+matrixCP' = CD.declFun matrixCPDeclaration
 
 
 ----------------------------------------------------------------------
