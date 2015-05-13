@@ -113,6 +113,7 @@ Library
     Tct.Trs.Method.Matrix.Matrix
     Tct.Trs.Method.Matrix.MatrixInterpretation
     Tct.Trs.Method.Matrix.NaturalMI
+    Tct.Trs.Method.Weightgap
     Tct.Trs.Method.WithCertification
     Tct.Trs.Processor
   build-depends:
