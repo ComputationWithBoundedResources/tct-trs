@@ -84,8 +84,6 @@ import qualified Tct.Trs.Method.Matrix.MatrixInterpretation as MI
 import qualified Tct.Trs.Method.Matrix.Matrix               as EncM
 
 
-import Debug.Trace
-
 ----------------------------------------------------------------------
 -- data types
 ----------------------------------------------------------------------
@@ -196,7 +194,7 @@ countDiagonal :: NaturalMIKind
               -> Int
               -> (EncM.Matrix Int -> Int)
 countDiagonal Triangular dim = const dim
-countDiagonal _ _ = EncM.diagonalNonZeros
+countDiagonal _ _            = EncM.diagonalNonZeros
 
 {- | Counts the degree depending of an interpretation on the matrix kind -}
 upperbound ::
@@ -206,15 +204,15 @@ upperbound ::
   -> CD.Complexity
 upperbound mi order inter =
   case kind_ order of
-    MI.UnrestrictedMatrix{} -> CD.Exp (Just 1)
-    MI.TriangularMatrix{} -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter
-    MI.ConstructorBased cs _ -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter'
+    MI.UnrestrictedMatrix{}                    -> CD.Exp (Just 1)
+    MI.TriangularMatrix{}                      -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter
+    MI.ConstructorBased cs _                   -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter'
       where inter' = inter{I.interpretations = filterCs $ I.interpretations inter}
             filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
-    MI.EdaMatrix Nothing -> CD.Poly $ Just (miDimension mi)
-    MI.EdaMatrix (Just n) -> CD.Poly $ Just n
-    MI.ConstructorEda _ Nothing -> CD.Poly $ Just (miDimension mi)
-    MI.ConstructorEda _ (Just n) -> CD.Poly $ Just n
+    MI.EdaMatrix Nothing                       -> CD.Poly $ Just (miDimension mi)
+    MI.EdaMatrix (Just n)                      -> CD.Poly $ Just n
+    MI.ConstructorEda _ Nothing                -> CD.Poly $ Just (miDimension mi)
+    MI.ConstructorEda _ (Just n)               -> CD.Poly $ Just n
 
 {- | Checks wheter a matrix is different to the identity matrix of a given dimension. -}
 maxNonIdMatrix :: Int
@@ -254,11 +252,11 @@ kindConstraints :: Ord fun
                 => MI.MatrixKind fun
                 -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
                 -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-kindConstraints MI.UnrestrictedMatrix _ = return SMT.top
-kindConstraints (MI.TriangularMatrix Nothing) _ = return SMT.top
-kindConstraints (MI.TriangularMatrix (Just deg)) absmi = diagOnesConstraint deg absmi -- SMT.bigAnd $ Map.map (diag deg) (I.interpretations absmi)
-kindConstraints (MI.ConstructorBased _  Nothing) _ = return SMT.top
-kindConstraints (MI.ConstructorBased cs (Just deg)) absmi = diagOnesConstraint deg absmi' -- SMT.bigAnd $ Map.map (diag deg) (I.interpretations absmi')
+kindConstraints MI.UnrestrictedMatrix _                   = return SMT.top
+kindConstraints (MI.TriangularMatrix Nothing) _           = return SMT.top
+kindConstraints (MI.TriangularMatrix (Just deg)) absmi    = diagOnesConstraint deg absmi
+kindConstraints (MI.ConstructorBased _  Nothing) _        = return SMT.top
+kindConstraints (MI.ConstructorBased cs (Just deg)) absmi = diagOnesConstraint deg absmi'
   where absmi' = absmi{I.interpretations = filterCs $ I.interpretations absmi}
         filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
 kindConstraints _ _ = return SMT.bot
@@ -298,19 +296,20 @@ entscheide p prob = do
     toKind Unrestricted = MI.UnrestrictedMatrix
     toKind Algebraic =
       if Prob.isRCProblem prob
-      then MI.ConstructorBased cs md
-      else MI.TriangularMatrix Nothing
-    toKind Triangular =
+      then MI.ConstructorBased cs md2
+      else MI.TriangularMatrix md2
+    toKind Triangular = 
       if Prob.isRCProblem prob
       then MI.ConstructorBased cs Nothing
       else MI.TriangularMatrix Nothing
     toKind Automaton =
       if Prob.isRCProblem prob
-      then MI.ConstructorEda cs md
-      else MI.EdaMatrix md
+      then MI.ConstructorEda cs (Just md1)
+      else MI.EdaMatrix (Just md1)
 
     cs = Sig.constructors sig
-    md = Just $ max 1 (miDegree p)
+    md1 = max 0 (miDegree p)
+    md2 = if md1 < (miDimension p) then Just md1 else Nothing
 
     shift = maybe I.All I.Shift (selector p)
 
@@ -539,7 +538,7 @@ instance CP.IsComplexityPair NaturalMI where
     where
       toResult pt = case CD.open pt of
         [nprob] -> CP.ComplexityPairProof
-          { CP.result = traceShow "abc" $ traceShow (show $ CD.open pt) pt
+          { CP.result = pt
           , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
           , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
         _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"

@@ -12,6 +12,8 @@ module Tct.Trs.Data.Signature
   , positions
   , constructors
   , defineds
+  , isDefined
+  , isConstructor
 
   -- * updates
   , setArity
@@ -79,6 +81,14 @@ constructors = constructors_
 -- | Returns the defined symbols
 defineds :: Signature f -> Symbols f
 defineds = defineds_
+
+-- | Checks wether the given symbol is a defined symbol.
+isDefined :: Ord f => f -> Signature f -> Bool
+isDefined f = S.member f . defineds
+
+-- | Checks wether the given symbol is a constructor symbol.
+isConstructor :: Ord f => f -> Signature f -> Bool
+isConstructor f = S.member f . constructors
 
 -- | Returns function symbols together with their arity.
 elems :: Signature f -> [(f, Int)]

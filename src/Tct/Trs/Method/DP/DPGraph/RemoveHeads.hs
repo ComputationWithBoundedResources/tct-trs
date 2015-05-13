@@ -1,13 +1,21 @@
--- | This module provides the /Remove Heads/ processor.
+{- | This module provides the /Remove Heads/ processor.
+
+@
+    |- <rem(S#) +/ rem(W#) + W, Q, T#> :f
+  ------------------------------------------
+          |- <S# / W# + W, Q, T#> :f
+@
+, where @rem(R#)@ removes DP rules @l#->com(r1#,...,rn#)@ that occur at root positions of the DP graph and all @ri#@ are starting terms.
+-}
 module Tct.Trs.Method.DP.DPGraph.RemoveHeads
   ( removeHeadsDeclaration
   , removeHeads
   ) where
 
 
-import Control.Applicative ((<$>))
-import qualified Data.Rewriting.Rule as R (Rule, rhs)
-import qualified Data.Rewriting.Term as R
+import           Control.Applicative          ((<$>))
+import qualified Data.Rewriting.Rule          as R (Rule, rhs)
+import qualified Data.Rewriting.Term          as R
 
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
@@ -16,17 +24,13 @@ import qualified Tct.Core.Data                as T
 import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.Trs as Trs
 import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
+import qualified Tct.Trs.Data.Signature       as Sig (isDefined)
+import qualified Tct.Trs.Data.Trs             as Trs
 
 
-{-
-
-remove dp rules l#->com(r1#,...,rn#) where all ri# only have starting terms
-
--}
 
 
 data RemoveHeads = RemoveHeads deriving Show
@@ -51,14 +55,17 @@ instance T.Processor RemoveHeads where
         | otherwise  = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
         where
           wdg = Prob.dependencyGraph prob
-          st  = Prob.startTerms prob
 
           heads = [ (n,r) | (n,cn) <- withNodeLabels' wdg (roots wdg), let r = theRule cn, isBasicC (R.rhs r) ]
 
-          isBasicC (R.Var _) = True
-          isBasicC (R.Fun f ts)
-            | Prob.isCompoundf f = all (Prob.isStartTerm st) ts
-            | otherwise          = error "Tct.Trs.Method.DP.DPGraph.RemoveHeads: not a compound symbol."
+          isBasicC (R.Var _)     = True
+          isBasicC t@(R.Fun f ts)
+            | Prob.isCompoundf f = all isBasicC ts
+            | isDefined f        = isStartTerm t
+            | otherwise          = error "Tct.Trs.Method.DP.DPGraph.RemoveHeads.solve.isBasicC: invalid rhs"
+            where
+              isStartTerm = Prob.isStartTerm (Prob.startTerms prob)
+              isDefined   = flip Sig.isDefined (Prob.signature prob)
 
           (ns,rs) = Trs.fromList `fmap` unzip heads
           nprob = prob
