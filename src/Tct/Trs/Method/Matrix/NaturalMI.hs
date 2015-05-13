@@ -25,12 +25,20 @@ module Tct.Trs.Method.Matrix.NaturalMI
   ( matrixDeclaration
   , matrix
   , matrix'
-
   , matrixCPDeclaration
   , matrixCP
   , matrixCP'
+  , args
+  , kind
+  , uargMonotoneConstraints
+  , slmiSafeRedpairConstraints
+  , kindConstraints
+  , certification
+  , isStrict
+  , interpretf
 
-
+  , NaturalMI(..)
+  , MatrixOrder(..)
   , NaturalMIKind (..)
   , UsableArgs (..)
   , UsableRules (..)
@@ -40,6 +48,7 @@ module Tct.Trs.Method.Matrix.NaturalMI
 -- general imports
 import           Control.Monad.Trans                        (liftIO)
 import qualified Data.Foldable                              as DF
+import qualified Data.IntSet                                as IS
 import qualified Data.List                                  as List
 import qualified Data.Map                                   as Map
 import qualified Data.Maybe                                 as DM
@@ -74,11 +83,13 @@ import           Tct.Trs.Data.Arguments                     (UsableArgs (..), Us
 
 import qualified Tct.Trs.Data.ComplexityPair as CP
 import qualified Tct.Trs.Data.Problem                       as Prob
+import qualified Tct.Trs.Data.ProblemKind                   as ProbK
 import qualified Tct.Trs.Data.RuleSelector                  as RS
 import qualified Tct.Trs.Data.Signature                     as Sig
 import qualified Tct.Trs.Data.Trs                           as Trs
 import qualified Tct.Trs.Encoding.Interpretation            as I
 import qualified Tct.Trs.Encoding.UsableRules               as UREnc
+import qualified Tct.Trs.Encoding.UsablePositions           as UPEnc
 import qualified Tct.Trs.Method.Matrix.MatrixInterpretation as MI
 -- should be  Encoding.Matrix
 import qualified Tct.Trs.Method.Matrix.Matrix               as EncM
@@ -232,6 +243,28 @@ isStrict :: MI.LinearInterpretation a Int
 isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = allGEQ && EncM.vEntry 1 lconst  > EncM.vEntry 1 rconst
   where allGEQ = and $ zipWith (>=) (DF.toList lconst) (DF.toList rconst)
 
+uargMonotoneConstraints :: UPEnc.UsablePositions Prob.F -> I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate SMT.IExpr) -> SMT.Expr
+uargMonotoneConstraints uarg = SMT.bigAnd . Map.mapWithKey funConstraint . I.interpretations
+  where funConstraint f = SMT.bigAnd . Map.map ((SMT..>= SMT.one) . EncM.mEntry 1 1) . filterUargs f . MI.coefficients
+        filterUargs f = Map.filterWithKey $ fun f
+        fun f (MI.SomeIndeterminate i) _ = isUsable f i uarg
+        isUsable :: Ord f => f -> Int -> UPEnc.UsablePositions f -> Bool
+        isUsable sym i up = maybe False (List.elem i) (Map.lookup sym $ Map.fromList $ UPEnc.usablePositions up)
+
+--slmiSafeRedpairConstraints :: (MIEntry a, AbstrOrdSemiring a b) => F.Signature -> UsablePositions -> MatrixInter a -> b
+slmiSafeRedpairConstraints :: Int -> UPEnc.UsablePositions Prob.F -> I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate SMT.IExpr) -> SMT.Expr
+slmiSafeRedpairConstraints dim uarg mi =
+  SMT.bigAnd $ Map.mapWithKey funConstraint $ compInterpretations mi
+  where compInterpretations = Map.filterWithKey isCompound . I.interpretations
+        isCompound f _      = Prob.isCompoundf f
+        --d                   = dimension mi
+        funConstraint f     = SMT.bigAnd . Map.map (mxEq (EncM.identityMatrix dim)) . filterUargs f . MI.coefficients
+        filterUargs f       = Map.filterWithKey $ fun f
+        fun f (MI.SomeIndeterminate i) _ = isUsable f i uarg
+        isUsable :: Ord f => f -> Int -> UPEnc.UsablePositions f -> Bool
+        isUsable sym i up = maybe False (List.elem i) (Map.lookup sym $ Map.fromList $ UPEnc.usablePositions up)
+        mxEq mx1 mx2 = SMT.bigAnd $ zipWith (SMT..==) (DF.toList mx1) (DF.toList mx2)
+
 
 {- | assert the matrix diagonal to be greather one iff a variable is one -}
 diagOnesConstraint :: Int
@@ -245,6 +278,16 @@ diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
       return v
     diags = List.transpose $ map diag' $ Map.elems (I.interpretations mi)
     diag'  = concatMap (DF.toList . EncM.diagonalEntries) . Map.elems . MI.coefficients
+
+{- | Maps NaturalMI kinds to Matrix kinds. Used in WeightGap. -}
+kind :: NaturalMI -> ProbK.StartTerms f -> MI.MatrixKind f
+kind NaturalMI{miKind=Unrestricted}           _                       = MI.UnrestrictedMatrix
+kind NaturalMI{miDegree=d, miKind=Algebraic}  (ProbK.BasicTerms _ cs) = MI.ConstructorBased cs (Just d)
+kind NaturalMI{miDegree=d, miKind=Algebraic}  ProbK.AllTerms {}       = MI.TriangularMatrix (Just d)
+kind NaturalMI{miDegree=d, miKind=Triangular} (ProbK.BasicTerms _ cs) = MI.ConstructorBased cs (Just d)
+kind NaturalMI{miDegree=d, miKind=Triangular} ProbK.AllTerms {}       = MI.TriangularMatrix (Just d)
+kind NaturalMI{miDegree=d, miKind=Automaton}  (ProbK.BasicTerms _ cs) = MI.ConstructorEda cs (Just (max 1 d))
+kind NaturalMI{miDegree=d, miKind=Automaton}  ProbK.AllTerms {}       = MI.EdaMatrix (Just (max 1 d))
 
 
 {- | build constraints for an interpretation depending on the matrix kind -}
@@ -394,7 +437,7 @@ description =  [ "description of the matrix interpretation processor: TODO"     
 
 {- | argument for the NaturalMIKind -}
 nmiKindArg :: CD.Argument 'CD.Required NaturalMIKind
-nmiKindArg = CD.arg 
+nmiKindArg = CD.arg
   `CD.withName` "miKind"
   `CD.withDomain` fmap show [(minBound :: NaturalMIKind)..]
   `CD.withHelp`  ["Specifies the kind of the matrix interpretation."]
@@ -599,4 +642,3 @@ instance Xml.Xml (MatrixOrder Int) where
 
 instance CD.SParsable i i NaturalMIKind where
   parseS = P.enum
-
