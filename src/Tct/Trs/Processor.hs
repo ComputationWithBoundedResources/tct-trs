@@ -157,14 +157,16 @@ toDP =
   >>> try usableRules
   where
     toDP' prob
-      | Prob.isInnermostProblem prob = timeoutIn 5 (dependencyPairs >>> try usableRules >>> wgOnUsable) <|> dependencyTuples
-      | otherwise = dependencyPairs >>> try usableRules >>> try wgOnUsable
+      -- | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> wgOnUsable) <> dependencyTuples
+      | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> shift) <> dependencyTuples
+      | otherwise                    = dependencyPairs >>> try usableRules >>> try wgOnUsable
 
     partIndep prob
       | Prob.isInnermostProblem prob = decomposeIndependentSG
       | otherwise                    = linearPathAnalysis
 
-    wgOnUsable = failing -- TODO: weightgap `wgOn` Weightgap.WgOnTrs
+    shift = matrix' 2 1 Algebraic UArgs URules (Just $ RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules) NoGreedy
+    wgOnUsable = failing
 
 -- | Tries to remove leafs in the congruence graph,
 -- by (i) orienting using predecessor extimation and the given processor,
