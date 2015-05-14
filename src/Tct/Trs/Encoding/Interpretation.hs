@@ -196,7 +196,7 @@ toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) c
 newProblem :: TrsProblem -> InterpretationProof a b -> T.Optional T.Id TrsProblem
 newProblem prob proof = case shift_ proof of
   All     -> T.Null
-  Shift _ -> T.Opt . T.Id $ prob
+  Shift _ -> T.Opt . T.Id . Prob.sanitiseDPGraph $  prob
     { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
     , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
     , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs

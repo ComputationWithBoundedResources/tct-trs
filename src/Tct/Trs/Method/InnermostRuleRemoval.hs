@@ -52,7 +52,7 @@ instance T.Processor InnermostRuleRemoval where
           removable = any (not . null . fullRewrite allRules) . directSubterms . lhs
           removed   = Trs.fromList $ filter removable trsRules
 
-          nprob = prob
+          nprob = Prob.sanitiseDPGraph $ prob
             { Prob.strictTrs = Prob.strictTrs prob `Trs.difference` removed
             , Prob.weakTrs   = Prob.weakTrs prob `Trs.difference` removed }
           proof = InnermostRuleRemovalProof { removed_ = removed }

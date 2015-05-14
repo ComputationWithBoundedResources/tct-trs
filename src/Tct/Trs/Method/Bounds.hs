@@ -39,6 +39,7 @@ import           Tct.Core.Combinators               ((>>>))
 import           Tct.Common.ProofCombinators        (ApplicationProof(..))
 
 import           Tct.Trs.Data
+import           Tct.Trs.Data.DependencyGraph       as DG (empty)
 import qualified Tct.Trs.Data.Problem               as Prob
 import qualified Tct.Trs.Data.ProblemKind           as Prob
 import qualified Tct.Trs.Data.Rewriting             as R
@@ -132,7 +133,8 @@ instance T.Processor Bounds where
         { Prob.strictDPs = Trs.empty
         , Prob.strictTrs = Trs.empty
         , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` Prob.strictDPs prob
-        , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` Prob.strictTrs prob }
+        , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` Prob.strictTrs prob 
+        , Prob.dpGraph   = DG.empty }
       proof = BoundsProof
         { enrichment_ = enrichment p
         , automaton_  = automaton
