@@ -28,31 +28,25 @@ module Tct.Trs.Method.Matrix.NaturalMI
   , matrixCPDeclaration
   , matrixCP
   , matrixCP'
-  , args
-  , kind
-  , uargMonotoneConstraints
-  , slmiSafeRedpairConstraints
-  , kindConstraints
-  , certification
-  , isStrict
-  , interpretf
 
-  , NaturalMI(..)
-  , MatrixOrder(..)
   , NaturalMIKind (..)
   , UsableArgs (..)
   , UsableRules (..)
   , Greedy (..)
+
+  -- * Weight gap
+
   ) where
 
 -- general imports
+import Data.Monoid ((<>))
 import           Control.Monad.Trans                        (liftIO)
 import qualified Data.Foldable                              as DF
-import qualified Data.IntSet                                as IS
 import qualified Data.List                                  as List
 import qualified Data.Map                                   as Map
 import qualified Data.Maybe                                 as DM
 import qualified Data.Set                                   as Set
+
 import qualified Data.Traversable                           as DT
 import qualified Data.Typeable                              as DT
 
@@ -78,6 +72,7 @@ import           Tct.Core.Parse            ()
 
 
 -- imports tct-trs
+import Tct.Trs.Data
 import qualified Tct.Trs.Data.Arguments                     as Arg
 import           Tct.Trs.Data.Arguments                     (UsableArgs (..), UsableRules (..), Greedy (..))
 
@@ -243,28 +238,6 @@ isStrict :: MI.LinearInterpretation a Int
 isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = allGEQ && EncM.vEntry 1 lconst  > EncM.vEntry 1 rconst
   where allGEQ = and $ zipWith (>=) (DF.toList lconst) (DF.toList rconst)
 
-uargMonotoneConstraints :: UPEnc.UsablePositions Prob.F -> I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate SMT.IExpr) -> SMT.Expr
-uargMonotoneConstraints uarg = SMT.bigAnd . Map.mapWithKey funConstraint . I.interpretations
-  where funConstraint f = SMT.bigAnd . Map.map ((SMT..>= SMT.one) . EncM.mEntry 1 1) . filterUargs f . MI.coefficients
-        filterUargs f = Map.filterWithKey $ fun f
-        fun f (MI.SomeIndeterminate i) _ = isUsable f i uarg
-        isUsable :: Ord f => f -> Int -> UPEnc.UsablePositions f -> Bool
-        isUsable sym i up = maybe False (List.elem i) (Map.lookup sym $ Map.fromList $ UPEnc.usablePositions up)
-
---slmiSafeRedpairConstraints :: (MIEntry a, AbstrOrdSemiring a b) => F.Signature -> UsablePositions -> MatrixInter a -> b
-slmiSafeRedpairConstraints :: Int -> UPEnc.UsablePositions Prob.F -> I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate SMT.IExpr) -> SMT.Expr
-slmiSafeRedpairConstraints dim uarg mi =
-  SMT.bigAnd $ Map.mapWithKey funConstraint $ compInterpretations mi
-  where compInterpretations = Map.filterWithKey isCompound . I.interpretations
-        isCompound f _      = Prob.isCompoundf f
-        --d                   = dimension mi
-        funConstraint f     = SMT.bigAnd . Map.map (mxEq (EncM.identityMatrix dim)) . filterUargs f . MI.coefficients
-        filterUargs f       = Map.filterWithKey $ fun f
-        fun f (MI.SomeIndeterminate i) _ = isUsable f i uarg
-        isUsable :: Ord f => f -> Int -> UPEnc.UsablePositions f -> Bool
-        isUsable sym i up = maybe False (List.elem i) (Map.lookup sym $ Map.fromList $ UPEnc.usablePositions up)
-        mxEq mx1 mx2 = SMT.bigAnd $ zipWith (SMT..==) (DF.toList mx1) (DF.toList mx2)
-
 
 {- | assert the matrix diagonal to be greather one iff a variable is one -}
 diagOnesConstraint :: Int
@@ -279,15 +252,45 @@ diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
     diags = List.transpose $ map diag' $ Map.elems (I.interpretations mi)
     diag'  = concatMap (DF.toList . EncM.diagonalEntries) . Map.elems . MI.coefficients
 
-{- | Maps NaturalMI kinds to Matrix kinds. Used in WeightGap. -}
-kind :: NaturalMI -> ProbK.StartTerms f -> MI.MatrixKind f
-kind NaturalMI{miKind=Unrestricted}           _                       = MI.UnrestrictedMatrix
-kind NaturalMI{miDegree=d, miKind=Algebraic}  (ProbK.BasicTerms _ cs) = MI.ConstructorBased cs (Just d)
-kind NaturalMI{miDegree=d, miKind=Algebraic}  ProbK.AllTerms {}       = MI.TriangularMatrix (Just d)
-kind NaturalMI{miDegree=d, miKind=Triangular} (ProbK.BasicTerms _ cs) = MI.ConstructorBased cs (Just d)
-kind NaturalMI{miDegree=d, miKind=Triangular} ProbK.AllTerms {}       = MI.TriangularMatrix (Just d)
-kind NaturalMI{miDegree=d, miKind=Automaton}  (ProbK.BasicTerms _ cs) = MI.ConstructorEda cs (Just (max 1 d))
-kind NaturalMI{miDegree=d, miKind=Automaton}  ProbK.AllTerms {}       = MI.EdaMatrix (Just (max 1 d))
+
+    -- kind = toKind (miKind p)
+    -- -- matrix interpretation kind to matrix kind
+    -- toKind Unrestricted = MI.UnrestrictedMatrix
+    -- toKind Algebraic =
+    --   if Prob.isRCProblem prob
+    --   then MI.ConstructorBased cs md2
+    --   else MI.TriangularMatrix md2
+    -- toKind Triangular = 
+    --   if Prob.isRCProblem prob
+    --   then MI.ConstructorBased cs Nothing
+    --   else MI.TriangularMatrix Nothing
+    -- toKind Automaton =
+    --   if Prob.isRCProblem prob
+    --   then MI.ConstructorEda cs (Just md1)
+    --   else MI.EdaMatrix (Just md1)
+
+    -- cs = Sig.constructors sig
+    -- md1 = max 0 (miDegree p)
+    -- md2 = if md1 < (miDimension p) then Just md1 else Nothing
+
+
+
+
+mxKind :: NaturalMIKind -> Int -> Int -> StartTerms fun -> MI.MatrixKind fun
+mxKind kind dim deg  st = case (kind, st) of
+  (Unrestricted, ProbK.BasicTerms{}) -> MI.UnrestrictedMatrix
+  (Triangular,   ProbK.BasicTerms{}) -> MI.ConstructorBased cs Nothing
+  (Triangular,   ProbK.AllTerms{})   -> MI.TriangularMatrix Nothing
+  (Algebraic,    ProbK.BasicTerms{}) -> MI.ConstructorBased cs md
+  (Algebraic,    ProbK.AllTerms{})   -> MI.TriangularMatrix md
+  (Automaton,    ProbK.BasicTerms{}) -> MI.ConstructorEda cs (min 1 `fmap` md)
+  (Automaton,    ProbK.AllTerms{})   -> MI.TriangularMatrix (min 1 `fmap` md)
+  where
+    cs = ProbK.constructors st
+    md = let d = max 0 deg in if d < dim then Just d else Nothing
+
+  
+
 
 
 {- | build constraints for an interpretation depending on the matrix kind -}
@@ -334,25 +337,7 @@ entscheide p prob = do
     absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (miDimension p)) (Sig.toMap sig)
 
     sig   = Prob.signature prob
-    kind = toKind (miKind p)
-    -- matrix interpretation kind to matrix kind
-    toKind Unrestricted = MI.UnrestrictedMatrix
-    toKind Algebraic =
-      if Prob.isRCProblem prob
-      then MI.ConstructorBased cs md2
-      else MI.TriangularMatrix md2
-    toKind Triangular = 
-      if Prob.isRCProblem prob
-      then MI.ConstructorBased cs Nothing
-      else MI.TriangularMatrix Nothing
-    toKind Automaton =
-      if Prob.isRCProblem prob
-      then MI.ConstructorEda cs (Just md1)
-      else MI.EdaMatrix (Just md1)
-
-    cs = Sig.constructors sig
-    md1 = max 0 (miDegree p)
-    md2 = if md1 < (miDimension p) then Just md1 else Nothing
+    kind = mxKind (miKind p) (miDimension p) (miDegree p) (Prob.startTerms prob)
 
     shift = maybe I.All I.Shift (selector p)
 
@@ -518,14 +503,7 @@ instance I.AbstractInterpretation NaturalMI where
        Namely require the top left entry of the function parameters given in poss
        to be greater then one. -}
   -- setMonotone :: NaturalMI -> B NaturalMI -> [Int] -> SMT.Expr
-  setMonotone _ (MI.LInter vmmap _) poss =
-    SMT.bigAnd $ map setMonotonePos poss
-    where
-      toSI = MI.SomeIndeterminate
-      setMonotonePos pos =
-        case Map.lookup (toSI pos) vmmap of
-        Just m -> EncM.mEntry 1 1 m SMT..> SMT.zero
-        Nothing -> error "Tct.Trs.Method.Matrix.NatrualMI.setMonotone: Argument Position not found"
+  setMonotone _ v ps = setMonotone v ps
 
   {- | apply the inFilter function on indices corresponding to a non-zero matrix -}
   -- setInFilter :: NaturalMI -> B NaturalMI -> (Int -> SMT.Expr) -> SMT.Expr
@@ -549,15 +527,30 @@ instance I.AbstractInterpretation NaturalMI where
 
   {- | compares two concrete linear interpretations with the 'greater or equal' relation -}
   -- gte :: NaturalMI -> C NaturalMI -> C NaturalMI -> SMT.Expr
-  gte _ (MI.LInter lcoeffs lconst) (MI.LInter rcoeffs rconst) =
-    SMT.bigAnd zipmaps SMT..&& gteVec lconst rconst
-    where
-      zipmaps = Map.intersectionWith gteMatrix lcoeffs rcoeffs
-      gteVec (EncM.Vector v1) (EncM.Vector v2) =
-        SMT.bigAnd $ zipWith (SMT..>=) v1 v2
+  gte _ lint1 lint2 = gte lint1 lint2
 
-      gteMatrix (EncM.Matrix m1) (EncM.Matrix m2) =
-        SMT.bigAnd (zipWith gteVec m1 m2)
+gte (MI.LInter lcoeffs lconst) (MI.LInter rcoeffs rconst) =
+  SMT.bigAnd zipmaps SMT..&& gteVec lconst rconst
+  where
+    zipmaps = Map.intersectionWith gteMatrix lcoeffs rcoeffs
+    gteVec (EncM.Vector v1) (EncM.Vector v2) =
+      SMT.bigAnd $ zipWith (SMT..>=) v1 v2
+
+    gteMatrix (EncM.Matrix m1) (EncM.Matrix m2) =
+      SMT.bigAnd (zipWith gteVec m1 m2)
+
+setMonotone (MI.LInter vmmap _) poss =
+  SMT.bigAnd $ map setMonotonePos poss
+  where
+    toSI = MI.SomeIndeterminate
+    setMonotonePos pos =
+      case Map.lookup (toSI pos) vmmap of
+      Just m -> EncM.mEntry 1 1 m SMT..> SMT.zero
+      Nothing -> error "Tct.Trs.Method.Matrix.NatrualMI.setMonotone: Argument Position not found"
+
+setStronglyLinear dim (MI.LInter vmmap cs) poss = MI.LInter (foldr k vmmap poss) cs
+  where k pos = Map.adjust (const $ EncM.identityMatrix dim) (toEnum pos)
+
 
 
 instance CD.Processor NaturalMI where
@@ -642,3 +635,180 @@ instance Xml.Xml (MatrixOrder Int) where
 
 instance CD.SParsable i i NaturalMIKind where
   parseS = P.enum
+
+
+
+--- * weightgap ------------------------------------------------------------------------------------------------------
+
+data WgOn 
+  = WgOnTrs -- ^ Orient at least all non-DP rules.
+  | WgOnAny -- ^ Orient some rule.
+  deriving (Eq, Show, DT.Typeable, Bounded, Enum)
+
+
+data WeightGap = WeightGap 
+  { wgDimension :: Int
+  , wgDegree    :: Int
+  , wgKind      :: NaturalMIKind
+  , wgUArgs     :: UsableArgs
+  , wgOn        :: WgOn
+  , wgSel       :: Maybe (ExpressionSelector F V)
+  } deriving (Show)
+
+data WeightGapOrder =  WeightGapOrder 
+  { wgProof       :: MatrixOrder Int
+  , wgConstGrowth :: Bool }
+  deriving (Show)
+
+type WeightGapProof = PC.OrientationProof WeightGapOrder
+
+
+instance CD.Processor WeightGap where
+  type ProofObject WeightGap = PC.ApplicationProof WeightGapProof
+  type I WeightGap           = Prob.TrsProblem
+  type O WeightGap           = Prob.TrsProblem
+
+  solve p prob
+    | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
+    | otherwise           = do
+      res <- wgEntscheide p prob
+      case res of
+        SMT.Sat order -> undefined
+        _             -> undefined
+
+wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
+wgEntscheide p prob = do
+  mto <- CD.remainingTime `fmap` CD.askStatus prob
+  res :: SMT.Result (I.Interpretation Prob.F (SomeLInter Int))
+    <- liftIO $ SMT.solveStM (SMT.minismt mto) $ do
+
+    SMT.setFormat "QF_NIA"
+
+    amint <- DT.mapM toSMTLinearInterpretation absi
+    strictVarEncoder <- Map.fromList `fmap` DT.mapM (\r -> SMT.bvarM' >>= \v -> return (r,v)) rules
+
+      
+    let
+      strict = (strictVarEncoder Map.!)
+      orientSelected (Trs.SelectDP r)  = strict r
+      orientSelected (Trs.SelectTrs r) = strict r
+      orientSelected (Trs.BigAnd es)   = SMT.bigAnd (orientSelected `fmap` es)
+      orientSelected (Trs.BigOr es)    = SMT.bigOr (orientSelected `fmap` es)
+
+      (.>=.) = gte
+
+
+      slamint = foldr k amint (UPEnc.usablePositions usablePositions)
+        where k (f,is) am = I.Interpretation $ Map.adjust (\a -> setStronglyLinear dim a is) f (I.interpretations am)
+      interpret = interpretf (wgDimension p) slamint
+
+      monotoneConstraints =
+        SMT.bigAnd [ setMonotone (I.interpretations slamint `find` f) is | (f,is)  <- UPEnc.usablePositions usablePositions ]
+          where find m f = error ("Interpretation.monotonConstraints: not found:" ++ show f) `DM.fromMaybe` Map.lookup f m
+
+      wOrderConstraints = SMT.bigAnd [ interpret (RR.lhs r) .>=. interpret (RR.rhs r) | r <- wrules ]
+
+      wgOrderConstraints = SMT.bigAnd [ ruleConstraint r | r <- rules ]
+        where
+          ruleConstraint r = wgConstraint SMT..&& (strict r SMT..==> orientConstraint) 
+            where 
+              li = interpret (RR.lhs r)
+              ri = interpret (RR.rhs r)
+              geqVec (EncM.Vector v1) (EncM.Vector v2) = SMT.bigAnd $ zipWith (SMT..>=) v1 v2
+              gtVec (EncM.Vector (v1:vs1)) (EncM.Vector (v2:vs2)) = (v1 SMT..> v2) `SMT.band` geqVec (EncM.Vector vs1) (EncM.Vector vs2)
+              wgConstraint = SMT.bigAnd 
+                [ maybe SMT.bot (\lm -> geqVec (EncM.mRow 1 lm) (EncM.mRow 1 rm)) (Map.lookup v $ MI.coefficients li)
+                | (v,rm) <- Map.toList $ MI.coefficients ri]
+              orientConstraint = SMT.bigAnd 
+                [ maybe SMT.bot  (\lm -> SMT.bigAnd [ geqVec (EncM.mRow j lm) (EncM.mRow j rm) | j <- [2..dim]])
+                                              (Map.lookup v $ MI.coefficients li)
+                                            | (v,rm) <- Map.toList $ MI.coefficients ri]
+                                `SMT.band` gtVec (MI.constant li) (MI.constant ri)
+
+
+      wgOnConstraints = case wgOn p of
+        WgOnTrs -> SMT.bigAnd [ strict r  | r <- strs ]
+        WgOnAny -> SMT.bigOr  [ strict r  | r <- srules ]
+
+      wgSelConstraints = case wgSel p of
+        Just sel -> orientSelected (RS.rsSelect sel prob)
+        Nothing  -> SMT.top
+     
+    SMT.assert monotoneConstraints
+    SMT.assert wOrderConstraints
+    SMT.assert wgOrderConstraints
+    SMT.assert wgOnConstraints
+    SMT.assert wgSelConstraints
+    SMT.assertM (kindConstraints kind slamint)
+    
+
+    return $ SMT.decode slamint
+  return $ wgproof `fmap` res
+  where
+
+    usablePositions = UPEnc.usableArgsWhereApplicable prob False (wgUArgs p == Arg.UArgs)
+
+    trs    = Prob.allComponents prob
+    rules  = Trs.toList trs
+    strs = Trs.toList (Prob.strictTrs prob)
+    srules = Trs.toList (Prob.strictComponents prob)
+    wrules = Trs.toList (Prob.weakComponents prob)
+
+
+    absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (wgDimension p)) (Sig.toMap sig)
+    dim = wgDimension p
+
+    isConstantGrowth = null strs || wgOn p == WgOnTrs
+
+    sig   = Prob.signature prob
+    kind = mxKind miKnd dim deg (Prob.startTerms prob)
+      where
+        miKnd 
+          | isConstantGrowth         = wgKind p
+          | wgKind p == Unrestricted = Algebraic
+          | otherwise                = wgKind p
+                            
+        deg 
+          | isConstantGrowth = wgDegree p
+          | otherwise        = 1
+
+
+
+    wgproof mint = WeightGapOrder 
+      { wgProof       = mproof mint
+      , wgConstGrowth = isConstantGrowth }
+
+    mproof mint = MatrixOrder 
+     { kind_ = kind
+     , dim_ = dim
+     , mint_ = I.InterpretationProof 
+        { I.sig_       = sig
+        , I.inter_     = mint
+        , I.uargs_     = usablePositions
+        , I.ufuns_     = Set.empty
+        , I.shift_     = I.Shift $ RS.selAnyOf RS.selStricts `DM.fromMaybe` (wgSel p)
+        , I.strictDPs_ = sDPs
+        , I.strictTrs_ = sTrs
+        , I.weakDPs_   = wDPs
+        , I.weakTrs_   = wTrs }
+      }
+      where
+      (sDPs,wDPs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
+      (sTrs,wTrs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
+      rs x = [ (r, (interpretf dim mint  lhs, interpretf dim mint rhs)) | r@(RR.Rule lhs rhs) <- Trs.toList x ]
+
+
+instance PP.Pretty WeightGapOrder where
+  pretty p@WeightGapOrder{} = PP.vcat
+      [ PP.text "The weightgap principle applies using the following " <> PP.text growth <> PP.colon
+      , PP.indent 2 $ PP.pretty (wgProof p) 
+      , PP.text "Further, it can be verified that all rules not oriented are covered by the weightgap condition." ]
+    where
+      growth 
+        | wgConstGrowth p = "constant growth matrix-interpretation"
+        | otherwise       = "nonconstant growth matrix-interpretation"
+
+instance Xml.Xml WeightGapOrder where
+  toXml p@WeightGapOrder{} = Xml.elt "weightgap" [Xml.toXml (wgProof p)]
+  toCeTA _                 = Xml.unsupported
+

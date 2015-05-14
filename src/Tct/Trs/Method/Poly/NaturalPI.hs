@@ -134,7 +134,7 @@ entscheide p prob = do
     sig   = Prob.signature prob
     kind  =
       if Prob.isRCProblem prob
-        then PI.ConstructorBased (shape p) (Sig.constructors sig)
+        then PI.ConstructorBased (shape p) (Sig.constructors sig) -- TODO: MS: test; do we gain on precision when restricted to start term constructors
         else PI.Unrestricted (shape p)
     absi  = I.Interpretation $ M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
     shift = maybe I.All I.Shift (selector p)

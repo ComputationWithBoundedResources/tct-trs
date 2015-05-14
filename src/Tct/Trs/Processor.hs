@@ -157,8 +157,8 @@ toDP =
   >>> try usableRules
   where
     toDP' prob
-      -- | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> wgOnUsable) <> dependencyTuples
-      | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> shift) <> dependencyTuples
+      -- | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> wgOnUsable) <|> dependencyTuples
+      | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> shift) <|> dependencyTuples
       | otherwise                    = dependencyPairs >>> try usableRules >>> try wgOnUsable
 
     partIndep prob

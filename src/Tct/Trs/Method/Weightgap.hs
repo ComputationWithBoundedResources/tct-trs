@@ -179,12 +179,12 @@ orientWGConstraints nmi svars smtint sr = SMT.bigAnd [ ruleConstraint rl | rl  <
 orientWG :: WeightGap -> Prob.TrsProblem -> SMT.SolverM (SMT.SolverState SMT.Expr) (I.InterpretationProof a b, MI.MatrixKind Prob.F, I.Interpretation Prob.F (MI.LinearInterpretation MI.SomeIndeterminate SMT.IExpr))
 orientWG p prob = do
   smtint <- F.mapM (I.encode mp) absmi
-  strictVarEncoder <- Map.fromList `fmap` F.mapM (\r -> SMT.nvarM' >>= \v -> return (r,v)) (TRS.toList allrules)
+  strictVarEncoder <- Map.fromList `fmap` F.mapM (\r -> SMT.bvarM' >>= \v -> return (r,v)) (TRS.toList allrules)
 
   let
     strict = (strictVarEncoder Map.!)
-    orientSelected (TRS.SelectDP r)  = strict r .> zero
-    orientSelected (TRS.SelectTrs r) = strict r .> zero
+    orientSelected (TRS.SelectDP r)  = strict r .== SMT.top
+    orientSelected (TRS.SelectTrs r) = strict r .== SMT.top
     orientSelected (TRS.BigAnd es)   = SMT.bigAnd (orientSelected `fmap` es)
     orientSelected (TRS.BigOr es)    = SMT.bigOr (orientSelected `fmap` es)
 
