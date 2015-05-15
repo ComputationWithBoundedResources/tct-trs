@@ -18,19 +18,17 @@ Maintainer  : andreas.kochesser@uibk.ac.at
 Stability   : unstable
 Portability : unportable
 
-TODO: describe matrix interpretations
 -}
 
 module Tct.Trs.Method.Matrix.NaturalMI
-  ( matrixDeclaration
+  (
+  -- * Matrix interpretation
+    matrixDeclaration
   , matrix
   , matrix'
   , matrixCPDeclaration
   , matrixCP
   , matrixCP'
-  , weightGapDeclaration
-  , weightgap
-  , weightgap'
 
   , NaturalMIKind (..)
   , UsableArgs (..)
@@ -38,12 +36,15 @@ module Tct.Trs.Method.Matrix.NaturalMI
   , Greedy (..)
 
   -- * Weight gap
-
+  , weightGapDeclaration
+  , weightgap
+  , weightgap'
   ) where
 
 -- general imports
 import Data.Monoid ((<>))
 import           Control.Monad.Trans                        (liftIO)
+import qualified Control.Monad                              as CM
 import qualified Data.Foldable                              as DF
 import qualified Data.List                                  as List
 import qualified Data.Map                                   as Map
@@ -61,7 +62,7 @@ import qualified Tct.Trs.Data                               as TD
 
 -- imports tct-common
 import qualified Tct.Common.ProofCombinators                as PC
-import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.==>), (.>))
+import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.==>), (.>), (.>=))
 import qualified Tct.Common.SMT                             as SMT
 
 
@@ -92,9 +93,51 @@ import qualified Tct.Trs.Method.Matrix.MatrixInterpretation as MI
 -- should be  Encoding.Matrix
 import qualified Tct.Trs.Method.Matrix.Matrix               as EncM
 
+----------------------------------------------------------------------
+-- keywords for text search:
+-- #MI   matrix interpretation
+-- ##MID matrix interpretation datatypes
+-- ##MIF matrix interpretation functions
+-- ##MIS matrix interpretation strategy declaration
+-- ##MIP matrix interpretation processor
+-- ##MIC matrix interpretation complexity pair
+-- ##MIX matrix interpretation xml and pretty print
+-- #WG   weightgap
+-- ##WGD weightgap data types
+-- ##WGP weightgap processor
+-- ##WGS weightgap strategy declaration
+-- ##WGX weightgap xml and prettyprint
+----------------------------------------------------------------------
+
 
 ----------------------------------------------------------------------
--- data types
+-- #MI matrix interpretation
+----------------------------------------------------------------------
+
+{-
+
+Interpret functions as linear equations over matrices, to orient
+rules of a rewrite system.
+
+Example:
+
+f(x,y) = [ 1 0 ] * x + [ 2 1 ] * y + [ 1 ]
+         [ 0 2 ]       [ 0 1 ]     + [ 1 ]
+
+            ^             ^            ^
+            |             |            |
+             coefficients           constant
+
+Variables x,y are vectors in matrix interpretations.
+Usually the matrix interpretations require restrictions, like
+a triangular shape for the coefficient to produce usable complexity
+results.
+
+-}
+
+
+----------------------------------------------------------------------
+-- ##MIF data types
 ----------------------------------------------------------------------
 
 -- | Kind of the Matrix Interpretation
@@ -132,7 +175,7 @@ type NaturalMIProof = PC.OrientationProof (MatrixOrder Int)
 type SomeLInter a = MI.LinearInterpretation MI.SomeIndeterminate a
 
 ----------------------------------------------------------------------
--- functions
+-- ##MIF functions
 ----------------------------------------------------------------------
 
 {- | update the certification (complexity result) depending on the matrix interpretation order.
@@ -206,23 +249,6 @@ countDiagonal Triangular dim = const dim
 countDiagonal _ _            = EncM.diagonalNonZeros
 
 {- | Counts the degree depending of an interpretation on the matrix kind -}
--- upperbound ::
---   NaturalMI
---   -> MatrixOrder Int
---   -> I.Interpretation Prob.F (SomeLInter Int)
---   -> CD.Complexity
--- upperbound mi order inter =
---   case kind_ order of
---     MI.UnrestrictedMatrix{}                    -> CD.Exp (Just 1)
---     MI.TriangularMatrix{}                      -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter
---     MI.ConstructorBased cs _                   -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter'
---       where inter' = inter{I.interpretations = filterCs $ I.interpretations inter}
---             filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
---     MI.EdaMatrix Nothing                       -> CD.Poly $ Just (miDimension mi)
---     MI.EdaMatrix (Just n)                      -> CD.Poly $ Just n
---     MI.ConstructorEda _ Nothing                -> CD.Poly $ Just (miDimension mi)
---     MI.ConstructorEda _ (Just n)               -> CD.Poly $ Just n
-
 upperbound ::
   Int -- ^ dimension
   -> NaturalMIKind
@@ -295,8 +321,74 @@ diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
     -- md1 = max 0 (miDegree p)
     -- md2 = if md1 < (miDimension p) then Just md1 else Nothing
 
+edaConstraints :: Int
+               -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+               -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+edaConstraints dim mi = do
+  relss <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM' -- index i,j represents relation(i,j)
+  gtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  rConstraints dim relss mi
+    `SMT.bandM` dConstraints dim relss gtwoss mi
+    `SMT.bandM` gtwoConstraints dim gtwoss mi
+     -- goneConstraints do not exist
+
+rConstraints :: Int
+             -> [[SMT.IExpr]]
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+rConstraints dim relss mi =
+  return $ reflexivity relss `SMT.band` transitivity relss `SMT.band` compatibility relss `SMT.band` nocycle relss
+  where d   = dim
+        toD = [1..d]
+        rel vss i j = vss!!i!!j SMT..== one
+        reflexivity vss   = SMT.bigAnd $ map (\ x -> rel vss x x) toD
+        transitivity vss  = SMT.bigAnd [ (rel vss x y `SMT.band` rel vss y z) .==> rel vss x z | x <- toD, y <- toD, z <- toD ]
+        compatibility vss = SMT.bigAnd [ ggeqConstraint mi x y .==> rel vss x y | x <- toD, y <- toD ]
+        nocycle vss       = SMT.bigAnd [ (rel vss 1 y `SMT.band` ggrtConstraint mi x y) .==> SMT.bnot (rel vss y x) | x <- toD, y <- toD ]
+
+dConstraints :: Int
+             -> [[SMT.IExpr]]
+             -> [[[[SMT.IExpr]]]]
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+dConstraints dim relss gtwoss mi = do
+  doness <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  dtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  let
+    rel i j = relss!!i!!j .== one
+    dtwo i j k = dtwoss!!i!!j!!k .== one
+    done i j k = doness!!i!!j!!k .== one
+    gtwo i j k l = gtwoss!!i!!j!!k!!l .== one
+
+    foreapprox  = SMT.bigAnd [ rel 1 x .==>  done x x x | x <- toD ]
+    forecompat  = SMT.bigAnd [ (done i x y `SMT.band` gtwo x y z u) SMT..==> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    backapprox  = SMT.bigAnd [ rel 1 x .==> dtwo x x x | x <- toD ]
+    backcompat  = SMT.bigAnd [ (dtwo i x y `SMT.band` gtwo z u x y) .==> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y `SMT.band` dtwo i x y) | i <- toD, x <- toD, y <- toD ]
+  return $ foreapprox `SMT.band` forecompat `SMT.band` backapprox `SMT.band` backcompat `SMT.band` exactness
+  where
+    toD         = [1..dim]
+
+gtwoConstraints :: Int
+                -> [[[[SMT.IExpr]]]]
+                -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+                -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+gtwoConstraints dim gtwoss mi =
+  return $ SMT.bigAnd [ f i j k l | i <- toD, j <- toD, k <- toD, l <- toD ]
+  where
+    toD = [1..dim]
+    gtwo i j k l = gtwoss!!i!!j!!k!!l .== one
+    f i j k l   = (gtwo i j k l) .<=> SMT.bigOr (map (SMT.bigOr . map (g i j k l) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
+    g i j k l m = (EncM.mEntry i k m .>= one) `SMT.band` (EncM.mEntry j l m .>= one)
 
 
+ggeqConstraint :: I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr) -> Int -> Int
+     -> SMT.Formula SMT.IFormula
+ggeqConstraint mi i j = SMT.bigOr (map (SMT.bigOr . map (\ m -> EncM.mEntry i j m .>= SR.one) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
+
+ggrtConstraint :: I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr) -> Int -> Int
+     -> SMT.Formula SMT.IFormula
+ggrtConstraint mi i j = SMT.bigOr (map (SMT.bigOr . map (\ m -> EncM.mEntry i j m .> SR.one) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
 
 mxKind :: NaturalMIKind -> Int -> Int -> StartTerms fun -> MI.MatrixKind fun
 mxKind kind dim deg  st = case (kind, st) of
@@ -328,7 +420,14 @@ kindConstraints (MI.ConstructorBased cs (Just deg)) absmi = diagOnesConstraint d
   where absmi' = absmi{I.interpretations = filterCs $ I.interpretations absmi}
         filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
 kindConstraints _ _ = return SMT.bot
--- kindConstraints (EdaMatrix Nothing) absmi = edaConstraints absmi
+kindConstraints (MI.EdaMatrix Nothing) absmi = edaConstraints dim absmi
+  where
+    ints = I.interpretations absmi
+    -- should we give dim as parameter to kindConstraints or extract it in the way done below?
+    dim = if Map.null ints
+          then 0
+          else EncM.vDim $ MI.constant $ snd $ head $ Map.assocs ints
+
 -- kindConstraints (EdaMatrix (Just deg)) absmi = idaConstraints deg absmi
 -- kindConstraints (ConstructorEda cs mdeg) absmi =
 --   rcConstraints (absmi' ds)
@@ -418,7 +517,7 @@ entscheide1 p aorder encoding decoding forceAny prob
 
 
 ----------------------------------------------------------------------
--- matrix strategy declaration
+-- ##MIS matrix strategy declaration
 ----------------------------------------------------------------------
 
 
@@ -506,7 +605,7 @@ matrix' = CD.declFun matrixDeclaration
 
 
 ----------------------------------------------------------------------
--- important instances
+-- ##MIP MI processor and abstract interpretation ##
 ----------------------------------------------------------------------
 
 instance I.AbstractInterpretation NaturalMI where
@@ -588,7 +687,9 @@ instance CD.Processor NaturalMI where
 
 
 
---- ** complexity pair -----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------
+-- ##MIC matrix interpretation complexity pair
+----------------------------------------------------------------------
 
 
 instance CP.IsComplexityPair NaturalMI where
@@ -636,7 +737,7 @@ matrixCP' = CD.declFun matrixCPDeclaration
 
 
 ----------------------------------------------------------------------
--- other instances
+-- ##MIX matrix interpretation prettyprint and xml
 ----------------------------------------------------------------------
 
 
@@ -660,7 +761,14 @@ instance CD.SParsable i i NaturalMIKind where
 
 
 
---- * weightgap ------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------
+-- #WG weightgap
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+-- ##WGD datatypes
+----------------------------------------------------------------------
+
 
 data WgOn
   = WgOnTrs -- ^ Orient at least all non-DP rules.
@@ -684,6 +792,9 @@ data WeightGapOrder =  WeightGapOrder
 
 type WeightGapProof = PC.OrientationProof WeightGapOrder
 
+----------------------------------------------------------------------
+-- ##WGP weightgap processor
+----------------------------------------------------------------------
 
 instance CD.Processor WeightGap where
   type ProofObject WeightGap = PC.ApplicationProof WeightGapProof
@@ -838,22 +949,10 @@ wgEntscheide p prob = do
       rs x = [ (r, (interpretf dim mint  lhs, interpretf dim mint rhs)) | r@(RR.Rule lhs rhs) <- Trs.toList x ]
 
 
-instance PP.Pretty WeightGapOrder where
-  pretty p@WeightGapOrder{} = PP.vcat
-      [ PP.text "The weightgap principle applies using the following " <> PP.text growth <> PP.colon
-      , PP.indent 2 $ PP.pretty (wgProof p)
-      , PP.text "Further, it can be verified that all rules not oriented are covered by the weightgap condition." ]
-    where
-      growth
-        | wgConstGrowth p = "constant growth matrix-interpretation"
-        | otherwise       = "nonconstant growth matrix-interpretation"
 
-instance Xml.Xml WeightGapOrder where
-  toXml p@WeightGapOrder{} = Xml.elt "weightgap" [Xml.toXml (wgProof p)]
-  toCeTA _                 = Xml.unsupported
-
-
-
+----------------------------------------------------------------------
+-- ##WGS weightgap strategy declaration
+----------------------------------------------------------------------
 
 weightGapStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> WgOn -> Maybe (RS.ExpressionSelector Prob.F Prob.V)
                   -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
@@ -904,3 +1003,22 @@ weightgap' ::  Int -> Int -> NaturalMIKind -> Arg.UsableArgs  -> WgOn
            -> Maybe (RS.ExpressionSelector Prob.F Prob.V)
            -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
 weightgap' = CD.declFun weightGapDeclaration
+
+----------------------------------------------------------------------
+-- ##WGX weightgap prettyprint and xml
+----------------------------------------------------------------------
+
+
+instance PP.Pretty WeightGapOrder where
+  pretty p@WeightGapOrder{} = PP.vcat
+      [ PP.text "The weightgap principle applies using the following " <> PP.text growth <> PP.colon
+      , PP.indent 2 $ PP.pretty (wgProof p)
+      , PP.text "Further, it can be verified that all rules not oriented are covered by the weightgap condition." ]
+    where
+      growth
+        | wgConstGrowth p = "constant growth matrix-interpretation"
+        | otherwise       = "nonconstant growth matrix-interpretation"
+
+instance Xml.Xml WeightGapOrder where
+  toXml p@WeightGapOrder{} = Xml.elt "weightgap" [Xml.toXml (wgProof p)]
+  toCeTA _                 = Xml.unsupported
