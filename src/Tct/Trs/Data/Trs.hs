@@ -1,15 +1,6 @@
-{- |
-Set like interface TRSs.
-
-Should be imported qualified.
- -}
--- TODO: MS
--- at some point check if lists actually would be better
--- * often we use toList + map
--- * often we use Prob.dpComponents ..., and we have to perform a union; for lists we could just concat the
--- components assuming that problem itself is valid
-
-{-# LANGUAGE DeriveFoldable #-}
+-- | This module provides a set like interface to TRSs.
+-- 
+-- Should be imported qualified.
 module Tct.Trs.Data.Trs
   (
   Trs
@@ -30,6 +21,7 @@ module Tct.Trs.Data.Trs
 
   , size
   , null
+  , isWellformed
   , isDuplicating, isLinear, isLeftLinear, isRightLinear, isCollapsing
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
 
@@ -48,6 +40,7 @@ import qualified Tct.Core.Common.Xml    as Xml
 
 import           Data.Rewriting.Rule    (Rule)
 import qualified Data.Rewriting.Rule    as R
+import qualified Data.Rewriting.Rules   as R (lhss)
 import qualified Data.Rewriting.Term    as T
 
 import qualified Tct.Trs.Data.Rewriting as R
@@ -159,6 +152,12 @@ null = lift1 S.null
 
 isSubset :: (Ord f, Ord v) => Trs f v -> Trs f v -> Bool
 isSubset = lift2 S.isSubsetOf
+
+isWellformed :: Ord v => Trs f v -> Bool
+isWellformed trs = all T.isFun (R.lhss rules) && all (\r -> vars (R.lhs r) `S.isSubsetOf` vars (R.rhs r)) rules
+  where 
+    rules = toList trs
+    vars = S.fromList . T.vars
 
 isLinear, isLeftLinear, isRightLinear, isDuplicating, isCollapsing :: (Ord f, Ord v) => Trs f v -> Bool
 isLinear      = all' R.isLinear

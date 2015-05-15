@@ -39,7 +39,7 @@ trsMode = TctMode
 parser :: String -> Either TctError TrsProblem
 parser s = case R.fromString s of
   Left e  -> Left $ TctParseError (show e)
-  Right p -> Right $ fromRewriting p
+  Right p -> either (Left . TctParseError) Right (fromRewriting p)
 
 -- | Trs specific command line options.
 options :: Options TrsOptions
