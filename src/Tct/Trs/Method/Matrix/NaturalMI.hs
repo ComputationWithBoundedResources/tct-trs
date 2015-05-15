@@ -28,6 +28,9 @@ module Tct.Trs.Method.Matrix.NaturalMI
   , matrixCPDeclaration
   , matrixCP
   , matrixCP'
+  , weightGapDeclaration
+  , weightgap
+  , weightgap'
 
   , NaturalMIKind (..)
   , UsableArgs (..)
@@ -143,7 +146,7 @@ certification mi order cert = case cert of
   CD.Null         -> CD.timeUBCert bound
   CD.Opt (CD.Id c) -> CD.updateTimeUBCert c (`SR.add` bound)
   where
-    bound = upperbound mi order (I.inter_ $ mint_ order)
+    bound = upperbound (miDimension mi) (miKind mi) (kind_ order) (I.inter_ $ mint_ order)
 
 {- | convert an abstract linear interpretation into an SMT interpretation -}
 toSMTLinearInterpretation :: SomeLInter (MI.MatrixInterpretationEntry fun)
@@ -203,22 +206,41 @@ countDiagonal Triangular dim = const dim
 countDiagonal _ _            = EncM.diagonalNonZeros
 
 {- | Counts the degree depending of an interpretation on the matrix kind -}
+-- upperbound ::
+--   NaturalMI
+--   -> MatrixOrder Int
+--   -> I.Interpretation Prob.F (SomeLInter Int)
+--   -> CD.Complexity
+-- upperbound mi order inter =
+--   case kind_ order of
+--     MI.UnrestrictedMatrix{}                    -> CD.Exp (Just 1)
+--     MI.TriangularMatrix{}                      -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter
+--     MI.ConstructorBased cs _                   -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter'
+--       where inter' = inter{I.interpretations = filterCs $ I.interpretations inter}
+--             filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
+--     MI.EdaMatrix Nothing                       -> CD.Poly $ Just (miDimension mi)
+--     MI.EdaMatrix (Just n)                      -> CD.Poly $ Just n
+--     MI.ConstructorEda _ Nothing                -> CD.Poly $ Just (miDimension mi)
+--     MI.ConstructorEda _ (Just n)               -> CD.Poly $ Just n
+
 upperbound ::
-  NaturalMI
-  -> MatrixOrder Int
+  Int -- ^ dimension
+  -> NaturalMIKind
+  -> MI.MatrixKind Prob.F
   -> I.Interpretation Prob.F (SomeLInter Int)
   -> CD.Complexity
-upperbound mi order inter =
-  case kind_ order of
-    MI.UnrestrictedMatrix{}                    -> CD.Exp (Just 1)
-    MI.TriangularMatrix{}                      -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter
-    MI.ConstructorBased cs _                   -> CD.Poly $ Just $ countDiagonal (miKind mi) (miDimension mi) $ maxNonIdMatrix (miDimension mi) inter'
-      where inter' = inter{I.interpretations = filterCs $ I.interpretations inter}
-            filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
-    MI.EdaMatrix Nothing                       -> CD.Poly $ Just (miDimension mi)
-    MI.EdaMatrix (Just n)                      -> CD.Poly $ Just n
-    MI.ConstructorEda _ Nothing                -> CD.Poly $ Just (miDimension mi)
-    MI.ConstructorEda _ (Just n)               -> CD.Poly $ Just n
+upperbound dim intKind ordKind inter =
+  case ordKind of
+   MI.UnrestrictedMatrix{}                    -> CD.Exp (Just 1)
+   MI.TriangularMatrix{}                      -> CD.Poly $ Just $ countDiagonal (intKind) (dim) $ maxNonIdMatrix (dim) inter
+   MI.ConstructorBased cs _                   -> CD.Poly $ Just $ countDiagonal (intKind) (dim) $ maxNonIdMatrix (dim) inter'
+     where inter' = inter{I.interpretations = filterCs $ I.interpretations inter}
+           filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
+   MI.EdaMatrix Nothing                       -> CD.Poly $ Just (dim)
+   MI.EdaMatrix (Just n)                      -> CD.Poly $ Just n
+   MI.ConstructorEda _ Nothing                -> CD.Poly $ Just (dim)
+   MI.ConstructorEda _ (Just n)               -> CD.Poly $ Just n
+
 
 {- | Checks wheter a matrix is different to the identity matrix of a given dimension. -}
 maxNonIdMatrix :: Int
@@ -260,7 +282,7 @@ diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
     --   if Prob.isRCProblem prob
     --   then MI.ConstructorBased cs md2
     --   else MI.TriangularMatrix md2
-    -- toKind Triangular = 
+    -- toKind Triangular =
     --   if Prob.isRCProblem prob
     --   then MI.ConstructorBased cs Nothing
     --   else MI.TriangularMatrix Nothing
@@ -289,7 +311,7 @@ mxKind kind dim deg  st = case (kind, st) of
     cs = ProbK.constructors st
     md = let d = max 0 deg in if d < dim then Just d else Nothing
 
-  
+
 
 
 
@@ -640,13 +662,13 @@ instance CD.SParsable i i NaturalMIKind where
 
 --- * weightgap ------------------------------------------------------------------------------------------------------
 
-data WgOn 
+data WgOn
   = WgOnTrs -- ^ Orient at least all non-DP rules.
   | WgOnAny -- ^ Orient some rule.
   deriving (Eq, Show, DT.Typeable, Bounded, Enum)
 
 
-data WeightGap = WeightGap 
+data WeightGap = WeightGap
   { wgDimension :: Int
   , wgDegree    :: Int
   , wgKind      :: NaturalMIKind
@@ -655,7 +677,7 @@ data WeightGap = WeightGap
   , wgSel       :: Maybe (ExpressionSelector F V)
   } deriving (Show)
 
-data WeightGapOrder =  WeightGapOrder 
+data WeightGapOrder =  WeightGapOrder
   { wgProof       :: MatrixOrder Int
   , wgConstGrowth :: Bool }
   deriving (Show)
@@ -667,14 +689,32 @@ instance CD.Processor WeightGap where
   type ProofObject WeightGap = PC.ApplicationProof WeightGapProof
   type I WeightGap           = Prob.TrsProblem
   type O WeightGap           = Prob.TrsProblem
+  type Forking WeightGap     = CD.Optional CD.Id
 
   solve p prob
     | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
     | otherwise           = do
       res <- wgEntscheide p prob
-      case res of
-        SMT.Sat order -> undefined
-        _             -> undefined
+      let
+        res' = case res of
+          SMT.Sat order
+            | Trs.null oriented -> I.toTree p prob $ CD.Fail (PC.Applicable $ PC.Order order)
+            | otherwise -> I.toTree p prob $ CD.Success newProb (PC.Applicable $ PC.Order order) cert
+            where
+                mi = mint_ $ wgProof order
+                oriented = (Trs.fromList . map fst $ I.strictTrs_ mi) `Trs.union` (Trs.fromList . map fst $ I.strictDPs_ mi)
+                newProb = I.newProblem prob mi
+                cert = wgCertification p order
+                wgCertification :: WeightGap -> WeightGapOrder -> CD.Optional CD.Id CD.Certificate -> CD.Certificate
+                wgCertification wg ord certificate = case certificate of
+                  CD.Null          -> CD.timeUBCert bound
+                  CD.Opt (CD.Id c) -> CD.updateTimeUBCert c (`SR.add` bound)
+                  where
+                    bound = upperbound (wgDimension wg) (wgKind wg) (kind_ $ wgProof ord) (I.inter_ $ mint_ (wgProof ord))
+          _ -> I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
+      return $ toResult res'
+    where
+      toResult pt = if CD.progress pt then CD.Continue pt else CD.Abort pt
 
 wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
 wgEntscheide p prob = do
@@ -687,7 +727,7 @@ wgEntscheide p prob = do
     amint <- DT.mapM toSMTLinearInterpretation absi
     strictVarEncoder <- Map.fromList `fmap` DT.mapM (\r -> SMT.bvarM' >>= \v -> return (r,v)) rules
 
-      
+
     let
       strict = (strictVarEncoder Map.!)
       orientSelected (Trs.SelectDP r)  = strict r
@@ -710,16 +750,16 @@ wgEntscheide p prob = do
 
       wgOrderConstraints = SMT.bigAnd [ ruleConstraint r | r <- rules ]
         where
-          ruleConstraint r = wgConstraint SMT..&& (strict r SMT..==> orientConstraint) 
-            where 
+          ruleConstraint r = wgConstraint SMT..&& (strict r SMT..==> orientConstraint)
+            where
               li = interpret (RR.lhs r)
               ri = interpret (RR.rhs r)
               geqVec (EncM.Vector v1) (EncM.Vector v2) = SMT.bigAnd $ zipWith (SMT..>=) v1 v2
               gtVec (EncM.Vector (v1:vs1)) (EncM.Vector (v2:vs2)) = (v1 SMT..> v2) `SMT.band` geqVec (EncM.Vector vs1) (EncM.Vector vs2)
-              wgConstraint = SMT.bigAnd 
+              wgConstraint = SMT.bigAnd
                 [ maybe SMT.bot (\lm -> geqVec (EncM.mRow 1 lm) (EncM.mRow 1 rm)) (Map.lookup v $ MI.coefficients li)
                 | (v,rm) <- Map.toList $ MI.coefficients ri]
-              orientConstraint = SMT.bigAnd 
+              orientConstraint = SMT.bigAnd
                 [ maybe SMT.bot  (\lm -> SMT.bigAnd [ geqVec (EncM.mRow j lm) (EncM.mRow j rm) | j <- [2..dim]])
                                               (Map.lookup v $ MI.coefficients li)
                                             | (v,rm) <- Map.toList $ MI.coefficients ri]
@@ -733,14 +773,14 @@ wgEntscheide p prob = do
       wgSelConstraints = case wgSel p of
         Just sel -> orientSelected (RS.rsSelect sel prob)
         Nothing  -> SMT.top
-     
+
     SMT.assert monotoneConstraints
     SMT.assert wOrderConstraints
     SMT.assert wgOrderConstraints
     SMT.assert wgOnConstraints
     SMT.assert wgSelConstraints
     SMT.assertM (kindConstraints kind slamint)
-    
+
 
     return $ SMT.decode slamint
   return $ wgproof `fmap` res
@@ -763,25 +803,25 @@ wgEntscheide p prob = do
     sig   = Prob.signature prob
     kind = mxKind miKnd dim deg (Prob.startTerms prob)
       where
-        miKnd 
+        miKnd
           | isConstantGrowth         = wgKind p
           | wgKind p == Unrestricted = Algebraic
           | otherwise                = wgKind p
-                            
-        deg 
+
+        deg
           | isConstantGrowth = wgDegree p
           | otherwise        = 1
 
 
 
-    wgproof mint = WeightGapOrder 
+    wgproof mint = WeightGapOrder
       { wgProof       = mproof mint
       , wgConstGrowth = isConstantGrowth }
 
-    mproof mint = MatrixOrder 
+    mproof mint = MatrixOrder
      { kind_ = kind
      , dim_ = dim
-     , mint_ = I.InterpretationProof 
+     , mint_ = I.InterpretationProof
         { I.sig_       = sig
         , I.inter_     = mint
         , I.uargs_     = usablePositions
@@ -801,10 +841,10 @@ wgEntscheide p prob = do
 instance PP.Pretty WeightGapOrder where
   pretty p@WeightGapOrder{} = PP.vcat
       [ PP.text "The weightgap principle applies using the following " <> PP.text growth <> PP.colon
-      , PP.indent 2 $ PP.pretty (wgProof p) 
+      , PP.indent 2 $ PP.pretty (wgProof p)
       , PP.text "Further, it can be verified that all rules not oriented are covered by the weightgap condition." ]
     where
-      growth 
+      growth
         | wgConstGrowth p = "constant growth matrix-interpretation"
         | otherwise       = "nonconstant growth matrix-interpretation"
 
@@ -812,3 +852,55 @@ instance Xml.Xml WeightGapOrder where
   toXml p@WeightGapOrder{} = Xml.elt "weightgap" [Xml.toXml (wgProof p)]
   toCeTA _                 = Xml.unsupported
 
+
+
+
+weightGapStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> WgOn -> Maybe (RS.ExpressionSelector Prob.F Prob.V)
+                  -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
+weightGapStrategy dim deg nmiKind ua on sl = CD.Proc
+  WeightGap { wgDimension = dim
+            , wgDegree = deg
+            , wgKind = nmiKind
+            , wgUArgs = ua
+            , wgOn = on
+            , wgSel = sl}
+
+weightGapDeclaration :: CD.Declaration (
+  '[ CD.Argument 'CD.Optional Int
+   , CD.Argument 'CD.Optional Int
+   , CD.Argument 'CD.Optional NaturalMIKind
+   , CD.Argument 'CD.Optional Arg.UsableArgs
+   , CD.Argument 'CD.Optional WgOn
+   , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V))
+  ] CD.:-> CD.Strategy Prob.TrsProblem Prob.TrsProblem)
+weightGapDeclaration = CD.declare  "weightgap" wgDescription wgArgs weightGapStrategy
+  where
+   wgDescription = [ "Uses the weight gap principle to shift some strict rules to the weak part of the problem"]
+   wgArgs :: ( CD.Argument 'CD.Optional Int
+          , CD.Argument 'CD.Optional Int
+          , CD.Argument 'CD.Optional NaturalMIKind
+          , CD.Argument 'CD.Optional Arg.UsableArgs
+          , CD.Argument 'CD.Optional WgOn
+          , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V)))
+   wgArgs = (argDim,argDeg, argNMIKind, argUA, argWgOn, argSel)
+   argDim = dimArg `CD.optional` 1
+   argDeg = degArg `CD.optional` 1
+   argNMIKind = nmiKindArg `CD.optional` Algebraic
+   argUA = Arg.usableArgs  `CD.optional` Arg.UArgs
+   argWgOn = CD.arg
+     `CD.withName` "on"
+     `CD.withDomain` fmap show [(minBound :: WgOn)..]
+     `CD.withHelp`  [ "This flag determines which rule have to be strictly oriented by the the matrix interpretation for the weight gap principle. "
+                    , "Here 'trs' refers to all strict non-dependency-pair rules of the considered problem, "
+                    , "while 'any' only demands any rule at all to be strictly oriented. "
+                    , "The default value is 'trs'."]
+     `CD.optional` WgOnTrs
+   argSel = slArg  `CD.optional` Just (RS.selAnyOf RS.selStricts)
+
+weightgap :: CD.Strategy Prob.TrsProblem Prob.TrsProblem
+weightgap = CD.deflFun weightGapDeclaration
+
+weightgap' ::  Int -> Int -> NaturalMIKind -> Arg.UsableArgs  -> WgOn
+           -> Maybe (RS.ExpressionSelector Prob.F Prob.V)
+           -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
+weightgap' = CD.declFun weightGapDeclaration
