@@ -81,6 +81,10 @@ import qualified Tct.Trs.Data.Signature       as Sig
 -- the signature contains all symbols of the DP/TRS components and all symbols stored in the start terms
 -- the dp graph corrensponds to the DP components. is empty if the DP components are empty
 
+-- NOTE: the dp graph stores DP rules as well as a Flag that indiciates wether it belongs to the strict/weak component
+-- this information has to be updated when the dp components of the problem are updated
+-- use santisieDPGraph to re-compute the graph
+
 
 -- | The problem type parameterised in the function symbol and variable type.
 data Problem f v = Problem

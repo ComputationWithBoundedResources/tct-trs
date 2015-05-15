@@ -1,5 +1,5 @@
-{- | This module provides the encoding for \usable rules modulo argument filtering\. -}
 {-# LANGUAGE ScopedTypeVariables #-}
+{- | This module provides the encoding for \usable rules modulo argument filtering\. -}
 module Tct.Trs.Encoding.UsableRules
   ( UsableEncoder
   , UsableSymbols (..)

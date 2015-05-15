@@ -173,6 +173,8 @@ isNonDuplicating    = not . isDuplicating
 
 
 -- * property-tests; return Just msg if property is not fulfilled.
+-- TODO: MS: this is confusing as we comine with <|> eg. isLinear' <|> isNonDuplicating'
+-- use Either, rename, fixed type?
 
 note :: Bool -> String -> Maybe String
 note b st = if b then Just st else Nothing

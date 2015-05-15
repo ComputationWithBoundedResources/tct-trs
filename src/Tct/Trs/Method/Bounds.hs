@@ -39,7 +39,6 @@ import           Tct.Core.Combinators               ((>>>))
 import           Tct.Common.ProofCombinators        (ApplicationProof(..))
 
 import           Tct.Trs.Data
-import           Tct.Trs.Data.DependencyGraph       as DG (empty)
 import qualified Tct.Trs.Data.Problem               as Prob
 import qualified Tct.Trs.Data.ProblemKind           as Prob
 import qualified Tct.Trs.Data.Rewriting             as R
@@ -123,18 +122,19 @@ instance T.Processor Bounds where
         return $ T.Success (T.toId nprob) (Applicable proof) (flip T.updateTimeUBCert (`add` T.linear) . T.fromId)
       maybeApplicable = Trs.isRightLinear' (strict `Trs.union` weak)
 
-      strict       = Prob.strictComponents prob
-      weak         = Prob.weakComponents prob
-      sig          = Prob.signature prob
-      st           = Prob.startTerms prob
+      strict = Prob.strictComponents prob
+      weak   = Prob.weakComponents prob
+      sig    = Prob.signature prob
+      st     = Prob.startTerms prob
 
       automaton = computeAutomaton sig st strict weak (enrichment p) (initialAutomaton p)
-      nprob = prob
+
+      -- MS: the problem is actually already solved; but we return a trivial problem so certificatioin is easier to handle
+      nprob = Prob.sanitiseDPGraph $ prob
         { Prob.strictDPs = Trs.empty
         , Prob.strictTrs = Trs.empty
         , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` Prob.strictDPs prob
-        , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` Prob.strictTrs prob 
-        , Prob.dpGraph   = DG.empty }
+        , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` Prob.strictTrs prob }
       proof = BoundsProof
         { enrichment_ = enrichment p
         , automaton_  = automaton
@@ -235,7 +235,7 @@ instance PP.Pretty BoundsProof where
       ppTransition (GEpsilon q1 q2)         = PP.int q1 <> ppArrow <> PP.int q2
       ppArrow = PP.text " -> "
 
--- MS: The implementation corresponds to CeTA's relative bounds.
+
 instance Xml.Xml BoundsProof where
   toXml p = Xml.elt "relativeBounds" [xbounds, xtrs] where
     xbounds = Xml.elt "bounds"

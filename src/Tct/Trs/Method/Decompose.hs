@@ -4,36 +4,30 @@ module Tct.Trs.Method.Decompose
   ( decomposeDeclaration
   , decompose
   , decompose'
-
-  -- * processor interface
-  , Decompose
-  , DecomposeBound (..)
-  , decomposeProc
-  , decomposeProc'
-  , combineBy
-  , decomposeBy
+  , DecomposeBound(..)
   ) where
 
 
 import           Control.Applicative
 import           Data.Typeable
 
-import qualified Data.Rewriting.Rule         as R (Rule)
-import qualified Data.Rewriting.Term         as R (isVariantOf)
+import qualified Data.Rewriting.Rule          as R (Rule)
+import qualified Data.Rewriting.Term          as R (isVariantOf)
 
-import qualified Tct.Core.Common.Parser      as P
-import qualified Tct.Core.Common.Pretty      as PP
+import qualified Tct.Core.Common.Parser       as P
+import qualified Tct.Core.Common.Pretty       as PP
 import           Tct.Core.Common.SemiRing
-import qualified Tct.Core.Common.Xml         as Xml
-import qualified Tct.Core.Data               as T
+import qualified Tct.Core.Common.Xml          as Xml
+import qualified Tct.Core.Data                as T
 
 import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.Problem        as Prob
-import qualified Tct.Trs.Data.Rewriting      as R
+import qualified Tct.Trs.Data.DependencyGraph as DG
+import qualified Tct.Trs.Data.Problem         as Prob
+import qualified Tct.Trs.Data.Rewriting       as R
 import           Tct.Trs.Data.RuleSelector
-import qualified Tct.Trs.Data.Trs            as Trs
+import qualified Tct.Trs.Data.Trs             as Trs
 
 
 data DecomposeBound
@@ -41,7 +35,7 @@ data DecomposeBound
   | RelativeAdd
   | RelativeMul
   | RelativeComp
-  deriving (Eq, Show, Typeable)
+  deriving (Eq, Show, Bounded, Enum, Typeable)
 
 
 -- checks condition on R and S
@@ -55,15 +49,13 @@ isApplicableRandS prob compfn = case compfn of
 
 -- for Add and RelativeComp rules in rProb have to be non-size increasing
 selectForcedRules :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> SelectorExpression f v
-selectForcedRules prob compfn =
-  BigAnd $ [SelectDP r | r <- forcedDps ] ++ [SelectTrs r | r <- forcedTrs ]
+selectForcedRules prob compfn = BigAnd $ [ SelectDP r | r <- forcedDps ] ++ [SelectTrs r | r <- forcedTrs ]
   where
-    (forcedDps, forcedTrs) =
-      case compfn of
-        RelativeComp -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
-        Add          -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
-        _ -> ([],[])
-        where fsi f = [ rule | rule <- Trs.toList (f prob), not (R.isNonSizeIncreasing rule)]
+    (forcedDps, forcedTrs) = case compfn of
+      RelativeComp -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
+      Add          -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
+      _            -> ([],[])
+      where fsi f = [ rule | rule <- Trs.toList (f prob), not (R.isNonSizeIncreasing rule)]
 
 -- for Add rProb and sProb commute
 isApplicableRModuloS :: (Ord f, Ord v) => Problem f v -> Problem f v -> DecomposeBound -> Maybe String
@@ -88,25 +80,25 @@ mkProbs prob compfn dps trs = (rProb, sProb)
     sDps = Prob.strictDPs prob `Trs.difference` rDps
     sTrs = Prob.strictTrs prob `Trs.difference` rTrs
 
-    rProb = Prob.sanitiseDPGraph $ prob
+    rProb = prob
       { Prob.strictDPs = rDps
       , Prob.strictTrs = rTrs
-      , Prob.weakTrs   = sTrs `Trs.union` Prob.weakTrs prob
-      , Prob.weakDPs   = sDps `Trs.union` Prob.weakDPs prob }
+      , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDps
+      , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs 
+      , Prob.dpGraph   = DG.setWeak sDps (Prob.dpGraph prob) }
 
     sProb = Prob.sanitiseDPGraph $ 
       if isAdditive compfn 
         then prob
-          { Prob.strictTrs  = sTrs
-          , Prob.strictDPs  = sDps
-          , Prob.weakTrs    = rTrs `Trs.union` Prob.weakTrs prob
-          , Prob.weakDPs    = rDps `Trs.union` Prob.weakDPs prob }
+          { Prob.strictDPs  = sDps
+          , Prob.strictTrs  = sTrs
+          , Prob.weakDPs    = Prob.weakDPs prob `Trs.union` rDps
+          , Prob.weakTrs    = Prob.weakTrs prob `Trs.union` rTrs }
         else prob 
           { Prob.strictTrs  = sTrs
           , Prob.strictDPs  = sDps }
 
     isAdditive c = c == Add || c == RelativeAdd
-
 
 
 --- * processor ------------------------------------------------------------------------------------------------------
@@ -214,36 +206,38 @@ bndArg = boundArg `T.optional` RelativeAdd
 selArg :: T.Argument 'T.Optional (ExpressionSelector F V)
 selArg = selectorArg `T.optional` selAnyOf selStricts
 
-decomposeProcDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional DecomposeBound ]
-   T.:-> Decompose )
-decomposeProcDeclaration = T.declare "decompose" desc (selArg, bndArg) decomposeProcessor
-
-decomposeProc :: ExpressionSelector F V -> DecomposeBound -> (Decompose -> Decompose) -> TrsStrategy
-decomposeProc sel b f = T.Proc . f $ T.declFun decomposeProcDeclaration sel b
-
-decomposeProc' :: (Decompose -> Decompose) -> TrsStrategy
-decomposeProc' f = T.Proc . f $ T.deflFun decomposeProcDeclaration
-
 decomposeDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional DecomposeBound ] 
    T.:-> TrsStrategy)
 decomposeDeclaration = T.declare "decompose" desc (selArg, bndArg) (\x y -> T.Proc (decomposeProcessor x y ))
-
-decomposeBy :: ExpressionSelector F V -> Decompose -> Decompose
-decomposeBy sel p = p{ onSelection=sel }
-
-combineBy :: DecomposeBound -> Decompose -> Decompose
-combineBy bnd p = p{ withBound=bnd }
-
-
 decompose :: ExpressionSelector F V -> DecomposeBound -> TrsStrategy
 decompose = T.declFun decomposeDeclaration
 
 decompose' :: TrsStrategy
 decompose' = T.deflFun decomposeDeclaration
+
+
+-- MS: unfortunately we can not provide update functions for strategie/strategydeclaratioin
+-- we could offer an alternative interface; 
+
+-- decomposeProcDeclaration :: T.Declaration (
+--   '[ T.Argument 'T.Optional (ExpressionSelector F V)
+--    , T.Argument 'T.Optional DecomposeBound ]
+--    T.:-> Decompose )
+-- decomposeProcDeclaration = T.declare "decompose" desc (selArg, bndArg) decomposeProcessor
+
+-- decomposeProc :: ExpressionSelector F V -> DecomposeBound -> (Decompose -> Decompose) -> TrsStrategy
+-- decomposeProc sel b f = T.Proc . f $ T.declFun decomposeProcDeclaration sel b
+
+-- decomposeProc' :: (Decompose -> Decompose) -> TrsStrategy
+-- decomposeProc' f = T.Proc . f $ T.deflFun decomposeProcDeclaration
+
+-- decomposeBy :: ExpressionSelector F V -> Decompose -> Decompose
+-- decomposeBy sel p = p{ onSelection=sel }
+
+-- combineBy :: DecomposeBound -> Decompose -> Decompose
+-- combineBy bnd p = p{ withBound=bnd }
 
 
 boundArg :: T.Argument 'T.Required DecomposeBound
@@ -256,9 +250,5 @@ boundArg = T.arg { T.argName = "allow", T.argDomain = "<bound>"} `T.withHelp` he
       , "<bound> is one of " ++ show [Add, RelativeAdd, RelativeMul, RelativeComp] ]
 
 instance T.SParsable i i DecomposeBound where
-  parseS = P.choice
-    [ P.symbol (show Add) >> return Add
-    , P.symbol (show RelativeAdd) >> return RelativeAdd
-    , P.symbol (show RelativeMul) >> return RelativeMul
-    , P.symbol (show RelativeComp) >> return RelativeComp ]
+  parseS = P.enum
 

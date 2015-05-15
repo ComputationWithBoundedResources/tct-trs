@@ -17,16 +17,17 @@ module Tct.Trs.Method.DP.DPGraph.DecomposeDG
   , decomposeDG
   , decomposeDG'
 
+  -- * ruleselector instances
   , decomposeDGselect
 
   -- * Processor
-  , decomposeDGProc
-  , decomposeDGProc'
+  -- , decomposeDGProc
+  -- , decomposeDGProc'
 
-  , DecomposeDG
-  , selectLowerBy
-  , solveLowerWith
-  , solveUpperWith
+  -- , DecomposeDG
+  -- , selectLowerBy
+  -- , solveLowerWith
+  -- , solveUpperWith
   ) where
 
 
@@ -67,12 +68,12 @@ data DecomposeDGProof
   deriving Show
 
 certfn :: T.Pair T.Certificate -> T.Certificate
-certfn (T.Pair (c1,c2)) = zero { T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.timeLB = T.timeLB c1 `add` T.timeLB c2}
+certfn (T.Pair (c1,c2)) = zero { T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.timeLB = T.timeLB c1 `add` T.timeLB c2 }
 
 instance T.Processor DecomposeDG where
   type ProofObject DecomposeDG = ApplicationProof DecomposeDGProof
-  type I DecomposeDG     = TrsProblem
-  type O DecomposeDG     = TrsProblem
+  type I DecomposeDG           = TrsProblem
+  type O DecomposeDG           = TrsProblem
   type Forking DecomposeDG     = T.Pair
 
   solve p prob = do
@@ -85,12 +86,11 @@ instance T.Processor DecomposeDG where
         | otherwise                       = do
           lowerProof <- mapply (onLower p) lowerProb
           upperProof <- mapply (onUpper p) upperProb
-          -- TODO: MS: what is the desired behaviour; currently we just ignore if they make any progress
-          -- tct2 description states a similar behaviour; but the tct2 implementation requires that the processors suceeds
+          -- TODO: MS: what is the desired behaviour; do we require progress if a strategy is given?; currently we ignore it
           case (lowerProof,upperProof) of
-            (T.Halt _, _) -> failx (Applicable $ DecomposeDGFail "lower strategy floped")
-            (_, T.Halt _) -> failx (Applicable $ DecomposeDGFail "upper strategy floped")
-            (lpt, rpt)  ->
+            (T.Halt _, _) -> failx (Applicable $ DecomposeDGFail "lower strategy failed")
+            (_, T.Halt _) -> failx (Applicable $ DecomposeDGFail "upper strategy failed")
+            (lpt, rpt)    ->
               return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn lpt, T.fromReturn rpt))
         where
           failx              = return . T.resultToTree p prob . T.Fail
@@ -121,7 +121,6 @@ instance T.Processor DecomposeDG where
             sepRule (R.Rule l (R.Fun f ts)) | Prob.isCompoundf f = [ R.Rule l ti | ti <- ts ]
             sepRule (R.Rule l r) = [ R.Rule l r ]
 
-          -- TODO: proper dp graph update
           upperProb = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = unselectedStrictDPs
             , Prob.weakDPs   = unselectedWeakDPs }
@@ -212,30 +211,30 @@ lowerArg = T.some T.strat
   `T.withHelp` ["Use this processor to solve the lower component."]
   `T.optional` Nothing
 
-decomposeDGProcDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional (Maybe TrsStrategy)
-   , T.Argument 'T.Optional (Maybe TrsStrategy) ]
-  T.:-> DecomposeDG)
-decomposeDGProcDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) decomposeDGProcessor
+-- decomposeDGProcDeclaration :: T.Declaration (
+  -- '[ T.Argument 'T.Optional (ExpressionSelector F V)
+  --  , T.Argument 'T.Optional (Maybe TrsStrategy)
+  --  , T.Argument 'T.Optional (Maybe TrsStrategy) ]
+  -- T.:-> DecomposeDG)
+-- decomposeDGProcDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) decomposeDGProcessor
 
 
-decomposeDGProc :: 
-  ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy
-  -> (DecomposeDG -> DecomposeDG) -> TrsStrategy
-decomposeDGProc sel st1 st2 f = T.Proc . f $ T.declFun decomposeDGProcDeclaration sel st1 st2
+-- decomposeDGProc :: 
+--   ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy
+--   -> (DecomposeDG -> DecomposeDG) -> TrsStrategy
+-- decomposeDGProc sel st1 st2 f = T.Proc . f $ T.declFun decomposeDGProcDeclaration sel st1 st2
 
-decomposeDGProc' :: (DecomposeDG -> DecomposeDG) -> TrsStrategy
-decomposeDGProc' f = T.Proc . f $ T.deflFun decomposeDGProcDeclaration
+-- decomposeDGProc' :: (DecomposeDG -> DecomposeDG) -> TrsStrategy
+-- decomposeDGProc' f = T.Proc . f $ T.deflFun decomposeDGProcDeclaration
 
-solveUpperWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
-solveUpperWith st p = p{ onUpper=Just st } 
+-- solveUpperWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
+-- solveUpperWith st p = p{ onUpper=Just st } 
 
-solveLowerWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
-solveLowerWith st p = p{ onLower=Just st } 
+-- solveLowerWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
+-- solveLowerWith st p = p{ onLower=Just st } 
 
-selectLowerBy :: ExpressionSelector F V -> DecomposeDG -> DecomposeDG
-selectLowerBy sel p = p{ onSelection=sel }
+-- selectLowerBy :: ExpressionSelector F V -> DecomposeDG -> DecomposeDG
+-- selectLowerBy sel p = p{ onSelection=sel }
 
 -- | This processor implements processor \'dependency graph decomposition\'.
 -- It tries to estimate the
@@ -268,7 +267,7 @@ decomposeDG' = T.deflFun decomposeDGDeclaration
 instance PP.Pretty DecomposeDGProof where
   pretty (DecomposeDGFail reason) =
     PP.text "Dependency graph decomposition failed: " <> PP.text reason <> PP.dot
-  pretty p@DecomposeDGProof{}     = PP.vcat . L.intersperse PP.empty $
+  pretty p@DecomposeDGProof{}     = PP.vcat
     [ PP.text "We decompose the input problem according to the dependency graph into the upper component"
     , PP.indent 2 $ PP.pretty (unselected_ p)
     , PP.text "and a lower component"

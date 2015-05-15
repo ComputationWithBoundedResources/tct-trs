@@ -19,7 +19,6 @@ import qualified Data.Rewriting.Rule         as R
 import qualified Data.Rewriting.Rules        as RS
 import qualified Data.Rewriting.Term         as T
 
-
 import qualified Tct.Core.Common.Pretty      as PP
 import qualified Tct.Core.Common.Xml         as Xml
 import qualified Tct.Core.Data               as T
@@ -33,7 +32,7 @@ import qualified Tct.Trs.Data.Trs            as Trs
 
 
 -- MS: stolen from mzini/hoca
--- Certifiable subterms and certifiable usable rules. C. Sternagel, and R. Thiemann. (Definition 4.5)
+-- following 'Certifiable Subterms and Certifiable Usable Rules. C. Sternagel, and R. Thiemann' (Definition 4.5)
 -- but additionally incorporates starting rules
 
 -- cap f(t1,...,tn) == f(tcap(t1),...,tcap(tn))
@@ -61,33 +60,33 @@ usableRulesOf' start trs = start `Trs.union` steps
 
 data UsableRules = UsableRules deriving Show
 
-data UsableRulesProof 
+data UsableRulesProof
   = UsableRulesProof
   { usable_    :: Trs F V
   , notUsable_ :: Trs F V }
   | UsableRulesFail
   deriving Show
 
-progress :: UsableRulesProof -> Bool
-progress = not . Trs.null . notUsable_
 
 instance T.Processor UsableRules where
   type ProofObject UsableRules = ApplicationProof UsableRulesProof
   type I UsableRules           = TrsProblem
   type O UsableRules           = TrsProblem
 
-  solve p prob                          = return . T.resultToTree p prob $
+  solve p prob = progress `seq` return . T.resultToTree p prob $
     maybe usables (T.Fail . Inapplicable) (Prob.isDPProblem' prob)
     where
       usables
-        | progress proof = T.Success (T.toId nprob) (Applicable proof) T.fromId
-        | otherwise      = T.Fail (Applicable UsableRulesFail)
+        | progress  = T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | otherwise = T.Fail (Applicable UsableRulesFail)
 
-      usable = usableRulesOf' (Prob.startComponents prob) (Prob.allComponents prob)
+      rules    = Prob.allComponents prob
+      usable   = usableRulesOf' (Prob.startComponents prob) rules
+      progress = Trs.size usable < Trs.size rules
 
       proof = UsableRulesProof
         { usable_    = usable
-        , notUsable_ = Prob.allComponents prob `Trs.difference` usable }
+        , notUsable_ = rules `Trs.difference` usable }
 
       nprob = Prob.sanitiseDPGraph $ prob
         { Prob.strictDPs = Prob.strictDPs prob `Trs.intersect` usable
@@ -103,16 +102,15 @@ instance PP.Pretty UsableRulesProof where
     | Trs.null (usable_ p) = PP.text "No rule is usable, rules are removed from the input problem."
     | otherwise = PP.vcat
       [ PP.text "We replace rewrite rules by usable rules:"
-      , PP.empty
       , PP.indent 2 $ PP.pretty (usable_ p) ]
   pretty UsableRulesFail = PP.text "All rules are usable."
 
 instance Xml.Xml UsableRulesProof where
   toXml p@UsableRulesProof{} = Xml.elt "usablerules" [Xml.toXml (usable_ p)]
-  toXml UsableRulesFail = Xml.elt "usablerules" []
+  toXml UsableRulesFail      = Xml.elt "usablerules" []
   toCeTA p@UsableRulesProof{} =
     Xml.elt "usableRules"
-      [ Xml.elt "nonUsableRules" [Xml.toXml (notUsable_ p)] ]
+      [ Xml.elt "nonUsableRules" [Xml.toXml (notUsable_ p)]]
   toCeTA UsableRulesFail = Xml.elt "usableRules" []
 
 

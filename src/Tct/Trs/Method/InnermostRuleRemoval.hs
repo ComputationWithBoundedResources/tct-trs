@@ -1,6 +1,13 @@
--- | This module implements the /Innermost Rule Removal/ transformation.
--- This processor removes rules 'f(l_1,...,l_n) -> r' for which l_i (1 <= i <=n) is not a normal form.
--- The processor applies only to innermost problems.
+{- | This module implements the /Innermost Rule Removal/ transformation.
+
+@
+    |- < S# + irr(S) / W# + irr(W) , Q, T> :f
+  ----------------------------------------------
+        |- <S# + S / W# + W , Q, T> :f
+@
+, where @irr(R)@ removes rules @f(l_1,...,l_n) -> r@ for wich @l_i (1 <= i <= n)@ is not in normal form.
+The processor applies only to innermost problems.
+-}
 module Tct.Trs.Method.InnermostRuleRemoval
   ( innermostRuleRemovalDeclaration
   , innermostRuleRemoval
@@ -77,7 +84,7 @@ innermostRuleRemoval = T.declFun innermostRuleRemovalDeclaration
 instance PP.Pretty InnermostRuleRemovalProof where
   pretty InnermostRuleRemovalFail      = PP.pretty "No rules can be removed."
   pretty p@InnermostRuleRemovalProof{} = PP.vcat
-    [ PP.text "Arguments of following rules are not not normal-forms."
+    [ PP.text "Arguments of following rules are not normal-forms."
     , PP.indent 2 . PP.pretty $ removed_ p
     , PP.text "All above mentioned rules can be savely removed." ]
 
