@@ -46,12 +46,12 @@ instance T.Processor RemoveWeakSuffixes where
 
   -- an scc in the congruence graph is considered weak if all rules in the scc are weak
   -- compute maximal weak suffix bottom-up
-  solve p prob =  return . T.resultToTree p prob $
-    maybe remtail (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  solve p prob =  T.resultToTree p prob `fmap`
+    maybe remtail (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
     where
       remtail
-        | null initials = T.Fail (Applicable RemoveWeakSuffixesFail)
-        | otherwise     = T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | null initials = return $ T.Fail (Applicable RemoveWeakSuffixesFail)
+        | otherwise     = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
         where
           onlyWeaks = not . any (isStrict . snd) . theSCC
 
@@ -94,8 +94,8 @@ removeWeakSuffixesDeclaration = T.declare "removeWeakSuffixes" desc () (T.Proc R
     , "Only applicable if the strict component is empty."]
 
 -- | Removes trailing weak paths.
--- A dependency pair is on a trailing weak path if it is from the weak components and all sucessors in the dependency graph
--- are on trailing weak paths.
+-- A dependency pair is on a trailing weak path if it is from the weak components and all sucessors in the dependency
+-- graph are on trailing weak paths.
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
 -- not applicable when @strictTrs prob \= Trs.empty@.
@@ -109,14 +109,9 @@ instance PP.Pretty RemoveWeakSuffixesProof where
   pretty RemoveWeakSuffixesFail      = PP.text "The dependency graph contains no sub-graph of weak DPs closed under successors."
   pretty p@RemoveWeakSuffixesProof{} = PP.vcat
     [ PP.text "Consider the dependency graph"
-    , PP.empty
-    , PP.pretty (wdg_ p)
-    , PP.empty
-    , PP.text $ unwords
-        [ "The following weak DPs constitute a sub-graph of the DG that is closed under successors."
-        , "The DPs are removed." ]
-    , PP.empty
-    , PP.pretty (removable_ p) ]
+    , PP.indent 2 $ PP.pretty (wdg_ p)
+    , PP.text "The following weak DPs constitute a sub-graph of the DG that is closed under successors. The DPs are removed."
+    , PP.indent 2 $ PP.pretty (removable_ p) ]
 
 instance Xml.Xml RemoveWeakSuffixesProof where
   toXml RemoveWeakSuffixesFail      = Xml.elt "removeWeakSuffixes" []
