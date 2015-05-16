@@ -322,62 +322,148 @@ diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
     -- md2 = if md1 < (miDimension p) then Just md1 else Nothing
 
 edaConstraints :: Int
+               -> (Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
                -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
                -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-edaConstraints dim mi = do
-  relss <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM' -- index i,j represents relation(i,j)
-  gtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
-  rConstraints dim relss mi
-    `SMT.bandM` dConstraints dim relss gtwoss mi
-    `SMT.bandM` gtwoConstraints dim gtwoss mi
+edaConstraints dim rel done dtwo gtwo mi =
+  rConstraints dim rel mi
+    `SMT.bandM` dConstraints dim rel done dtwo gtwo mi
+    `SMT.bandM` gtwoConstraints dim gtwo mi
      -- goneConstraints do not exist
 
-rConstraints :: Int
-             -> [[SMT.IExpr]]
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-rConstraints dim relss mi =
-  return $ reflexivity relss `SMT.band` transitivity relss `SMT.band` compatibility relss `SMT.band` nocycle relss
-  where d   = dim
-        toD = [1..d]
-        rel vss i j = vss!!i!!j SMT..== one
-        reflexivity vss   = SMT.bigAnd $ map (\ x -> rel vss x x) toD
-        transitivity vss  = SMT.bigAnd [ (rel vss x y `SMT.band` rel vss y z) .==> rel vss x z | x <- toD, y <- toD, z <- toD ]
-        compatibility vss = SMT.bigAnd [ ggeqConstraint mi x y .==> rel vss x y | x <- toD, y <- toD ]
-        nocycle vss       = SMT.bigAnd [ (rel vss 1 y `SMT.band` ggrtConstraint mi x y) .==> SMT.bnot (rel vss y x) | x <- toD, y <- toD ]
+idaConstraints :: Int
+               -> Int
+               -> (Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+               -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+               ->  SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+idaConstraints dim deg rel irel jrel hrel trel gthree mi =
+  rConstraints dim rel mi
+    `SMT.bandM` tConstraints dim rel trel gthree mi
+    `SMT.bandM` iConstraints dim irel trel mi
+    `SMT.bandM` jConstraints dim rel irel jrel mi
+    `SMT.bandM` hConstraints dim deg jrel hrel mi
+    `SMT.bandM` gThreeConstraints dim gthree mi
+    -- edaConstraints are not needed
 
 dConstraints :: Int
-             -> [[SMT.IExpr]]
-             -> [[[[SMT.IExpr]]]]
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-dConstraints dim relss gtwoss mi = do
-  doness <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
-  dtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
-  let
-    rel i j = relss!!i!!j .== one
-    dtwo i j k = dtwoss!!i!!j!!k .== one
-    done i j k = doness!!i!!j!!k .== one
-    gtwo i j k l = gtwoss!!i!!j!!k!!l .== one
-
+dConstraints dim rel done dtwo gtwo mi =
+  return $ foreapprox `SMT.band` forecompat `SMT.band` backapprox `SMT.band` backcompat `SMT.band` exactness
+  where
+    toD         = [1..dim]
     foreapprox  = SMT.bigAnd [ rel 1 x .==>  done x x x | x <- toD ]
     forecompat  = SMT.bigAnd [ (done i x y `SMT.band` gtwo x y z u) SMT..==> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
     backapprox  = SMT.bigAnd [ rel 1 x .==> dtwo x x x | x <- toD ]
     backcompat  = SMT.bigAnd [ (dtwo i x y `SMT.band` gtwo z u x y) .==> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
     exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y `SMT.band` dtwo i x y) | i <- toD, x <- toD, y <- toD ]
-  return $ foreapprox `SMT.band` forecompat `SMT.band` backapprox `SMT.band` backcompat `SMT.band` exactness
+
+
+
+hConstraints :: Int
+             -> Int
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+hConstraints dim deg jrel hrel mi = return $ unaryNotation `SMT.band` jDecrease
   where
-    toD         = [1..dim]
+    toD = [1..dim]
+    unaryNotation = SMT.bigAnd [ hrel x h .==> hrel x (h - 1) | x <- toD, h <- [2..deg - 1] ]
+    jDecrease = SMT.bigAnd [ f i j | i <- toD, j <- toD ]
+    f i j = jrel i j .==> SMT.bigOr (map (\ h -> hrel i h `SMT.band` SMT.bnot (hrel j h)) [1..deg - 1])
+
+
+iConstraints :: Int
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+iConstraints dim irel trel mi = return $
+  SMT.bigAnd [ if x == y then SMT.top else trel x y y .==> irel x y | x <- toD, y <- toD ]
+  where
+    toD = [1..dim]
+
+jConstraints :: Int
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+jConstraints dim rel irel jrel mi =
+  return $ SMT.bigAnd [ f i j | i <- toD, j <- toD ]
+  where
+    toD = [1..dim]
+    f i j = jrel i j .<=> SMT.bigOr (map (\ k -> irel i k `SMT.band` rel k j) toD)
+
+
+rConstraints :: Int
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+rConstraints dim rel mi =
+  return $ reflexivity `SMT.band` transitivity `SMT.band` compatibility `SMT.band` nocycle
+  where
+    toD = [1..dim]
+    reflexivity   = SMT.bigAnd $ map (\ x -> rel x x) toD
+    transitivity  = SMT.bigAnd [ (rel x y `SMT.band` rel y z) .==> rel x z | x <- toD, y <- toD, z <- toD ]
+    compatibility = SMT.bigAnd [ ggeqConstraint mi x y .==> rel x y | x <- toD, y <- toD ]
+    nocycle       = SMT.bigAnd [ (rel 1 y `SMT.band` ggrtConstraint mi x y) .==> SMT.bnot (rel y x) | x <- toD, y <- toD ]
+
+rcConstraints :: Int
+              -> (Int -> Int -> SMT.Formula SMT.IFormula)
+              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+rcConstraints dim rel mi = return $ SMT.bigAnd [ ggeqConstraint mi 1 x .==> rel 1 x | x <- toD ]
+  where
+    toD = [1..dim]
+
+tConstraints :: Int
+             -> (Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+tConstraints dim rel trel gthree mi =
+  return $ initial `SMT.band` gThreeStep
+  where
+    toD = [1..dim]
+    initial = SMT.bigAnd [ if x == y then SMT.top else (rel 1 x `SMT.band` rel 1 y) .==> trel x x y | x <- toD, y <- toD ]
+    gThreeStep = SMT.bigAnd [ (trel x y z `SMT.band` gthree x y z u v w) .==> trel u v w | x <- toD, y <- toD, z <- toD, u <- toD, v <- toD, w <- toD ]
+
+
+gThreeConstraints :: Int
+             -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
+             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
+             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+gThreeConstraints dim gthree mi = return $
+  SMT.bigAnd [ f i j k x y z | i <- toD, j <- toD, k <- toD, x <- toD, y <- toD, z <- toD ]
+  where
+    toD       = [1..dim]
+    f i j k x y z = (gthree i j k x y z) .<=> SMT.bigOr (map (SMT.bigOr . map (g i j k x y z) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
+    g i j k x y z m = (EncM.mEntry i x m .>= one) `SMT.band` (EncM.mEntry j y m .>= one) `SMT.band` (EncM.mEntry k z m .>= one)
+
 
 gtwoConstraints :: Int
-                -> [[[[SMT.IExpr]]]]
+                -> (Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
                 -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
                 -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-gtwoConstraints dim gtwoss mi =
+gtwoConstraints dim gtwo mi =
   return $ SMT.bigAnd [ f i j k l | i <- toD, j <- toD, k <- toD, l <- toD ]
   where
     toD = [1..dim]
-    gtwo i j k l = gtwoss!!i!!j!!k!!l .== one
     f i j k l   = (gtwo i j k l) .<=> SMT.bigOr (map (SMT.bigOr . map (g i j k l) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
     g i j k l m = (EncM.mEntry i k m .>= one) `SMT.band` (EncM.mEntry j l m .>= one)
 
@@ -420,21 +506,79 @@ kindConstraints (MI.ConstructorBased cs (Just deg)) absmi = diagOnesConstraint d
   where absmi' = absmi{I.interpretations = filterCs $ I.interpretations absmi}
         filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
 kindConstraints _ _ = return SMT.bot
-kindConstraints (MI.EdaMatrix Nothing) absmi = edaConstraints dim absmi
+kindConstraints (MI.EdaMatrix Nothing) absmi = do
+  relss  <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM' -- index i,j represents relation(i,j)
+  doness <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  dtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  gtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  let
+    rel i j = relss!!i!!j .== one
+    done i j k = doness!!i!!j!!k .== one
+    dtwo i j k = dtwoss!!i!!j!!k .== one
+    gtwo i j k l = gtwoss!!i!!j!!k!!l .== one
+
+  edaConstraints dim rel done dtwo gtwo absmi
   where
     ints = I.interpretations absmi
     -- should we give dim as parameter to kindConstraints or extract it in the way done below?
     dim = if Map.null ints
           then 0
           else EncM.vDim $ MI.constant $ snd $ head $ Map.assocs ints
+kindConstraints (MI.EdaMatrix (Just deg)) absmi = do
+  relss    <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  iss      <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  jss      <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  hss      <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  tss      <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  gthreess <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
 
--- kindConstraints (EdaMatrix (Just deg)) absmi = idaConstraints deg absmi
--- kindConstraints (ConstructorEda cs mdeg) absmi =
---   rcConstraints (absmi' ds)
---   && maybe (edaConstraints (absmi' cs)) (\ deg -> idaConstraints deg (absmi' cs)) mdeg
---   where ds = F.symbols (signature absmi) Set.\\ cs
---         absmi' fs = absmi{interpretations = filterFs fs $ interpretations absmi}
---         filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
+  let
+    rel i j = relss!!i!!j .== one
+    irel i j = iss!!i!!j .== one
+    jrel i j = jss!!i!!j .== one
+    hrel i j = hss!!i!!j .== one
+    trel i j k = tss!!i!!j!!k .== one
+    gthree i j k x y z = gthreess!!i!!j!!k!!x!!y!!z .== one
+
+  idaConstraints dim deg rel irel jrel hrel trel gthree absmi
+  where
+    ints = I.interpretations absmi
+    dim = if Map.null ints
+          then 0
+          else EncM.vDim $ MI.constant $ snd $ head $ Map.assocs ints
+kindConstraints (MI.ConstructorEda cs mdeg) absmi = do
+  relss    <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  iss      <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  jss      <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  hss      <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  tss      <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  gthreess <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  doness <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  dtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  gtwoss <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
+  let
+    rel i j = relss!!i!!j .== one
+    irel i j = iss!!i!!j .== one
+    jrel i j = jss!!i!!j .== one
+    hrel i j = hss!!i!!j .== one
+    trel i j k = tss!!i!!j!!k .== one
+    gthree i j k x y z = gthreess!!i!!j!!k!!x!!y!!z .== one
+    done i j k = doness!!i!!j!!k .== one
+    dtwo i j k = dtwoss!!i!!j!!k .== one
+    gtwo i j k l = gtwoss!!i!!j!!k!!l .== one
+
+  rcConstraints dim rel (absmi' ds)
+    `SMT.bandM` maybe (edaConstraints dim rel done dtwo gtwo (absmi' cs))
+                      (\ deg -> idaConstraints dim deg rel irel jrel hrel trel gthree (absmi' cs))
+                      mdeg
+  where
+    ints = I.interpretations absmi
+    dim = if Map.null ints
+          then 0
+          else EncM.vDim $ MI.constant $ snd $ head $ Map.assocs ints
+    ds = (Map.keysSet $ I.interpretations absmi) Set.\\ cs
+    absmi' fs = absmi{I.interpretations = filterFs fs $ I.interpretations absmi}
+    filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
 
 
 entscheide :: NaturalMI -> Prob.TrsProblem -> CD.TctM (CD.Return (CD.ProofTree Prob.TrsProblem))
