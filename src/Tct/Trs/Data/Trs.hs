@@ -154,7 +154,7 @@ isSubset :: (Ord f, Ord v) => Trs f v -> Trs f v -> Bool
 isSubset = lift2 S.isSubsetOf
 
 isWellformed :: Ord v => Trs f v -> Bool
-isWellformed trs = all T.isFun (R.lhss rules) && all (\r -> vars (R.lhs r) `S.isSubsetOf` vars (R.rhs r)) rules
+isWellformed trs = all T.isFun (R.lhss rules) && all (\r -> vars (R.rhs r) `S.isSubsetOf` vars (R.lhs r)) rules
   where 
     rules = toList trs
     vars = S.fromList . T.vars

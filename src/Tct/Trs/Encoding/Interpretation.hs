@@ -196,7 +196,10 @@ toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) c
 newProblem :: TrsProblem -> InterpretationProof a b -> T.Optional T.Id TrsProblem
 newProblem prob proof = case shift_ proof of
   All     -> T.Null
-  Shift _ -> T.Opt . T.Id . Prob.sanitiseDPGraph $  prob
+  Shift _ -> T.Opt . T.Id $ newProblem' prob proof
+
+newProblem' :: Problem F V -> InterpretationProof a b -> Problem F V
+newProblem' prob proof = Prob.sanitiseDPGraph $  prob
     { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
     , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
     , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs
@@ -205,7 +208,6 @@ newProblem prob proof = case shift_ proof of
     rules = Trs.fromList . fst . unzip
     sDPs = rules (strictDPs_ proof)
     sTrs = rules (strictTrs_ proof)
-
 
 
 instance (PP.Pretty a, PP.Pretty b) => PP.Pretty (InterpretationProof a b) where

@@ -64,6 +64,7 @@ defaultDeclarations =
   -- Semantic
   , T.SD polyDeclaration
   , T.SD matrixDeclaration
+  , T.SD weightGapDeclaration
 
   -- DP
   , T.SD dependencyPairsDeclaration
