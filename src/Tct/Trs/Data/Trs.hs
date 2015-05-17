@@ -32,14 +32,18 @@ module Tct.Trs.Data.Trs
   , null
   , isDuplicating, isLinear, isLeftLinear, isRightLinear, isCollapsing
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
+  , isOverlay
 
   , isLinear', isRightLinear', isNonErasing', isNonSizeIncreasing', isNonDuplicating'
+  , isOverlay'
   ) where
 
 
 import qualified Data.Foldable          as F
 import qualified Data.Set               as S
 import qualified Data.Map               as M
+import qualified Data.List              as L
+
 import           Data.Typeable
 import           Prelude                hiding (concat, filter, map, null)
 
@@ -49,6 +53,7 @@ import qualified Tct.Core.Common.Xml    as Xml
 import           Data.Rewriting.Rule    (Rule)
 import qualified Data.Rewriting.Rule    as R
 import qualified Data.Rewriting.Term    as T
+import qualified Data.Rewriting.CriticalPair as CP
 
 import qualified Tct.Trs.Data.Rewriting as R
 import qualified Tct.Trs.Data.Signature as Sig
@@ -172,6 +177,8 @@ isNonErasing        = all' R.isNonErasing
 isNonSizeIncreasing = all' R.isNonSizeIncreasing
 isNonDuplicating    = not . isDuplicating
 
+isOverlay :: (Ord f, Ord v) => Trs f v -> Bool
+isOverlay = L.null . CP.cpsIn' . toList 
 
 -- * property-tests; return Just msg if property is not fulfilled.
 
@@ -187,6 +194,8 @@ isNonErasing' trs        = note (not $ isNonErasing trs) " some rule is erasing"
 isNonSizeIncreasing' trs = note (not $ isNonSizeIncreasing trs) " some rule is size-increasing"
 isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is duplicating"
 
+isOverlay' :: (Ord f, Ord v) => Trs f v -> Maybe String
+isOverlay' trs = note (not $ isOverlay trs) " system is not overlay"
 
 --- * proof data -----------------------------------------------------------------------------------------------------
 

@@ -46,6 +46,7 @@ import           Tct.Trs.Method.DP.UsableRules                   as M
 import           Tct.Trs.Method.Empty                            as M
 import           Tct.Trs.Method.InnermostRuleRemoval             as M
 import           Tct.Trs.Method.Matrix.NaturalMI                 as M
+import           Tct.Trs.Method.ToInnermost                      as M
 import           Tct.Trs.Method.Poly.NaturalPI                   as M
 import           Tct.Trs.Method.WithCertification                as M
 
@@ -60,6 +61,7 @@ defaultDeclarations =
   , T.SD boundsDeclaration
 
   , T.SD innermostRuleRemovalDeclaration
+  , T.SD toInnermostDeclaration
 
   -- Semantic
   , T.SD polyDeclaration
@@ -179,4 +181,3 @@ removeLeaf cp =
   >>> try usableRules
   >>> try trivial
   where anyStrictLeaf = RS.selAnyOf $ RS.selLeafCDG `RS.selInter` RS.selStricts
-

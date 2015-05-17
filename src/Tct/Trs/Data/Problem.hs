@@ -39,6 +39,9 @@ module Tct.Trs.Data.Problem
   , isDCProblem'
   , isInnermostProblem'
 
+  , noWeakComponents
+  , noWeakComponents'
+
   -- * instance
   , TrsProblem
   , F
@@ -241,6 +244,12 @@ isInnermostProblem' prob = note (not $ isInnermostProblem prob) "not an innermos
 -- | A problem is trivial, if the strict DP/TRS components are empty.
 isTrivial :: (Ord f, Ord v) => Problem f v -> Bool
 isTrivial prob = Trs.null (strictDPs prob) && Trs.null (strictComponents prob)
+
+noWeakComponents :: (Ord f, Ord v) =>  Problem f v -> Bool
+noWeakComponents = Trs.null . weakComponents
+
+noWeakComponents' :: (Ord f, Ord v) => Problem f v -> Maybe String
+noWeakComponents' prob = note (not $ noWeakComponents prob) " contains weak components "
 
 
 --- * problem instance -----------------------------------------------------------------------------------------------
