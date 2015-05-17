@@ -1,7 +1,11 @@
+-- | This module provides the /With Certification/ processor.
+-- Is used to certify the proof output of a (sub) strategy.
 module Tct.Trs.Method.WithCertification 
-  ( withCertification
+  ( withCertificationDeclaration
+  , withCertification
   , withCertification'
-  , withCertificationDeclaration
+  -- * arguments
+  , TotalProof (..)
   ) where
 
 
@@ -15,19 +19,22 @@ import           Tct.Trs.Data
 import qualified Tct.Trs.Data.CeTA      as CeTA
 
 
+-- TODO: MS: the behaviour should be changed; return some feedback (not an error) if certification is applied/successful
+-- | Indicates wether to allow partial proofs.
+-- A partial proof uses unknown proofs/assumptions to handle unsupported transformations and open problems.
+-- 
+-- The current implementation behaves as follows
+--  * if TotalProof is set, certification is ignored if there are open problems left
+--  * throws an error if certification is not successful
+--  * silent return if certification is successful.
 data TotalProof = TotalProof | PartialProof
   deriving (Show, Eq, Enum, Bounded, Typeable)
 
-data ClosedProof = ClosedProof | OpenProof
-  deriving (Show, Eq, Enum, Bounded, Typeable)
-
-instance T.SParsable i i TotalProof where parseS = P.enum
-instance T.SParsable i i ClosedProof where parseS = P.enum
+instance T.SParsable i i TotalProof where parseS = P.enum 
 
 data WithCertification = WithCertification
-  { total_      :: TotalProof
-  , closed_     :: ClosedProof
-  , onStrategy_ :: TrsStrategy
+  { kind       :: TotalProof
+  , onStrategy :: TrsStrategy
   } deriving Show
 
 
@@ -37,15 +44,14 @@ instance T.Processor WithCertification where
   type O WithCertification           = TrsProblem
 
   solve p prob = do
-    ret <- T.evaluate (onStrategy_ p) prob
+    ret <- T.evaluate (onStrategy p) prob
     tmp <- T.tempDirectory `fmap` T.askState
     res <- case ret of
       T.Halt _ -> return (Left "Halting computation.")
       rpt
-        | T.isOpen pt && (closed_ p == OpenProof) -> return (Right pt)
-        | T.isOpen pt                             -> return (Left "Can not be certified. Problem is Open ")
-        | (total_ p == TotalProof)                -> CeTA.totalProofIO' tmp pt
-        | otherwise                               -> CeTA.partialProofIO' tmp pt
+        | kind p == PartialProof -> CeTA.partialProofIO' tmp pt
+        | T.isOpen pt            -> return (Right pt)
+        | otherwise              -> CeTA.totalProofIO' tmp pt
         where pt = T.fromReturn rpt
     let
       toRet = case ret of
@@ -55,32 +61,29 @@ instance T.Processor WithCertification where
 
     either (throwError . userError) (return . toRet) res
 
-withCertificationStrategy :: TotalProof -> ClosedProof -> TrsStrategy -> TrsStrategy
-withCertificationStrategy t c st = T.Proc $ WithCertification { total_ = t, closed_ = c, onStrategy_ = st }
+withCertificationStrategy :: TotalProof -> TrsStrategy -> TrsStrategy
+withCertificationStrategy t st = T.Proc $ WithCertification { kind = t, onStrategy = st }
 
 withCertificationDeclaration :: T.Declaration(
   '[ T.Argument 'T.Optional TotalProof
-   , T.Argument 'T.Optional ClosedProof
    , T.Argument 'T.Required TrsStrategy]
    T.:-> TrsStrategy)
-withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, closedArg, T.strat) withCertificationStrategy
+withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, T.strat) withCertificationStrategy
   where
     desc = "This processor invokes CeTA on the result of the provided strategy."
     totalArg = T.arg
-      `T.withName` "totalProof"
-      `T.withHelp` ["This argument specifies wheter to invoke CeTA with '--allow-assumptions'. To allow partial proof" ]
+      `T.withName` "kind"
+      `T.withHelp` [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ]
       `T.optional` TotalProof
       `T.withDomain` fmap show [(minBound :: TotalProof)..]
-    closedArg = T.arg
-      `T.withName` "closedProof"
-      `T.withHelp` ["This argument specifies wether certficiation should only be invoked on closed proof trees."]
-      `T.optional` OpenProof
-      `T.withDomain` fmap show [(minBound :: ClosedProof)..]
 
+-- | 
+-- > withCertification (dependencyTuples >>> matrix >>> empty)
+-- > dependencyPairs' WIDP >>> withCertification (matrix >>> empty)
 withCertification :: TrsStrategy -> TrsStrategy
 withCertification = T.deflFun withCertificationDeclaration
 
-withCertification' :: TotalProof -> ClosedProof -> TrsStrategy -> TrsStrategy
+-- | > (withCertification' PartialProof dependencyTuples) >>> matrix >>> empty
+withCertification' :: TotalProof -> TrsStrategy -> TrsStrategy
 withCertification' = T.declFun withCertificationDeclaration
-
 

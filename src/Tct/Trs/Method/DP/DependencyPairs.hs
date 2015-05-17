@@ -34,12 +34,7 @@ import qualified Tct.Trs.Data.Trs            as Trs
 
 
 data DPKind = WDP | WIDP | DT
-  deriving (Eq, Enum, Bounded, Typeable)
-
-instance Show DPKind where
-  show WDP  = "wdp"
-  show WIDP = "widp"
-  show DT   = "dt"
+  deriving (Show, Eq, Enum, Bounded, Typeable)
 
 isTuples :: DPKind -> Bool
 isTuples = (DT==)

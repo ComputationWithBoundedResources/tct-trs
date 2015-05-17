@@ -5,15 +5,15 @@ module Tct.Trs.Method.ComplexityPair
   ) where
 
 
-import qualified Tct.Core.Common.Parser        as P
-import qualified Tct.Core.Data                 as T
-import qualified Tct.Core.Data                 as P (SParsable (..), SParser)
-import qualified Tct.Core.Parse                as P
+import qualified Tct.Core.Common.Parser          as P
+import qualified Tct.Core.Data                   as T
+import qualified Tct.Core.Data                   as P (SParsable (..), SParser)
+import qualified Tct.Core.Parse                  as P
 
-import           Tct.Trs.Data                  (TrsProblem)
+import           Tct.Trs.Data                    (TrsProblem)
 import           Tct.Trs.Data.ComplexityPair
-import           Tct.Trs.Method.Poly.NaturalPI (polyCPDeclaration)
 import           Tct.Trs.Method.Matrix.NaturalMI (matrixCPDeclaration)
+import           Tct.Trs.Method.Poly.NaturalPI   (polyCPDeclaration)
 
 
 complexityPairDeclarations :: [ComplexityPairDeclaration]
@@ -27,8 +27,7 @@ cpsParser = P.choice ((\(CD d) -> P.declaration d) `fmap` complexityPairDeclarat
 complexityPairArg :: T.Argument 'T.Required ComplexityPair
 complexityPairArg = T.arg
   `T.withName` "complexityPair"
-  `T.withHelp`
-    [ "This argument the complexity pair to apply." ]
+  `T.withHelp` [ "This argument specifies the complexity pair to apply." ]
 
 instance P.SParsable TrsProblem TrsProblem ComplexityPair where
   parseS = cpsParser

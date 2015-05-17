@@ -84,6 +84,10 @@ import qualified Tct.Trs.Data.Signature       as Sig
 -- the signature contains all symbols of the DP/TRS components and all symbols stored in the start terms
 -- the dp graph corrensponds to the DP components. is empty if the DP components are empty
 
+-- NOTE: the dp graph stores DP rules as well as a Flag that indiciates wether it belongs to the strict/weak component
+-- this information has to be updated when the dp components of the problem are updated
+-- use santisieDPGraph to re-compute the graph
+
 
 -- | The problem type parameterised in the function symbol and variable type.
 data Problem f v = Problem
@@ -137,27 +141,36 @@ ruleSet prob = RuleSet
 
 --- ** construction --------------------------------------------------------------------------------------------------
 
--- FIXME: MS: add sanity check of symbols;
+-- TODO: MS: add sanity check of symbols;
 -- we use a wrapper for distinguishing dp/com symbols; but pretty printing can still fail if a symbols c_1 or f# exists
+-- are there any conventions?
+
+-- NOTE: MS: the tpdb contains non-wellformed examples; with free vars on the rhs
+-- the current implementation is not designed to deal with them; we catch them in 'fromRewriting'
 
 -- | Transforms a 'Data.Rewriting.Problem' into a 'TrsProblem'.
-fromRewriting :: R.Problem String String -> TrsProblem
-fromRewriting prob = Problem
-  { startTerms   = case R.startTerms prob of
-      R.AllTerms   -> AllTerms (defs `S.union` cons)
-      R.BasicTerms -> BasicTerms defs cons
-  , strategy = case R.strategy prob of
-      R.Innermost -> Innermost
-      R.Full      -> Full
-      R.Outermost -> Outermost
-  , signature  = sig
+fromRewriting :: R.Problem String String -> Either String TrsProblem
+fromRewriting prob = 
+  if Trs.isWellformed sTrs && Trs.isWellformed wTrs
+    then
+      Right Problem
+        { startTerms   = case R.startTerms prob of
+            R.AllTerms   -> AllTerms (defs `S.union` cons)
+            R.BasicTerms -> BasicTerms defs cons
+        , strategy = case R.strategy prob of
+            R.Innermost -> Innermost
+            R.Full      -> Full
+            R.Outermost -> Outermost
+        , signature  = sig
 
-  , strictDPs  = Trs.empty
-  , strictTrs  = sTrs
-  , weakDPs    = Trs.empty
-  , weakTrs    = wTrs
+        , strictDPs  = Trs.empty
+        , strictTrs  = sTrs
+        , weakDPs    = Trs.empty
+        , weakTrs    = wTrs
 
-  , dpGraph = DPG.empty }
+        , dpGraph = DPG.empty }
+    else
+      Left "problem not wellformed."
   where
     toFun (R.Rule l r) = let k = R.map (F . TrsFun . BS.pack) (V . BS.pack) in R.Rule (k l) (k r)
     sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)

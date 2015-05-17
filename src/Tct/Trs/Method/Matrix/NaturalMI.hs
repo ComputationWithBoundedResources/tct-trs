@@ -26,16 +26,20 @@ module Tct.Trs.Method.Matrix.NaturalMI
     matrixDeclaration
   , matrix
   , matrix'
-  , matrixCPDeclaration
-  , matrixCP
-  , matrixCP'
 
+  -- * Arguments
   , NaturalMIKind (..)
   , UsableArgs (..)
   , UsableRules (..)
   , Greedy (..)
 
+  -- * Complexity Pair
+  , matrixCPDeclaration
+  , matrixCP
+  , matrixCP'
+
   -- * Weight gap
+  , WgOn (..)
   , weightGapDeclaration
   , weightgap
   , weightgap'
@@ -62,7 +66,7 @@ import qualified Tct.Trs.Data                               as TD
 
 -- imports tct-common
 import qualified Tct.Common.ProofCombinators                as PC
-import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.==>), (.>), (.>=))
+import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.==>), (.>), (.>=), (.&&))
 import qualified Tct.Common.SMT                             as SMT
 
 
@@ -73,7 +77,6 @@ import qualified Tct.Core.Common.SemiRing                   as SR
 import qualified Tct.Core.Common.Xml                        as Xml
 import qualified Tct.Core.Data                              as CD
 import           Tct.Core.Parse            ()
-
 
 -- imports tct-trs
 import Tct.Trs.Data
@@ -360,7 +363,7 @@ dConstraints :: Int
              -> (Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-dConstraints dim rel done dtwo gtwo mi =
+dConstraints dim rel done dtwo gtwo _ =
   return $ foreapprox `SMT.band` forecompat `SMT.band` backapprox `SMT.band` backcompat `SMT.band` exactness
   where
     toD         = [1..dim]
@@ -378,7 +381,7 @@ hConstraints :: Int
              -> (Int -> Int -> SMT.Formula SMT.IFormula)
              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-hConstraints dim deg jrel hrel mi = return $ unaryNotation `SMT.band` jDecrease
+hConstraints dim deg jrel hrel _ = return $ unaryNotation `SMT.band` jDecrease
   where
     toD = [1..dim]
     unaryNotation = SMT.bigAnd [ hrel x h .==> hrel x (h - 1) | x <- toD, h <- [2..deg - 1] ]
@@ -391,7 +394,7 @@ iConstraints :: Int
              -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-iConstraints dim irel trel mi = return $
+iConstraints dim irel trel _ = return $
   SMT.bigAnd [ if x == y then SMT.top else trel x y y .==> irel x y | x <- toD, y <- toD ]
   where
     toD = [1..dim]
@@ -402,7 +405,7 @@ jConstraints :: Int
              -> (Int -> Int -> SMT.Formula SMT.IFormula)
              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-jConstraints dim rel irel jrel mi =
+jConstraints dim rel irel jrel _ =
   return $ SMT.bigAnd [ f i j | i <- toD, j <- toD ]
   where
     toD = [1..dim]
@@ -436,7 +439,7 @@ tConstraints :: Int
              -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-tConstraints dim rel trel gthree mi =
+tConstraints dim rel trel gthree _ =
   return $ initial `SMT.band` gThreeStep
   where
     toD = [1..dim]
@@ -478,7 +481,7 @@ ggrtConstraint mi i j = SMT.bigOr (map (SMT.bigOr . map (\ m -> EncM.mEntry i j 
 
 mxKind :: NaturalMIKind -> Int -> Int -> StartTerms fun -> MI.MatrixKind fun
 mxKind kind dim deg  st = case (kind, st) of
-  (Unrestricted, ProbK.BasicTerms{}) -> MI.UnrestrictedMatrix
+  (Unrestricted, _)                  -> MI.UnrestrictedMatrix
   (Triangular,   ProbK.BasicTerms{}) -> MI.ConstructorBased cs Nothing
   (Triangular,   ProbK.AllTerms{})   -> MI.TriangularMatrix Nothing
   (Algebraic,    ProbK.BasicTerms{}) -> MI.ConstructorBased cs md
@@ -505,7 +508,6 @@ kindConstraints (MI.ConstructorBased _  Nothing) _        = return SMT.top
 kindConstraints (MI.ConstructorBased cs (Just deg)) absmi = diagOnesConstraint deg absmi'
   where absmi' = absmi{I.interpretations = filterCs $ I.interpretations absmi}
         filterCs = Map.filterWithKey (\f _ -> f `Set.member` cs)
-kindConstraints _ _ = return SMT.bot
 kindConstraints (MI.EdaMatrix Nothing) absmi = do
   relss  <- CM.replicateM dim $ CM.replicateM dim SMT.nvarM' -- index i,j represents relation(i,j)
   doness <- CM.replicateM dim $ CM.replicateM dim $ CM.replicateM dim SMT.nvarM'
@@ -694,12 +696,12 @@ nmiKindArg = CD.arg
 
 {- | dimension argument -}
 dimArg :: CD.Argument 'CD.Required Int
-dimArg = CD.nat { CD.argName = "dimension" , CD.argDomain = "<nat>" }
+dimArg = CD.nat { CD.argName = "dimension" }
          `CD.withHelp` ["Specifies the dimension of the matrices used in the interpretation."]
 
 {- | degree argument -}
 degArg :: CD.Argument 'CD.Required Int
-degArg = CD.nat { CD.argName = "degree" , CD.argDomain = "<nat>" }
+degArg = CD.nat { CD.argName = "degree" }
          `CD.withHelp` ["Specifies the maximal degree of the matrices used in the interpretation."]
 
 {- | rule selctor argument -}
@@ -794,16 +796,17 @@ instance I.AbstractInterpretation NaturalMI where
   -- gte :: NaturalMI -> C NaturalMI -> C NaturalMI -> SMT.Expr
   gte _ lint1 lint2 = gte lint1 lint2
 
+gte :: Ord f => MI.LinearInterpretation f SMT.IExpr -> MI.LinearInterpretation f SMT.IExpr -> SMT.Expr
 gte (MI.LInter lcoeffs lconst) (MI.LInter rcoeffs rconst) =
   SMT.bigAnd zipmaps SMT..&& gteVec lconst rconst
   where
     zipmaps = Map.intersectionWith gteMatrix lcoeffs rcoeffs
+    gteMatrix (EncM.Matrix m1) (EncM.Matrix m2) =
+      SMT.bigAnd (zipWith gteVec m1 m2)
     gteVec (EncM.Vector v1) (EncM.Vector v2) =
       SMT.bigAnd $ zipWith (SMT..>=) v1 v2
 
-    gteMatrix (EncM.Matrix m1) (EncM.Matrix m2) =
-      SMT.bigAnd (zipWith gteVec m1 m2)
-
+setMonotone :: MI.SomeLinearInterpretation SMT.IExpr -> [Int] -> SMT.Expr
 setMonotone (MI.LInter vmmap _) poss =
   SMT.bigAnd $ map setMonotonePos poss
   where
@@ -813,6 +816,7 @@ setMonotone (MI.LInter vmmap _) poss =
       Just m -> EncM.mEntry 1 1 m SMT..> SMT.zero
       Nothing -> error "Tct.Trs.Method.Matrix.NatrualMI.setMonotone: Argument Position not found"
 
+setStronglyLinear :: SR.SemiRing c => Int -> MI.SomeLinearInterpretation c -> [Int] -> MI.SomeLinearInterpretation c
 setStronglyLinear dim (MI.LInter vmmap cs) poss = MI.LInter (foldr k vmmap poss) cs
   where k pos = Map.adjust (const $ EncM.identityMatrix dim) (toEnum pos)
 
@@ -919,6 +923,8 @@ data WgOn
   | WgOnAny -- ^ Orient some rule.
   deriving (Eq, Show, DT.Typeable, Bounded, Enum)
 
+instance CD.SParsable i i WgOn where
+  parseS = P.enum
 
 data WeightGap = WeightGap
   { wgDimension :: Int
@@ -926,7 +932,6 @@ data WeightGap = WeightGap
   , wgKind      :: NaturalMIKind
   , wgUArgs     :: UsableArgs
   , wgOn        :: WgOn
-  , wgSel       :: Maybe (ExpressionSelector F V)
   } deriving (Show)
 
 data WeightGapOrder =  WeightGapOrder
@@ -944,32 +949,20 @@ instance CD.Processor WeightGap where
   type ProofObject WeightGap = PC.ApplicationProof WeightGapProof
   type I WeightGap           = Prob.TrsProblem
   type O WeightGap           = Prob.TrsProblem
-  type Forking WeightGap     = CD.Optional CD.Id
 
   solve p prob
     | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
-    | otherwise           = do
+    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictComponents prob) = return . CD.resultToTree p prob $ incompatible
+    | otherwise = do
       res <- wgEntscheide p prob
-      let
-        res' = case res of
-          SMT.Sat order
-            | Trs.null oriented -> I.toTree p prob $ CD.Fail (PC.Applicable $ PC.Order order)
-            | otherwise -> I.toTree p prob $ CD.Success newProb (PC.Applicable $ PC.Order order) cert
-            where
-                mi = mint_ $ wgProof order
-                oriented = (Trs.fromList . map fst $ I.strictTrs_ mi) `Trs.union` (Trs.fromList . map fst $ I.strictDPs_ mi)
-                newProb = I.newProblem prob mi
-                cert = wgCertification p order
-                wgCertification :: WeightGap -> WeightGapOrder -> CD.Optional CD.Id CD.Certificate -> CD.Certificate
-                wgCertification wg ord certificate = case certificate of
-                  CD.Null          -> CD.timeUBCert bound
-                  CD.Opt (CD.Id c) -> CD.updateTimeUBCert c (`SR.add` bound)
-                  where
-                    bound = upperbound (wgDimension wg) (wgKind wg) (kind_ $ wgProof ord) (I.inter_ $ mint_ (wgProof ord))
-          _ -> I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
-      return $ toResult res'
-    where
-      toResult pt = if CD.progress pt then CD.Continue pt else CD.Abort pt
+      CD.resultToTree p prob `fmap` case res of
+        SMT.Sat order -> return $ CD.Success (CD.toId nprob) (PC.Applicable $ PC.Order order)  cert
+          where 
+            nprob = I.newProblem' prob (mint_ $ wgProof order)
+            bound = upperbound (wgDimension p) (wgKind p) (kind_ $ wgProof order) (I.inter_ $ mint_ (wgProof order))
+            cert  = (flip CD.updateTimeUBCert (`SR.add` bound) . CD.fromId)
+        _  -> return incompatible
+      where incompatible = CD.Fail (PC.Applicable PC.Incompatible)
 
 wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
 wgEntscheide p prob = do
@@ -982,16 +975,9 @@ wgEntscheide p prob = do
     amint <- DT.mapM toSMTLinearInterpretation absi
     strictVarEncoder <- Map.fromList `fmap` DT.mapM (\r -> SMT.bvarM' >>= \v -> return (r,v)) rules
 
-
     let
       strict = (strictVarEncoder Map.!)
-      orientSelected (Trs.SelectDP r)  = strict r
-      orientSelected (Trs.SelectTrs r) = strict r
-      orientSelected (Trs.BigAnd es)   = SMT.bigAnd (orientSelected `fmap` es)
-      orientSelected (Trs.BigOr es)    = SMT.bigOr (orientSelected `fmap` es)
-
       (.>=.) = gte
-
 
       slamint = foldr k amint (UPEnc.usablePositions usablePositions)
         where k (f,is) am = I.Interpretation $ Map.adjust (\a -> setStronglyLinear dim a is) f (I.interpretations am)
@@ -1005,37 +991,28 @@ wgEntscheide p prob = do
 
       wgOrderConstraints = SMT.bigAnd [ ruleConstraint r | r <- rules ]
         where
-          ruleConstraint r = wgConstraint SMT..&& (strict r SMT..==> orientConstraint)
+          ruleConstraint r = wgConstraint .&& (strict r .==> orientConstraint)
             where
               li = interpret (RR.lhs r)
               ri = interpret (RR.rhs r)
-              geqVec (EncM.Vector v1) (EncM.Vector v2) = SMT.bigAnd $ zipWith (SMT..>=) v1 v2
-              gtVec (EncM.Vector (v1:vs1)) (EncM.Vector (v2:vs2)) = (v1 SMT..> v2) `SMT.band` geqVec (EncM.Vector vs1) (EncM.Vector vs2)
-              wgConstraint = SMT.bigAnd
-                [ maybe SMT.bot (\lm -> geqVec (EncM.mRow 1 lm) (EncM.mRow 1 rm)) (Map.lookup v $ MI.coefficients li)
-                | (v,rm) <- Map.toList $ MI.coefficients ri]
-              orientConstraint = SMT.bigAnd
-                [ maybe SMT.bot  (\lm -> SMT.bigAnd [ geqVec (EncM.mRow j lm) (EncM.mRow j rm) | j <- [2..dim]])
-                                              (Map.lookup v $ MI.coefficients li)
-                                            | (v,rm) <- Map.toList $ MI.coefficients ri]
-                                `SMT.band` gtVec (MI.constant li) (MI.constant ri)
+              geqVec v1 v2 = SMT.bigAnd $ zipWith (.>=) (DF.toList v1) (DF.toList v2)
+              gtVec v1 v2  = geqVec v1 v2 .&& EncM.vEntry 1 v1 .> EncM.vEntry 1 v2
+
+              wgConstraint = SMT.bigAnd $ Map.intersectionWith k (MI.coefficients li) (MI.coefficients ri)
+                where k lm rm = geqVec (EncM.mRow 1 lm) (EncM.mRow 1 rm)
+              orientConstraint = SMT.bigAnd (Map.intersectionWith k (MI.coefficients li) (MI.coefficients ri)) .&& gtVec (MI.constant li) (MI.constant ri)
+                where k lm rm = SMT.bigAnd [ geqVec (EncM.mRow j lm) (EncM.mRow j rm) | j <- [2..dim]]
 
 
       wgOnConstraints = case wgOn p of
         WgOnTrs -> SMT.bigAnd [ strict r  | r <- strs ]
         WgOnAny -> SMT.bigOr  [ strict r  | r <- srules ]
 
-      wgSelConstraints = case wgSel p of
-        Just sel -> orientSelected (RS.rsSelect sel prob)
-        Nothing  -> SMT.top
-
     SMT.assert monotoneConstraints
     SMT.assert wOrderConstraints
     SMT.assert wgOrderConstraints
     SMT.assert wgOnConstraints
-    SMT.assert wgSelConstraints
     SMT.assertM (kindConstraints kind slamint)
-
 
     return $ SMT.decode slamint
   return $ wgproof `fmap` res
@@ -1045,7 +1022,7 @@ wgEntscheide p prob = do
 
     trs    = Prob.allComponents prob
     rules  = Trs.toList trs
-    strs = Trs.toList (Prob.strictTrs prob)
+    strs   = Trs.toList (Prob.strictTrs prob)
     srules = Trs.toList (Prob.strictComponents prob)
     wrules = Trs.toList (Prob.weakComponents prob)
 
@@ -1067,8 +1044,6 @@ wgEntscheide p prob = do
           | isConstantGrowth = wgDegree p
           | otherwise        = 1
 
-
-
     wgproof mint = WeightGapOrder
       { wgProof       = mproof mint
       , wgConstGrowth = isConstantGrowth }
@@ -1081,7 +1056,9 @@ wgEntscheide p prob = do
         , I.inter_     = mint
         , I.uargs_     = usablePositions
         , I.ufuns_     = Set.empty
-        , I.shift_     = I.Shift $ RS.selAnyOf RS.selStricts `DM.fromMaybe` (wgSel p)
+        , I.shift_     = I.Shift $ case wgOn p of
+            WgOnAny -> RS.selAnyOf RS.selStricts
+            WgOnTrs -> RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules
         , I.strictDPs_ = sDPs
         , I.strictTrs_ = sTrs
         , I.weakDPs_   = wDPs
@@ -1098,15 +1075,13 @@ wgEntscheide p prob = do
 -- ##WGS weightgap strategy declaration
 ----------------------------------------------------------------------
 
-weightGapStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> WgOn -> Maybe (RS.ExpressionSelector Prob.F Prob.V)
-                  -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
-weightGapStrategy dim deg nmiKind ua on sl = CD.Proc
-  WeightGap { wgDimension = dim
-            , wgDegree = deg
-            , wgKind = nmiKind
-            , wgUArgs = ua
-            , wgOn = on
-            , wgSel = sl}
+weightGapStrategy :: Int -> Int -> NaturalMIKind -> UsableArgs -> WgOn -> TrsStrategy
+weightGapStrategy dim deg nmiKind ua on = CD.Proc WeightGap
+  { wgDimension = dim
+  , wgDegree    = deg
+  , wgKind      = nmiKind
+  , wgUArgs     = ua
+  , wgOn        = on }
 
 weightGapDeclaration :: CD.Declaration (
   '[ CD.Argument 'CD.Optional Int
@@ -1114,18 +1089,10 @@ weightGapDeclaration :: CD.Declaration (
    , CD.Argument 'CD.Optional NaturalMIKind
    , CD.Argument 'CD.Optional Arg.UsableArgs
    , CD.Argument 'CD.Optional WgOn
-   , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V))
   ] CD.:-> CD.Strategy Prob.TrsProblem Prob.TrsProblem)
-weightGapDeclaration = CD.declare  "weightgap" wgDescription wgArgs weightGapStrategy
+weightGapDeclaration = CD.declare  "weightgap" wgDescription (argDim,argDeg, argNMIKind, argUA, argWgOn) weightGapStrategy
   where
    wgDescription = [ "Uses the weight gap principle to shift some strict rules to the weak part of the problem"]
-   wgArgs :: ( CD.Argument 'CD.Optional Int
-          , CD.Argument 'CD.Optional Int
-          , CD.Argument 'CD.Optional NaturalMIKind
-          , CD.Argument 'CD.Optional Arg.UsableArgs
-          , CD.Argument 'CD.Optional WgOn
-          , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V)))
-   wgArgs = (argDim,argDeg, argNMIKind, argUA, argWgOn, argSel)
    argDim = dimArg `CD.optional` 1
    argDeg = degArg `CD.optional` 1
    argNMIKind = nmiKindArg `CD.optional` Algebraic
@@ -1138,14 +1105,11 @@ weightGapDeclaration = CD.declare  "weightgap" wgDescription wgArgs weightGapStr
                     , "while 'any' only demands any rule at all to be strictly oriented. "
                     , "The default value is 'trs'."]
      `CD.optional` WgOnTrs
-   argSel = slArg  `CD.optional` Just (RS.selAnyOf RS.selStricts)
 
-weightgap :: CD.Strategy Prob.TrsProblem Prob.TrsProblem
+weightgap :: TrsStrategy
 weightgap = CD.deflFun weightGapDeclaration
 
-weightgap' ::  Int -> Int -> NaturalMIKind -> Arg.UsableArgs  -> WgOn
-           -> Maybe (RS.ExpressionSelector Prob.F Prob.V)
-           -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
+weightgap' ::  Int -> Int -> NaturalMIKind -> UsableArgs  -> WgOn -> TrsStrategy
 weightgap' = CD.declFun weightGapDeclaration
 
 ----------------------------------------------------------------------

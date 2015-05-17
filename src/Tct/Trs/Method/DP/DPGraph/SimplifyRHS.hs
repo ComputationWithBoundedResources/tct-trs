@@ -5,12 +5,12 @@
   ------------------------------------------
           |- <S# / W# + W, Q, T#> :f
 @
-, where simp(R#) removes @ri@ from right-hand sides @c_n(r_1,...,r_n)@ if no instance of @ri@ can be rewritten, ie. if
+, where @simp(R#)@ removes @ri@ from right-hand sides @c_n(r_1,...,r_n)@ if no instance of @ri@ can be rewritten, ie. if
 there is no outgoing edge @i@.
 -}
-module Tct.Trs.Method.DP.DPGraph.SimplifyRHS 
+module Tct.Trs.Method.DP.DPGraph.SimplifyRHS
   ( simplifyRHSDeclaration
-  , simplifyRHS 
+  , simplifyRHS
   ) where
 
 
@@ -47,19 +47,20 @@ instance T.Processor SimplifyRHS where
   type I SimplifyRHS           = TrsProblem
   type O SimplifyRHS           = TrsProblem
 
-  solve p prob =  return . T.resultToTree p prob $
-    maybe simpRHS (T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  solve p prob =  T.resultToTree p prob `fmap`
+    maybe simpRHS (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
     where
       simpRHS
-        | null simplified = T.Fail (Applicable SimplifyRHSFail)
-        | otherwise       = T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | null simplified = return $ T.Fail (Applicable SimplifyRHSFail)
+        | otherwise       = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
         where
           wdg = Prob.dependencyGraph prob
 
-          -- FIXME: MS: this is not optimal; 
-          -- I assumed that all my rhs have compound symbols after the DP transformation; this is not true after the decomposeDG transformation.
-          -- We can now have rhs of length one which are removed; ie which should be replaced with fresh compound symbols.
-          -- Either make sure that we have the appropriate format or introduce fresh compound symbols here
+          -- TODO: MS: this is not optimal;
+          -- I assumed that all my rhs have compound symbols after the DP transformation; this is not true after the
+          -- decomposeDG transformation. We can now have rhs of length one which are removed (in practice they are
+          -- probably already removed before); ie which should be replaced with fresh compound symbols. Either make
+          -- sure that we have the appropriate format or introduce fresh compound symbols here
           elims = [ (isStrict cn, (r, elimRule n r)) | (n,cn) <- lnodes wdg, let r = theRule cn ]
           elimRule n (R.Rule l (R.Fun f rs))
             | not (Prob.isCompoundf f) = Nothing
@@ -112,12 +113,9 @@ instance PP.Pretty SimplifyRHSProof where
   pretty SimplifyRHSFail      = PP.text "No rule was simplified."
   pretty p@SimplifyRHSProof{} = PP.vcat
     [ PP.text "Consider the dependency graph"
-    , PP.empty
-    , PP.pretty (wdg_ p)
-    , PP.empty
+    , PP.indent 2 $ PP.pretty (wdg_ p)
     , PP.text "Due to missing edges in the depndency graph, the right-hand sides of following rules could be simplified:"
-    , PP.empty
-    , PP.pretty (Trs.fromList $ simplified_ p) ]
+    , PP.indent 2 $ PP.pretty (Trs.fromList $ simplified_ p) ]
 
 instance Xml.Xml SimplifyRHSProof where
   toXml SimplifyRHSFail      = Xml.elt "simpRHS" []

@@ -27,6 +27,7 @@ module Tct.Trs.Method.Matrix.MatrixInterpretation (
   , MatrixInterpretationEntry(..)
   , MatrixKind(..)
   , SomeIndeterminate(..)
+  , SomeLinearInterpretation
   -- * functions
   , absStdMatrix
   , absTriMatrix
@@ -108,6 +109,8 @@ data MatrixKind fun
 
 -- | Canonical variable type for abstract linear matrix interpretations.
 newtype SomeIndeterminate = SomeIndeterminate Int deriving (Eq, Ord, Enum)
+
+type SomeLinearInterpretation f = LinearInterpretation SomeIndeterminate f
 
 ----------------------------------------------------------------------
 -- functions

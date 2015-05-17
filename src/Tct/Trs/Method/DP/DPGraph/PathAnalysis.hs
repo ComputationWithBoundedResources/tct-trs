@@ -78,7 +78,7 @@ instance T.Processor PathAnalysis where
           wdg = Prob.dependencyGraph prob
           cdg = Prob.congruenceGraph prob
 
-          nprob (_,rs) = prob { Prob.strictDPs=Prob.sdps rs, Prob.weakDPs=Prob.wdps rs }
+          nprob (_,rs) = Prob.sanitiseDPGraph $ prob { Prob.strictDPs=Prob.sdps rs, Prob.weakDPs=Prob.wdps rs }
           proof = PathAnalysisProof
             { paths_         = paths
             , wdg_           = wdg

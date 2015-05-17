@@ -1,15 +1,16 @@
-
 -- | This module provides the /Empty/ processor.
+-- Checks wether the strict components of a problem are empty.
 module Tct.Trs.Method.Empty
   ( emptyDeclaration
   , empty
   ) where
 
-import qualified Tct.Core.Processor.Empty                        as E
-import qualified Tct.Core.Data as T
+import qualified Tct.Core.Data            as T
+import qualified Tct.Core.Processor.Empty as E
 
-import qualified Tct.Trs.Data.Problem as Prob
-import Tct.Trs.Data
+import           Tct.Trs.Data
+import qualified Tct.Trs.Data.Problem     as Prob
+
 
 empty :: TrsStrategy
 empty = E.empty Prob.isTrivial
