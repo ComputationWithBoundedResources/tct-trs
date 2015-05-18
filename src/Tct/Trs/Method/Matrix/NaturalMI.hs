@@ -952,7 +952,7 @@ instance CD.Processor WeightGap where
 
   solve p prob
     | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
-    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictComponents prob) = return . CD.resultToTree p prob $ incompatible
+    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictTrs prob) = return . CD.resultToTree p prob $ incompatible
     | otherwise = do
       res <- wgEntscheide p prob
       CD.resultToTree p prob `fmap` case res of
