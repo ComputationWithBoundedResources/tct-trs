@@ -102,7 +102,12 @@ successive :: [TrsStrategy] -> TrsStrategy
 successive = chainWith (try empty)
 
 whenNonTrivial :: TrsStrategy -> TrsStrategy
-whenNonTrivial st = withProblem $ \p -> when (not $ Prob.isTrivial p) st
+whenNonTrivial st = withProblem $ \p -> 
+  if Prob.isTrivial p then M.empty else st
+
+tew :: TrsStrategy -> TrsStrategy
+tew = te . whenNonTrivial
+
 
 --- * simplifications ------------------------------------------------------------------------------------------------
 

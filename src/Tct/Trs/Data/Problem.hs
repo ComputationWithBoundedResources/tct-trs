@@ -256,7 +256,7 @@ isInnermostProblem' prob = note (not $ isInnermostProblem prob) "not an innermos
 
 -- | A problem is trivial, if the strict DP/TRS components are empty.
 isTrivial :: (Ord f, Ord v) => Problem f v -> Bool
-isTrivial prob = Trs.null (strictDPs prob) && Trs.null (strictComponents prob)
+isTrivial prob = Trs.null (strictComponents prob)
 
 noWeakComponents :: (Ord f, Ord v) =>  Problem f v -> Bool
 noWeakComponents = Trs.null . weakComponents
