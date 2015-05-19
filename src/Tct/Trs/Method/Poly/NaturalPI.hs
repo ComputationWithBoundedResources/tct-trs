@@ -47,6 +47,7 @@ import           Tct.Trs.Data.Arguments              (Greedy (..), UsableArgs (.
 import qualified Tct.Trs.Data.Arguments              as Arg
 import qualified Tct.Trs.Data.ComplexityPair         as CP
 import qualified Tct.Trs.Data.Problem                as Prob
+import qualified Tct.Trs.Data.ProblemKind            as Prob
 import qualified Tct.Trs.Data.RuleSelector           as RS
 import qualified Tct.Trs.Data.Signature              as Sig
 import qualified Tct.Trs.Data.Trs                    as Trs
@@ -134,7 +135,8 @@ entscheide p prob = do
     sig   = Prob.signature prob
     kind  =
       if Prob.isRCProblem prob
-        then PI.ConstructorBased (shape p) (Sig.constructors sig) -- TODO: MS: test; do we gain on precision when restricted to start term constructors
+        -- then PI.ConstructorBased (shape p) (Sig.constructors sig) -- TODO: MS: test; do we gain on precision when restricted to start term constructors
+        then PI.ConstructorBased (shape p) (Prob.constructors $ Prob.startTerms prob)
         else PI.Unrestricted (shape p)
     absi  = I.Interpretation $ M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
     shift = maybe I.All I.Shift (selector p)
