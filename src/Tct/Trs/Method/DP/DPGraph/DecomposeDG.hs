@@ -86,12 +86,11 @@ instance T.Processor DecomposeDG where
         | otherwise                       = do
           lowerProof <- mapply (onLower p) lowerProb
           upperProof <- mapply (onUpper p) upperProb
-          -- TODO: MS: what is the desired behaviour; do we require progress if a strategy is given?; currently we ignore it
           case (lowerProof,upperProof) of
-            (T.Halt _, _) -> failx (Applicable $ DecomposeDGFail "lower strategy failed")
-            (_, T.Halt _) -> failx (Applicable $ DecomposeDGFail "upper strategy failed")
-            (lpt, rpt)    ->
-              return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn lpt, T.fromReturn rpt))
+            (lpt, rpt) 
+              | T.isContinuing lpt && T.isContinuing rpt  
+                          -> return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn lpt, T.fromReturn rpt))
+              | otherwise -> failx (Applicable $ DecomposeDGFail "a strategy failed")
         where
           failx              = return . T.resultToTree p prob . T.Fail
           mapply s pr        = maybe (return . T.Continue $ T.Open pr) (flip T.evaluate pr) s
