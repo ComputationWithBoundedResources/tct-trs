@@ -7,6 +7,7 @@ module Tct.Trs.Processor
   , (>>!!)
   , successive
   , whenNonTrivial
+  , tew
 
   -- * Strategies
   , dpsimps

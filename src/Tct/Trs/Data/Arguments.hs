@@ -21,6 +21,11 @@ module Tct.Trs.Data.Arguments
   , greedy
   , useGreedy
 
+  -- * Restrict
+  , Restrict (..)
+  , restrict
+  , useRestrict
+
   -- * Kind
   , HasKind (..)
   ) where
@@ -98,6 +103,23 @@ greedy = T.arg
 
 useGreedy :: Greedy -> Bool
 useGreedy = (Greedy==)
+
+
+data Restrict = Restrict | NoRestrict 
+  deriving (Bounded, Enum, Eq, Typeable, Show)
+
+instance T.SParsable i i Restrict where
+  parseS = P.enum
+
+restrict :: T.Argument 'T.Required Restrict
+restrict = T.arg
+  `T.withName` "restrict"
+  `T.withHelp`
+    [ "This argument specifies whether the abstract interpretation of non-start coefficients should be restricted." ]
+  `T.withDomain` fmap show [(minBound :: Restrict)..]
+
+useRestrict :: Restrict -> Bool
+useRestrict = (Restrict==)
 
 
 class HasKind p where

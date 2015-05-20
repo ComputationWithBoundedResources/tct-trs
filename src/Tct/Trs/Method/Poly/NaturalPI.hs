@@ -6,6 +6,7 @@ module Tct.Trs.Method.Poly.NaturalPI
   , poly
   , poly'
   , Shape (..)
+  , Restrict (..)
   , UsableArgs (..)
   , UsableRules (..)
   , Greedy (..)
@@ -43,7 +44,7 @@ import           Tct.Common.SMT                      ((.==>), (.>), (.>=))
 import qualified Tct.Common.SMT                      as SMT
 
 import           Tct.Trs.Data
-import           Tct.Trs.Data.Arguments              (Greedy (..), UsableArgs (..), UsableRules (..))
+import           Tct.Trs.Data.Arguments              (Greedy (..), UsableArgs (..), UsableRules (..), Restrict (..))
 import qualified Tct.Trs.Data.Arguments              as Arg
 import qualified Tct.Trs.Data.ComplexityPair         as CP
 import qualified Tct.Trs.Data.Problem                as Prob
@@ -55,8 +56,10 @@ import qualified Tct.Trs.Encoding.Interpretation     as I
 import qualified Tct.Trs.Encoding.UsableRules        as UREnc
 
 
+
 data NaturalPI = NaturalPI
   { shape    :: PI.Shape
+  , restrict :: Arg.Restrict
   , uargs    :: Arg.UsableArgs
   , urules   :: Arg.UsableRules
   , selector :: Maybe (ExpressionSelector F V)
@@ -133,11 +136,10 @@ entscheide p prob = do
     toResult pt = if T.progress pt then T.Continue pt else T.Abort pt
 
     sig   = Prob.signature prob
-    kind  =
-      if Prob.isRCProblem prob
-        -- then PI.ConstructorBased (shape p) (Sig.constructors sig) -- TODO: MS: test; do we gain on precision when restricted to start term constructors
-        then PI.ConstructorBased (shape p) (Prob.constructors $ Prob.startTerms prob)
-        else PI.Unrestricted (shape p)
+    kind  = case Prob.startTerms prob of
+      Prob.AllTerms{}                       -> PI.Unrestricted (shape p)
+      Prob.BasicTerms{Prob.constructors=cs} -> PI.ConstructorBased (shape p) $ if Arg.useRestrict (restrict p) then Sig.constructors sig else cs
+
     absi  = I.Interpretation $ M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
     shift = maybe I.All I.Shift (selector p)
 
@@ -206,9 +208,10 @@ selectorArg = RS.selectorArg
 
 --- ** strategy ------------------------------------------------------------------------------------------------------
 
-polyStrategy :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
-polyStrategy sh ua ur sl gr = T.Proc $ NaturalPI
+polyStrategy :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
+polyStrategy sh li ua ur sl gr = T.Proc $ NaturalPI
   { shape    = sh
+  , restrict = li 
   , uargs    = ua
   , urules   = ur
   , selector = sl
@@ -216,6 +219,7 @@ polyStrategy sh ua ur sl gr = T.Proc $ NaturalPI
 
 polyDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional PI.Shape
+   , T.Argument 'T.Optional Arg.Restrict
    , T.Argument 'T.Optional Arg.UsableArgs
    , T.Argument 'T.Optional Arg.UsableRules
    , T.Argument 'T.Optional (Maybe (ExpressionSelector F V))
@@ -224,6 +228,7 @@ polyDeclaration :: T.Declaration (
 polyDeclaration = T.declare "poly" description args polyStrategy where
   args =
     ( PI.shapeArg `T.optional` PI.Linear
+    , Arg.restrict `T.optional` Arg.Restrict
     , Arg.usableArgs `T.optional` Arg.UArgs
     , Arg.usableRules `T.optional` Arg.URules
     , T.some selectorArg `T.optional` Just (RS.selAnyOf RS.selStricts)
@@ -232,7 +237,7 @@ polyDeclaration = T.declare "poly" description args polyStrategy where
 poly :: TrsStrategy
 poly = T.deflFun polyDeclaration
 
-poly' :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
+poly' :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
 poly' = T.declFun polyDeclaration
 
 
@@ -248,9 +253,10 @@ instance IsComplexityPair NaturalPI where
           , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
         _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
 
-polyProcessorCP :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
-polyProcessorCP sh ua ur = CP.toComplexityPair $ NaturalPI
+polyProcessorCP :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
+polyProcessorCP sh li ua ur = CP.toComplexityPair $ NaturalPI
   { shape    = sh
+  , restrict = li 
   , uargs    = ua
   , urules   = ur
   , selector = Nothing
@@ -258,6 +264,7 @@ polyProcessorCP sh ua ur = CP.toComplexityPair $ NaturalPI
 
 polyCPDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional PI.Shape
+   , T.Argument 'T.Optional Arg.Restrict
    , T.Argument 'T.Optional Arg.UsableArgs
    , T.Argument 'T.Optional Arg.UsableRules ]
    T.:-> ComplexityPair )
@@ -265,13 +272,14 @@ polyCPDeclaration = T.declare "polyCP" description argsCP polyProcessorCP
   where
     argsCP =
       ( PI.shapeArg `T.optional` PI.Linear
+      , Arg.restrict `T.optional` Arg.Restrict
       , Arg.usableArgs `T.optional` Arg.UArgs
       , Arg.usableRules `T.optional` Arg.URules )
 
 polyCP :: ComplexityPair
 polyCP = T.deflFun polyCPDeclaration
 
-polyCP' :: PI.Shape -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
+polyCP' :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
 polyCP' = T.declFun polyCPDeclaration
 
 
