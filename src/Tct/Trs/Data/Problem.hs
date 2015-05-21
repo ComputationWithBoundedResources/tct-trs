@@ -2,6 +2,7 @@ module Tct.Trs.Data.Problem
   (
   -- * problem
     Problem (..)
+  , TrsProblem
 
   , dependencyGraph
   , congruenceGraph
@@ -41,19 +42,10 @@ module Tct.Trs.Data.Problem
 
   , noWeakComponents
   , noWeakComponents'
-
-  -- * instance
-  , TrsProblem
-  , F
-  , V
-  , markFun
-  , compoundf
-  , isCompoundf
   ) where
 
 
 import           Control.Applicative          ((<|>))
-import qualified Data.ByteString.Char8        as BS
 import qualified Data.Set                     as S
 import           Data.Typeable
 
@@ -73,7 +65,8 @@ import qualified Tct.Trs.Data.Trs             as Trs
 
 import           Tct.Trs.Data.Signature       (Signature)
 import qualified Tct.Trs.Data.Signature       as Sig
-
+import           Tct.Trs.Data.Symbol          (F, V, Fun)
+import qualified Tct.Trs.Data.Symbol          as Symb
 
 
 --- * trs problem ----------------------------------------------------------------------------------------------------
@@ -141,6 +134,12 @@ ruleSet prob = RuleSet
 
 --- ** construction --------------------------------------------------------------------------------------------------
 
+-- MS:
+-- it would be no problem to keep the symbol type and variable type abstract; provided one defines a suitable class
+-- yet it gets annoying when defining processors / strategies
+
+type TrsProblem = Problem F V
+
 -- TODO: MS: add sanity check of symbols;
 -- we use a wrapper for distinguishing dp/com symbols; but pretty printing can still fail if a symbols c_1 or f# exists
 -- are there any conventions?
@@ -150,7 +149,7 @@ ruleSet prob = RuleSet
 
 -- | Transforms a 'Data.Rewriting.Problem' into a 'TrsProblem'.
 fromRewriting :: R.Problem String String -> Either String TrsProblem
-fromRewriting prob = 
+fromRewriting prob =
   if Trs.isWellformed sTrs && Trs.isWellformed wTrs
     then
       Right Problem
@@ -172,7 +171,7 @@ fromRewriting prob =
     else
       Left "problem not wellformed."
   where
-    toFun (R.Rule l r) = let k = R.map (F . TrsFun . BS.pack) (V . BS.pack) in R.Rule (k l) (k r)
+    toFun (R.Rule l r) = let k = R.map (Symb.fun) (Symb.var) in R.Rule (k l) (k r)
     sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)
     wTrs = Trs.fromList . map toFun $ R.weakRules (R.rules prob)
     trs  = sTrs `Trs.union` wTrs
@@ -184,8 +183,18 @@ fromRewriting prob =
 
 --- ** updates  ------------------------------------------------------------------------------------------------------
 
+sanitiseSignature :: (Ord f, Ord v) => Problem f v -> Problem f v
+sanitiseSignature prob = prob
+  { startTerms = case startTerms prob of
+      BasicTerms ds cs -> BasicTerms (restrict ds) (restrict cs)
+      AllTerms fs      -> AllTerms (restrict fs)
+  , signature  = sig }
+  where
+    sig = Trs.signature $ allComponents prob
+    restrict = Sig.restrictToSignature sig
+
 -- | Computes the dpGraph from the DP components of the problem and updates the dpGraph component of the Problem.
-sanitiseDPGraph :: (Ord f, Ord v) => Problem f v -> Problem f v
+sanitiseDPGraph :: (Fun f, Ord f, Ord v) => Problem f v -> Problem f v
 sanitiseDPGraph prob = prob
   { dpGraph = DPG.estimatedDependencyGraph (ruleSet prob) (strategy prob) }
 
@@ -265,68 +274,7 @@ noWeakComponents' :: (Ord f, Ord v) => Problem f v -> Maybe String
 noWeakComponents' prob = note (not $ noWeakComponents prob) " contains weak components "
 
 
---- * problem instance -----------------------------------------------------------------------------------------------
-
--- MS:
--- it would be no problem to keep the symbol type and variable type abstract; provided one defines a suitable class
--- yet it gets annoying when defining processors / strategies
-
-type TrsProblem = Problem F V
-
--- | Annotated function symbol.
-data AFun f
-  = TrsFun f
-  | DpFun f
-  | ComFun Int
-  deriving (Eq, Ord, Show, Typeable)
-
-newtype F = F (AFun BS.ByteString)
-  deriving (Eq, Ord, Show, Typeable)
-
-newtype V = V BS.ByteString
-  deriving (Eq, Ord, Show, Typeable)
-
--- | Transforms a function symbol into a dependency pair symbol.
-markFun :: F -> F
-markFun (F (TrsFun f)) = F (DpFun f)
-markFun _              = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
-
--- | Returns a compound symbol with the given index.
-compoundf :: Int -> F
-compoundf = F . ComFun
-
--- | Checks wether the symbol is a compound symbol.
-isCompoundf :: F -> Bool
-isCompoundf (F (ComFun _)) = True
-isCompoundf _              = False
-
-
 --- * proofdata ------------------------------------------------------------------------------------------------------
-
-instance PP.Pretty V where
-  pretty (V v) = PP.text (BS.unpack v)
-
-instance Xml.Xml V where
-  toXml (V v) = Xml.elt "var" [Xml.text (BS.unpack v)]
-  toCeTA      = Xml.toXml
-
-instance PP.Pretty BS.ByteString where
-  pretty = PP.text . BS.unpack
-
-instance Xml.Xml BS.ByteString where
-  toXml  = Xml.text . BS.unpack
-  toCeTA = Xml.text . BS.unpack
-
-instance PP.Pretty F where
-  pretty (F (TrsFun f)) = PP.text (BS.unpack f)
-  pretty (F (DpFun f))  = PP.text (BS.unpack f) PP.<> PP.char '#'
-  pretty (F (ComFun i)) = PP.pretty "c_" PP.<> PP.int i
-
-instance Xml.Xml F where
-  toXml (F (TrsFun f)) = Xml.elt "name" [Xml.text $ BS.unpack  f]
-  toXml (F (DpFun f))  = Xml.elt "sharp" [Xml.elt "name" [Xml.text $ BS.unpack f]]
-  toXml (F (ComFun f)) = Xml.elt "name" [Xml.text $ 'c':show f]
-  toCeTA = Xml.toXml
 
 
 instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where

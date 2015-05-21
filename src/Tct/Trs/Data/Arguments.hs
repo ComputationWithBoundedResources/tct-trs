@@ -36,8 +36,7 @@ import           Data.Typeable
 import qualified Tct.Core.Common.Parser    as P
 import qualified Tct.Core.Data             as T
 
-import           Tct.Trs.Data.Problem      (F, V)
-import           Tct.Trs.Data.RuleSelector (ExpressionSelector)
+import           Tct.Trs.Data
 
 
 class HasSelection p where

@@ -72,7 +72,7 @@ isCommutative rRules' sRules' = isCommutative' 5 cps
     cps                = R.toPairs $ R.forwardPairs rRules' sRules'
     isCommutative' n    = all (\(l,r) -> r `reductOf` take n (reducts l))
 
-mkProbs :: (Show f, Show v, Ord f, Ord v) => Problem f v -> DecomposeBound -> Trs f v -> Trs f v -> (Problem f v, Problem f v)
+mkProbs :: (Fun f, Show f, Show v, Ord f, Ord v) => Problem f v -> DecomposeBound -> Trs f v -> Trs f v -> (Problem f v, Problem f v)
 mkProbs prob compfn dps trs = (rProb, sProb)
   where
     rDps = dps `Trs.intersect` Prob.strictDPs prob
@@ -84,17 +84,17 @@ mkProbs prob compfn dps trs = (rProb, sProb)
       { Prob.strictDPs = rDps
       , Prob.strictTrs = rTrs
       , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDps
-      , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs 
+      , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs
       , Prob.dpGraph   = DG.setWeak sDps (Prob.dpGraph prob) }
 
-    sProb = Prob.sanitiseDPGraph $ 
-      if isAdditive compfn 
+    sProb = Prob.sanitiseDPGraph $
+      if isAdditive compfn
         then prob
           { Prob.strictDPs  = sDps
           , Prob.strictTrs  = sTrs
           , Prob.weakDPs    = Prob.weakDPs prob `Trs.union` rDps
           , Prob.weakTrs    = Prob.weakTrs prob `Trs.union` rTrs }
-        else prob 
+        else prob
           { Prob.strictTrs  = sTrs
           , Prob.strictDPs  = sDps }
 
@@ -103,7 +103,7 @@ mkProbs prob compfn dps trs = (rProb, sProb)
 
 --- * processor ------------------------------------------------------------------------------------------------------
 
-data Decompose = Decompose 
+data Decompose = Decompose
   { onSelection :: ExpressionSelector F V
   , withBound   :: DecomposeBound }
   deriving Show
@@ -123,7 +123,7 @@ progress DecomposeProof{..} =
   case bound_ of
     Add -> not $ Trs.null (Prob.allComponents rProb_) || Trs.null (Prob.allComponents sProb_)
     _   -> not $ Prob.isTrivial rProb_ || Prob.isTrivial sProb_
-progress DecomposeFail = False  
+progress DecomposeFail = False
 
 instance T.Processor Decompose where
   type ProofObject Decompose = ApplicationProof DecomposeProof
@@ -208,7 +208,7 @@ selArg = selectorArg `T.optional` selAnyOf selStricts
 
 decomposeDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional DecomposeBound ] 
+   , T.Argument 'T.Optional DecomposeBound ]
    T.:-> TrsStrategy)
 decomposeDeclaration = T.declare "decompose" desc (selArg, bndArg) (\x y -> T.Proc (decomposeProcessor x y ))
 decompose :: ExpressionSelector F V -> DecomposeBound -> TrsStrategy
@@ -219,7 +219,7 @@ decompose' = T.deflFun decomposeDeclaration
 
 
 -- MS: unfortunately we can not provide update functions for strategie/strategydeclaratioin
--- we could offer an alternative interface; 
+-- we could offer an alternative interface;
 
 -- decomposeProcDeclaration :: T.Declaration (
 --   '[ T.Argument 'T.Optional (ExpressionSelector F V)

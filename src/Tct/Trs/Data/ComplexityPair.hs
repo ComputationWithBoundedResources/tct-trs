@@ -20,6 +20,7 @@ import qualified Tct.Core.Data             as T
 import           Tct.Trs.Data.Problem
 import           Tct.Trs.Data.RuleSelector (ExpressionSelector)
 import           Tct.Trs.Data.Trs          (Trs)
+import           Tct.Trs.Data.Symbol       (F, V)
 
 
 data ComplexityPairProof = ComplexityPairProof

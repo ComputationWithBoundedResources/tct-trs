@@ -48,6 +48,7 @@ import qualified Tct.Common.Graph            as Gr (empty)
 import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Rewriting      as R
 import qualified Tct.Trs.Data.RuleSet        as Rs
+import qualified Tct.Trs.Data.Symbol         as Symb
 import qualified Tct.Trs.Data.Trs            as Trs
 
 
@@ -100,12 +101,12 @@ withRulesPair' = foldl k ([],[],[])
 
 --- ** estimated dependency graph -------------------------------------------------------------------------------------
 
-estimatedDependencyGraph :: (Ord f, Ord v) => Rs.RuleSet f v -> Prob.Strategy -> DependencyGraph f v
+estimatedDependencyGraph :: (Ord f, Ord v, Symb.Fun f) => Rs.RuleSet f v -> Prob.Strategy -> DependencyGraph f v
 estimatedDependencyGraph rs strat  = DependencyGraph wdg cdg where
   wdg = estimatedDependencyGraph' rs strat
   cdg = toCongruenceGraph wdg
 
-estimatedDependencyGraph' :: (Ord v, Ord f, Num b, Enum b) => Rs.RuleSet f v -> Prob.Strategy -> Graph (DGNode f v) b
+estimatedDependencyGraph' :: (Ord v, Ord f, Symb.Fun f) => Rs.RuleSet f v -> Prob.Strategy -> Graph (DGNode f v) Int
 estimatedDependencyGraph' rs strat = mkGraph ns es
   where
     (strictDPs, weakDPs) = (Trs.toList $ Rs.sdps rs, Trs.toList $ Rs.wdps rs)
@@ -115,7 +116,9 @@ estimatedDependencyGraph' rs strat = mkGraph ns es
     (R.Rule s t) `edgesTo` (R.Rule u v)=
       case t of
         R.Var _    -> []
-        R.Fun _ ts -> [ i | (i,ti) <- zip [1..] ts, (s,ti) `edgeTo` (u,v) ]
+        R.Fun f ts
+          | Symb.isCompoundFun f -> [ i | (i,ti) <- zip [1..] ts, (s,ti) `edgeTo` (u,v) ]
+          | otherwise            -> [ 1 | (s,t) `edgeTo` (u,v) ]
 
     (s,t) `edgeTo` (u,_) =
       let
@@ -238,7 +241,7 @@ instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (DG f v) where
     where
       rs = L.sortBy (compare `on` fst) [ (n, r) | (n, r) <- lnodes wdg]
       ppnode n rule =
-        PP.int n <> PP.colon <> strict (isStrict rule) <> PP.pretty (theRule rule) 
+        PP.int n <> PP.colon <> strict (isStrict rule) <> PP.colon <> PP.pretty (theRule rule) 
         PP.<$$> PP.indent 3 
           (PP.vcat [ arr i <> PP.pretty (theRule r_m) <> PP.colon <> PP.int m | (m,r_m,i) <- lsuccessors wdg n ])
       arr i = PP.text "-->_" <> PP.int i

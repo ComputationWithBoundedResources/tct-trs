@@ -10,7 +10,7 @@ module Tct.Trs.Method.DP.DependencyPairs
   ) where
 
 
-import           Control.Applicative         ((<|>))
+import           Control.Applicative         ((<|>), (<$>))
 import           Control.Monad.State.Strict
 import qualified Data.Traversable            as F
 import           Data.Typeable
@@ -30,6 +30,7 @@ import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Signature      as Sig
 import qualified Tct.Trs.Data.Trs            as Trs
+import qualified Tct.Trs.Data.Symbol         as Symb
 
 
 
@@ -61,14 +62,17 @@ subtermsDT defineds s@(R.Fun f ss)
   where subs = concatMap (subtermsDT defineds) ss
 subtermsDT _ _ = []
 
--- MS: we follow tct2 and Com(t)=Com(t) for singleton argument list t; hence rhs always have a compound symbol
-markRule :: (R.Term F V -> [R.Term F V]) -> R.Rule F V -> State Int (R.Rule F V)
-markRule subtermsOf (R.Rule lhs rhs) = do
-  i <- modify succ >> get
-  return $ R.Rule (markTerm lhs) (R.Fun (Prob.compoundf i) (map markTerm $ subtermsOf rhs))
-  where
-    markTerm (R.Fun f fs) = R.Fun (Prob.markFun f) fs
-    markTerm v            = v
+markTerm :: Fun f => R.Term f v -> R.Term f v
+markTerm (R.Fun f fs) = R.Fun (Symb.markFun f) fs
+markTerm v            = v
+
+markRule :: Fun f => (R.Term f v -> [R.Term f v]) -> R.Rule f v -> State Int (R.Rule f v)
+markRule subtermsOf (R.Rule lhs rhs) =
+  R.Rule (markTerm lhs) <$> case markTerm `fmap` subtermsOf rhs of
+    [t] -> return t
+    ts  -> do
+      i <- modify succ >> get
+      return $ R.Fun (Symb.compoundFun i) ts
 
 -- | (Original Rule, DP Rule)
 type Transformation f v = (R.Rule f v, R.Rule f v)
@@ -127,10 +131,10 @@ instance T.Processor DependencyPairs where
         return (ss,ws)
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks
-      nsig = unions [sig, Sig.map Prob.markFun (Sig.restrictSignature sig defineds), Trs.signature sDPs, Trs.signature wDPs]
+      nsig = unions [sig, Sig.map Symb.markFun (Sig.restrictSignature sig defineds), Trs.signature sDPs, Trs.signature wDPs]
         where unions = foldr1 Sig.union
       nprob = Prob.sanitiseDPGraph $ prob
-        { Prob.startTerms = Prob.BasicTerms (Prob.markFun `S.map` Prob.defineds starts) (Prob.constructors starts)
+        { Prob.startTerms = Prob.BasicTerms (Symb.markFun `S.map` Prob.defineds starts) (Prob.constructors starts)
         , Prob.signature  = nsig
 
         , Prob.strictDPs = sDPs
@@ -171,12 +175,12 @@ instance Xml.Xml DependencyPairsProof where
       , Xml.elt "weakDPs" [Xml.toXml (fromTransformation $ weakTransformation proof)] ]
   toCeTA proof = case dpKindUsed proof of
     WIDP -> Xml.unsupported
-    WDP -> 
+    WDP ->
       Xml.elt "wdpTransformation"
-        [ Xml.elt "compoundSymbols" [ xsymb f i | (f,i) <- Sig.elems . Sig.filter Prob.isCompoundf $ newSignature proof ]
+        [ Xml.elt "compoundSymbols" [ xsymb f i | (f,i) <- Sig.elems . Sig.filter Symb.isCompoundFun $ newSignature proof ]
         , xstrict "WDP", xweak "WDP", xlhss ]
         where xsymb f i = Xml.elt "symbol" [ Xml.toXml f, Xml.elt "arity" [Xml.int i] ]
-    DT -> 
+    DT ->
       Xml.elt "dtTransformation" [ xstrict "DT" , xweak "DT", xlhss ]
     where
       ruleWith dp (old,new) = Xml.elt ("ruleWith"++dp) [ Xml.toCeTA old, Xml.toCeTA new ]

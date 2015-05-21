@@ -29,6 +29,7 @@ import qualified Tct.Trs.Data.Problem     as Prob
 import qualified Tct.Trs.Data.ProblemKind as Prob
 import qualified Tct.Trs.Data.Rewriting   as R (isUnifiable)
 import qualified Tct.Trs.Data.Signature   as Sig
+import qualified Tct.Trs.Data.Symbol      as Symb
 import qualified Tct.Trs.Data.Trs         as Trs
 
 
@@ -144,7 +145,7 @@ usableArgsWhereApplicable prob onlyCompound useUA = case (onlyCompound, useUA, P
     trs = Prob.allComponents prob
     str = Prob.strategy prob
     sig = Prob.signature prob
-    (compSig, nonCompSig) = Sig.partition Prob.isCompoundf sig
+    (compSig, nonCompSig) = Sig.partition Symb.isCompoundFun sig
 
 -- | Returns the usable positions as list.
 usablePositions :: UsablePositions f -> [(f, [Int])]

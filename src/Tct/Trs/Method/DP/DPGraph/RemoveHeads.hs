@@ -28,9 +28,8 @@ import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
 import qualified Tct.Trs.Data.Signature       as Sig (isDefined)
+import qualified Tct.Trs.Data.Symbol          as Symb
 import qualified Tct.Trs.Data.Trs             as Trs
-
-
 
 
 data RemoveHeads = RemoveHeads deriving Show
@@ -60,9 +59,9 @@ instance T.Processor RemoveHeads where
 
           isBasicC (R.Var _)     = True
           isBasicC t@(R.Fun f ts)
-            | Prob.isCompoundf f = all isBasicC ts
-            | isDefined f        = isStartTerm t
-            | otherwise          = error "Tct.Trs.Method.DP.DPGraph.RemoveHeads.solve.isBasicC: invalid rhs"
+            | Symb.isCompoundFun f = all isBasicC ts
+            | isDefined f          = isStartTerm t
+            | otherwise            = error "Tct.Trs.Method.DP.DPGraph.RemoveHeads.solve.isBasicC: invalid rhs"
             where
               isStartTerm = Prob.isStartTerm (Prob.startTerms prob)
               isDefined   = flip Sig.isDefined (Prob.signature prob)

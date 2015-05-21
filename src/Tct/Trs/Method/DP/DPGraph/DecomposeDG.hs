@@ -49,6 +49,7 @@ import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.RuleSelector    as RS
 import qualified Tct.Trs.Data.RuleSet         as Prob
+import qualified Tct.Trs.Data.Symbol          as Symb
 import qualified Tct.Trs.Data.Trs             as Trs
 
 
@@ -87,8 +88,8 @@ instance T.Processor DecomposeDG where
           lowerProof <- mapply (onLower p) lowerProb
           upperProof <- mapply (onUpper p) upperProb
           case (lowerProof,upperProof) of
-            (lpt, rpt) 
-              | T.isContinuing lpt && T.isContinuing rpt  
+            (lpt, rpt)
+              | T.isContinuing lpt && T.isContinuing rpt
                           -> return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn lpt, T.fromReturn rpt))
               | otherwise -> failx (Applicable $ DecomposeDGFail "a strategy failed")
         where
@@ -117,7 +118,7 @@ instance T.Processor DecomposeDG where
           -- compute extension rules sep
           extension = sep unselectedStrictDPs `Trs.union` sep unselectedWeakDPs where
             sep = Trs.fromList . concatMap sepRule . Trs.toList
-            sepRule (R.Rule l (R.Fun f ts)) | Prob.isCompoundf f = [ R.Rule l ti | ti <- ts ]
+            sepRule (R.Rule l (R.Fun f ts)) | Symb.isCompoundFun f = [ R.Rule l ti | ti <- ts ]
             sepRule (R.Rule l r) = [ R.Rule l r ]
 
           upperProb = Prob.sanitiseDPGraph $ prob
@@ -218,7 +219,7 @@ lowerArg = T.some T.strat
 -- decomposeDGProcDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) decomposeDGProcessor
 
 
--- decomposeDGProc :: 
+-- decomposeDGProc ::
 --   ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy
 --   -> (DecomposeDG -> DecomposeDG) -> TrsStrategy
 -- decomposeDGProc sel st1 st2 f = T.Proc . f $ T.declFun decomposeDGProcDeclaration sel st1 st2
@@ -227,10 +228,10 @@ lowerArg = T.some T.strat
 -- decomposeDGProc' f = T.Proc . f $ T.deflFun decomposeDGProcDeclaration
 
 -- solveUpperWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
--- solveUpperWith st p = p{ onUpper=Just st } 
+-- solveUpperWith st p = p{ onUpper=Just st }
 
 -- solveLowerWith :: TrsStrategy -> DecomposeDG -> DecomposeDG
--- solveLowerWith st p = p{ onLower=Just st } 
+-- solveLowerWith st p = p{ onLower=Just st }
 
 -- selectLowerBy :: ExpressionSelector F V -> DecomposeDG -> DecomposeDG
 -- selectLowerBy sel p = p{ onSelection=sel }

@@ -154,9 +154,9 @@ data NaturalMIKind
 
 -- | Proof information for matrix Interpretations.
 data MatrixOrder a
-  = MatrixOrder { kind_ :: MI.MatrixKind Prob.F -- ^ restictions of the matrices used in the proof
+  = MatrixOrder { kind_ :: MI.MatrixKind F -- ^ restictions of the matrices used in the proof
                 , dim_  :: Int -- ^ dimensions of the matrices used in the proof
-                , mint_ :: I.InterpretationProof (MI.LinearInterpretation MI.SomeIndeterminate a) (MI.LinearInterpretation Prob.V a) -- ^ a proof which interprets canonical variables to user variables
+                , mint_ :: I.InterpretationProof (MI.LinearInterpretation MI.SomeIndeterminate a) (MI.LinearInterpretation V a) -- ^ a proof which interprets canonical variables to user variables
                 } deriving (Show)
 
 
@@ -167,7 +167,7 @@ data NaturalMI = NaturalMI
                  , miKind      :: NaturalMIKind -- ^ kind of interpretation
                  , uargs       :: Arg.UsableArgs -- ^ usable arguments
                  , urules      :: Arg.UsableRules -- ^ usable rules
-                 , selector    :: Maybe (TD.ExpressionSelector Prob.F Prob.V)
+                 , selector    :: Maybe (TD.ExpressionSelector F V)
                  , greedy      :: Arg.Greedy
                  } deriving (Show)
 
@@ -224,9 +224,9 @@ entryToSMT MI.MIConstOne = return one  -- SMT.numM 1
 {- | Takes the SMT interpretations of functions to build an interpretation of a term -}
 interpretf :: (SR.SemiRing a)
            => Int
-           -> I.Interpretation Prob.F (SomeLInter a)
-           -> RT.Term Prob.F Prob.V
-           -> MI.LinearInterpretation Prob.V a
+           -> I.Interpretation F (SomeLInter a)
+           -> RT.Term F V
+           -> MI.LinearInterpretation V a
 interpretf dim ebsi = I.interpretTerm interpretFun interpretVar
   where
     interpretFun f ts = addAll $ zipWith handleArg [1..] ts
@@ -255,8 +255,8 @@ countDiagonal _ _            = EncM.diagonalNonZeros
 upperbound ::
   Int -- ^ dimension
   -> NaturalMIKind
-  -> MI.MatrixKind Prob.F
-  -> I.Interpretation Prob.F (SomeLInter Int)
+  -> MI.MatrixKind F
+  -> I.Interpretation F (SomeLInter Int)
   -> CD.Complexity
 upperbound dim intKind ordKind inter =
   case ordKind of
@@ -614,7 +614,7 @@ entscheide1 ::
   NaturalMI
   -> MatrixOrder c
   -> SMT.SolverState SMT.Expr
-  -> (I.Interpretation Prob.F (SomeLInter SMT.IExpr), Maybe (UREnc.UsableEncoder Prob.F))
+  -> (I.Interpretation F (SomeLInter SMT.IExpr), Maybe (UREnc.UsableEncoder F))
   -> I.ForceAny
   -> Prob.TrsProblem
   -> CD.TctM (CD.ProofTree (Prob.TrsProblem))
@@ -622,7 +622,7 @@ entscheide1 p aorder encoding decoding forceAny prob
   | Prob.isTrivial prob = return . I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
   | otherwise           = do
     mto <- CD.remainingTime `fmap` CD.askStatus prob
-    res :: SMT.Result (I.Interpretation Prob.F (SomeLInter Int), Maybe (UREnc.UsableSymbols Prob.F))
+    res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
       <- liftIO $ SMT.solve (SMT.minismt mto) (encoding `assertx` forceAny srules) (SMT.decode decoding)
     case res of
       SMT.Sat a
@@ -669,7 +669,7 @@ entscheide1 p aorder encoding decoding forceAny prob
 
 {- | create options/ configuration  for the NaturalMI strategy -}
 matrixStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
-               -> Maybe (TD.ExpressionSelector Prob.F Prob.V)
+               -> Maybe (TD.ExpressionSelector F V)
                -> Arg.Greedy
                -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
 matrixStrategy dim deg nmiKind ua ur sl gr = CD.Proc $
@@ -717,7 +717,7 @@ args ::
   , CD.Argument 'CD.Optional NaturalMIKind
   , CD.Argument 'CD.Optional Arg.UsableArgs
   , CD.Argument 'CD.Optional Arg.UsableRules
-  , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V))
+  , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V))
   , CD.Argument 'CD.Optional Arg.Greedy )
 args =
   ( dimArg          `CD.optional` 1
@@ -735,7 +735,7 @@ matrixDeclaration :: CD.Declaration (
    , CD.Argument 'CD.Optional NaturalMIKind
    , CD.Argument 'CD.Optional Arg.UsableArgs
    , CD.Argument 'CD.Optional Arg.UsableRules
-   , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector Prob.F Prob.V))
+   , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V))
    , CD.Argument 'CD.Optional Arg.Greedy
   ] CD.:-> CD.Strategy Prob.TrsProblem Prob.TrsProblem)
 matrixDeclaration = CD.declare "matrix" description args matrixStrategy
@@ -744,7 +744,7 @@ matrix :: CD.Strategy Prob.TrsProblem Prob.TrsProblem
 matrix = CD.deflFun matrixDeclaration
 
 matrix' :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
-               -> Maybe (TD.ExpressionSelector Prob.F Prob.V)
+               -> Maybe (TD.ExpressionSelector F V)
                -> Arg.Greedy
                -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
 matrix' = CD.declFun matrixDeclaration
@@ -756,11 +756,11 @@ matrix' = CD.declFun matrixDeclaration
 
 instance I.AbstractInterpretation NaturalMI where
   -- | Type of abstract matrix interpretations.
-  type (A NaturalMI) = SomeLInter (MI.MatrixInterpretationEntry Prob.F)
+  type (A NaturalMI) = SomeLInter (MI.MatrixInterpretationEntry F)
   -- | Type of SMT interpretations. Abstract Varaibles replaced by SMT variables.
   type (B NaturalMI) = SomeLInter SMT.IExpr
   -- | Type of concrete interpretations. SMT variables replaced by integers.
-  type (C NaturalMI) = MI.LinearInterpretation Prob.V SMT.IExpr
+  type (C NaturalMI) = MI.LinearInterpretation V SMT.IExpr
 
   {- transforms a single abstract interpretation of a function into an SMT interpretation. -}
   -- | encode :: NaturalMI -> A NaturalMI -> SMT.SolverStM SMT.Expr (B NaturalMI)
@@ -780,7 +780,7 @@ instance I.AbstractInterpretation NaturalMI where
       func (MI.SomeIndeterminate i) m = SMT.bigOr (fmap ( .> SMT.zero) m) .==> inFilter i
 
   {- | Given an abstract interpretation get a concrete interpretation  for a Trs-Term. -}
-  -- interpret   :: NaturalMI -> I.Interpretation Prob.F (B NaturalMI) -> RT.Term Prob.F Prob.V -> C NaturalMI
+  -- interpret   :: NaturalMI -> I.Interpretation F (B NaturalMI) -> RT.Term F V -> C NaturalMI
   interpret = interpretf . miDimension
 
   {- | Add a SMT value (smtexpr) to the constant part of an interpretation.
@@ -967,7 +967,7 @@ instance CD.Processor WeightGap where
 wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
 wgEntscheide p prob = do
   mto <- CD.remainingTime `fmap` CD.askStatus prob
-  res :: SMT.Result (I.Interpretation Prob.F (SomeLInter Int))
+  res :: SMT.Result (I.Interpretation F (SomeLInter Int))
     <- liftIO $ SMT.solveStM (SMT.minismt mto) $ do
 
     SMT.setFormat "QF_NIA"

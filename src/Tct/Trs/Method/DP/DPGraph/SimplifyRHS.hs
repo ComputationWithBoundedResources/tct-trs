@@ -30,6 +30,7 @@ import           Tct.Trs.Data
 import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Signature       as Sig
+import qualified Tct.Trs.Data.Symbol          as Symb
 import qualified Tct.Trs.Data.Trs             as Trs
 
 
@@ -63,7 +64,7 @@ instance T.Processor SimplifyRHS where
           -- sure that we have the appropriate format or introduce fresh compound symbols here
           elims = [ (isStrict cn, (r, elimRule n r)) | (n,cn) <- lnodes wdg, let r = theRule cn ]
           elimRule n (R.Rule l (R.Fun f rs))
-            | not (Prob.isCompoundf f) = Nothing
+            | not (Symb.isCompoundFun f) = Nothing
             -- | not (Prob.isCompoundf f) = error $ "SimplifyRHS.elim: not a compound symbol: " ++ show f
             | otherwise                = if length rs' == length rs then Nothing else Just $ R.Rule l (R.Fun f rs')
             where
