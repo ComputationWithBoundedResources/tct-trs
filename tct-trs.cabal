@@ -84,6 +84,7 @@ Library
     Tct.Trs.Data.RuleSelector
     Tct.Trs.Data.RuleSet
     Tct.Trs.Data.Signature
+    Tct.Trs.Data.Symbol
     Tct.Trs.Data.Trs
     Tct.Trs.Encoding.ArgumentFiltering
     Tct.Trs.Encoding.Bounds.Automata
