@@ -200,9 +200,7 @@ isOverlay' trs = note (not $ isOverlay trs) " system is not overlay"
 --- * proofdata  -----------------------------------------------------------------------------------------------------
 
 ppTrs :: (PP.Pretty f, PP.Pretty v) => Trs f v -> PP.Doc
-ppTrs trs 
-  | null trs  = PP.braces PP.space
-  | otherwise = PP.vcat . fmap PP.pretty $ toList trs
+ppTrs = PP.vcat . fmap PP.pretty . toList
 
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
   pretty = ppTrs

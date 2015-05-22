@@ -111,7 +111,7 @@ instance PP.Pretty RemoveWeakSuffixesProof where
     [ PP.text "Consider the dependency graph"
     , PP.indent 2 $ PP.pretty (wdg_ p)
     , PP.text "The following weak DPs constitute a sub-graph of the DG that is closed under successors. The DPs are removed."
-    , PP.indent 2 $ PP.pretty (removable_ p) ]
+    , PP.indent 2 $ PP.listing' (removable_ p) ]
 
 instance Xml.Xml RemoveWeakSuffixesProof where
   toXml RemoveWeakSuffixesFail      = Xml.elt "removeWeakSuffixes" []

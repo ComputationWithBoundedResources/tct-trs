@@ -289,7 +289,7 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
     , PP.indent 2 $ PP.pretty (weakTrs prob)
     , PP.text "Signature:"
     , PP.indent 2 $ PP.pretty (signature prob)
-    , PP.text "Kind:"
+    , PP.text "Obligation:"
     , PP.indent 2 $ PP.pretty (strategy prob)
     , PP.indent 2 $ PP.pretty (startTerms prob) ]
 
