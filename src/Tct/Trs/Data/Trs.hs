@@ -52,7 +52,6 @@ import qualified Tct.Trs.Data.Rewriting as R
 import qualified Tct.Trs.Data.Signature as Sig
 
 
-
 type RuleSet f v = S.Set (Rule f v)
 
 newtype TrsT a = TrsT (S.Set a)
@@ -198,10 +197,12 @@ isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is dupl
 isOverlay' :: (Ord f, Ord v) => Trs f v -> Maybe String
 isOverlay' trs = note (not $ isOverlay trs) " system is not overlay"
 
---- * proof data -----------------------------------------------------------------------------------------------------
+--- * proofdata  -----------------------------------------------------------------------------------------------------
 
 ppTrs :: (PP.Pretty f, PP.Pretty v) => Trs f v -> PP.Doc
-ppTrs = PP.vcat . fmap PP.pretty . toList
+ppTrs trs 
+  | null trs  = PP.braces PP.space
+  | otherwise = PP.vcat . fmap PP.pretty $ toList trs
 
 instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
   pretty = ppTrs

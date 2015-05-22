@@ -272,12 +272,12 @@ instance PP.Pretty PredecessorEstimationProof where
     , PP.indent 2 ppEstimated
     , PP.text "by application of"
     , PP.indent 2 $ PP.text "Pre" <> PP.parens ppEstimated <> PP.text " = " <> ppPredecessors <> PP.dot
-    , PP.text "Here rules are labeld as follows:"
+    , PP.text "Here rules are labelled as follows:"
     , PP.indent 2 $ ppRules ]
     where
-      ppRules        = PP.pretty [ (n, theRule cn) | (n,cn) <- lnodes (wdg_ p) ]
-      ppEstimated    = PP.set [ PP.int (node s) | s <- selected_ p ]
-      ppPredecessors = PP.set [ PP.int n | s <- selected_ p, (n,_) <- preds s]
+      ppRules        = PP.listing' [ (n, theRule cn) | (n,cn) <- lnodes (wdg_ p) ]
+      ppEstimated    = PP.set' [ (node s) | s <- selected_ p ]
+      ppPredecessors = PP.set' [ n | s <- selected_ p, (n,_) <- preds s]
   pretty p@PredecessorEstimationCPProof{} = PP.vcat
     [ PP.text $ "We first use the processor " ++ show (cp_ p) ++ " to orient following rules strictly:"
     , PP.indent 2 $ PP.listing' rdps
