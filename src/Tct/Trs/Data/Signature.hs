@@ -10,9 +10,9 @@ module Tct.Trs.Data.Signature
   , elems
   , arity
   , positions
-  , constructors
   , defineds
   , isDefined
+  , constructors
   , isConstructor
 
   -- * updates
@@ -30,7 +30,6 @@ import qualified Data.Map.Strict        as M
 import           Data.Maybe             (fromMaybe)
 import qualified Data.Set               as S
 import           Prelude                hiding (filter, map)
-import qualified Prelude                as P (map)
 
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml    as Xml
@@ -74,10 +73,6 @@ mkSignature (ds,cs) = Signature
 symbols :: Signature f -> Symbols f
 symbols = M.keysSet . signature_
 
--- | Returns the constructor symbols.
-constructors :: Signature f -> Symbols f
-constructors = constructors_
-
 -- | Returns the defined symbols
 defineds :: Signature f -> Symbols f
 defineds = defineds_
@@ -85,6 +80,10 @@ defineds = defineds_
 -- | Checks wether the given symbol is a defined symbol.
 isDefined :: Ord f => f -> Signature f -> Bool
 isDefined f = S.member f . defineds
+
+-- | Returns the constructor symbols.
+constructors :: Signature f -> Symbols f
+constructors = constructors_
 
 -- | Checks wether the given symbol is a constructor symbol.
 isConstructor :: Ord f => f -> Signature f -> Bool
@@ -125,12 +124,18 @@ map f sig = Signature
 
 -- | Computes the union of two singatures. Throws an error if @f1 == f2@ and @arity f1 /= arity f2@, for any @f1@ in
 -- the first signature and @f2@ in the second signature.
+--
+-- prop> defineds sig3 == defineds sig1 `S.union` defineds sig2
+-- prop> constructors sig3 `S.subset` (constructors sig1 `S.union` constructors sig3)
 union :: Ord f => Signature f -> Signature f -> Signature f
 union sig1 sig2 = Signature
   { signature_    = M.unionWith err1 (signature_ sig1) (signature_ sig2)
-  , defineds_     = defineds_ sig1 `S.union` defineds_ sig2
-  , constructors_ = constructors_ sig1 `S.union` constructors_ sig2 }
-  where err1 ar1 ar2 = if ar1 == ar2 then ar1 else error "Tct.Trs.Data.Signature.union: same symbol with different arities"
+  , defineds_     = ds
+  , constructors_ = cs `S.difference` ds }
+  where 
+    ds = defineds_ sig1 `S.union` defineds_ sig2
+    cs = constructors_ sig1 `S.union` constructors_ sig2
+    err1 ar1 ar2 = if ar1 == ar2 then ar1 else error "Tct.Trs.Data.Signature.union: same symbol with different arities"
 
 -- | Filter function symbols.
 filter :: (f -> Bool) -> Signature f -> Signature f
@@ -154,9 +159,12 @@ restrictToSignature sig fs = symbols sig `S.intersection` fs
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
-instance PP.Pretty f => PP.Pretty (Signature f) where
-  pretty = PP.set . P.map k . elems
-    where k (f,i) = PP.tupled [PP.pretty f, PP.int i]
+instance (Ord f, PP.Pretty f) => PP.Pretty (Signature f) where
+  pretty sig = PP.set (k `fmap` ds) PP.<+> PP.char '/' PP.<+> PP.set (k `fmap` cs)
+    where 
+      ds = elems $ restrictSignature sig (defineds sig)
+      cs = elems $ restrictSignature sig (constructors sig) 
+      k (f,i) = PP.pretty f PP.<> PP.char '/' PP.<> PP.int i
 
 instance Xml.Xml f => Xml.Xml (Signature f) where
   toXml sig = Xml.elt "signature" [ symb f i | (f,i) <- elems sig ]
