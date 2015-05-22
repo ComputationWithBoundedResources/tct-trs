@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | This module provides \Argument Filtering\.
 module Tct.Trs.Encoding.ArgumentFiltering
-  ( 
+  (
   -- * Argument Filtering
   Filtering (..)
   , ArgumentFiltering
@@ -78,6 +78,7 @@ instance PP.Pretty f => PP.Pretty (ArgumentFiltering f) where
 
 --- * infilter -------------------------------------------------------------------------------------------------------
 --- a restricted version that ignores projection
+
 data InFilterEncoder f = InFilterEncoder
   (ArgumentFiltering f)     -- ^ initial argument filtering
   (M.Map (f,Int) SMT.Expr)  -- ^ variable mapping
@@ -89,7 +90,7 @@ instance Ord f => SMT.Decode SMT.Environment (InFilterEncoder f) (ArgumentFilter
     where
       insert (f,i) = alter (k i) f
       k i (Just (Filtering s)) = Just $ Filtering (IS.insert i s)
-      k _ _ = error "Tct.Trs.Encoding.ArgumentFiltering.insert: the impossible happened."
+      k _ _                    = error "Tct.Trs.Encoding.ArgumentFiltering.decode.insert: filtering not defined."
 
 -- | Sets the initial argumentfiltering. Provides a mapping for each @(symbol, position)@.
 inFilterEncoder :: Ord f => Problem f v -> SMT.SolverStM SMT.Expr (InFilterEncoder f)
@@ -104,5 +105,6 @@ inFilterEncoder prob = InFilterEncoder initial `liftM` mapping
 
 -- | In filter mapping.
 inFilter :: Ord f => InFilterEncoder f -> f -> Int -> SMT.Expr
-inFilter (InFilterEncoder _ m) f i = SMT.top `fromMaybe` M.lookup (f,i) m
+inFilter (InFilterEncoder _ m) f i = error err `fromMaybe` M.lookup (f,i) m
+  where err = "Tct.Trs.Encoding.ArgumentFiltering: entry not defined."
 

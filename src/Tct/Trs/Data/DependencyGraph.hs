@@ -21,7 +21,7 @@ module Tct.Trs.Data.DependencyGraph
   , allRulesFromNode
   , allRulesFromNodes
   , allRulesPairFromNodes
-  
+
   --- * update
   , setWeak
   , setStrict
@@ -194,40 +194,22 @@ isCyclicNode cdg n = isCyclic $ lookupNodeLabel' cdg n
 --- * update ---------------------------------------------------------------------------------------------------------
 
 
-updateDGNode :: (Ord f, Ord v) => (DGNode f v -> DGNode f v) -> DependencyGraph f v -> DependencyGraph f v 
-updateDGNode k dg = dg 
+updateDGNode :: (Ord f, Ord v) => (DGNode f v -> DGNode f v) -> DependencyGraph f v -> DependencyGraph f v
+updateDGNode k dg = dg
   { dependencyGraph = Gr.updateLabels k (dependencyGraph dg)
   , congruenceGraph = Gr.updateLabels updateCDGNode (congruenceGraph dg) }
   where
     updateCDGNode n        = n { theSCC = map updateSCCNode (theSCC n) }
     updateSCCNode (nid, n) = (nid, k n)
 
--- | @setWeak trs gr@ updates label information indicating strictness of a rule. 
-setWeak :: (Ord f, Ord v) => Trs.Trs f v -> DependencyGraph f v -> DependencyGraph f v 
+-- | @setWeak trs gr@ updates label information indicating strictness of a rule.
+setWeak :: (Ord f, Ord v) => Trs.Trs f v -> DependencyGraph f v -> DependencyGraph f v
 setWeak trs = updateDGNode (\ n -> n {isStrict = isStrict n && not (theRule n `Trs.member` trs)})
 
--- | @setStrict trs gr@ updates label information indicating strictness of a rule. 
-setStrict :: (Ord f, Ord v) => Trs.Trs f v -> DependencyGraph f v -> DependencyGraph f v 
+-- | @setStrict trs gr@ updates label information indicating strictness of a rule.
+setStrict :: (Ord f, Ord v) => Trs.Trs f v -> DependencyGraph f v -> DependencyGraph f v
 setStrict trs = updateDGNode (\ n -> n {isStrict = isStrict n || not (theRule n `Trs.member` trs)})
 
--- data DGNode f v = DGNode
---   { theRule  :: R.Rule f v
---   , isStrict :: Bool }
---   deriving (Eq, Show)
-
--- type DG f v = Graph (DGNode f v) Int
-
--- data CDGNode f v = CDGNode
---   { theSCC   :: [(NodeId, DGNode f v)]
---   , isCyclic :: Bool }
---   deriving (Eq, Show)
-
--- type CDG f v = Graph (CDGNode f v) (R.Rule f v, Int)
-
--- data DependencyGraph f v = DependencyGraph
---   { dependencyGraph :: DG f v
---   , congruenceGraph :: CDG f v
---   } deriving (Eq, Show)
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
@@ -241,9 +223,9 @@ instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (DG f v) where
     where
       rs = L.sortBy (compare `on` fst) [ (n, r) | (n, r) <- lnodes wdg]
       ppnode n rule =
-        PP.int n <> PP.colon <> strict (isStrict rule) <> PP.colon <> PP.pretty (theRule rule) 
-        PP.<$$> PP.indent 3 
-          (PP.vcat [ arr i <> PP.pretty (theRule r_m) <> PP.colon <> PP.int m | (m,r_m,i) <- lsuccessors wdg n ])
+        PP.int n <> PP.colon <> strict (isStrict rule) <> PP.colon <> PP.pretty (theRule rule)
+        PP.<$$> PP.indent 3
+          (PP.vcat [ arr i <> PP.space <> PP.pretty (theRule r_m) <> PP.colon <> PP.int m | (m,r_m,i) <- lsuccessors wdg n ])
       arr i = PP.text "-->_" <> PP.int i
       strict b = if b then PP.char 'S' else PP.char 'W'
 
