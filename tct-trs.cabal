@@ -1,33 +1,26 @@
-Name:               tct-trs
-Version:            3.0.0
-Author:
+name:          tct-trs
+version:       3.0.0
+stability:     experimental
+author:
+  Martin Avanzini, Andreas Kochesser, Georg Moser, Michael Schaper, Maria Schett
+maintainer:
   Martin Avanzini <martin.avanzini@uibk.ac.at>,
   Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
-  Georg Moser <georg.moser@uibk.ac.at>,
   Michael Schaper <michael.schaper@uibk.ac.at>,
   Maria Schett <maria.schett@uibk.ac.at>
-Maintainer:
-  Martin Avanzini <martin.avanzini@uibk.ac.at>,
-  Andreas Kochesser <andreas.kochesser@uibk.ac.at>,
-  Georg Moser <georg.moser@uibk.ac.at>,
-  Michael Schaper <michael.schaper@uibk.ac.at>,
-  Maria Schett <maria.schett@uibk.ac.at>
-Category: Program Analysis
-Stability: Experimental
-License: BSD3
-License-file: LICENSE
-Homepage: http://cl-informatik.uibk.ac.at/software/tct/
-Synopsis: A Complexity Analyser for Term Rewrite Systems
-Description:
+license:       BSD3
+license-file:  LICENSE
+category:      Program Analysis
+synopsis:      A Complexity Framework for Term Rewrite Systems
+description:
   The Tyrolean Complexity Tool (TcT for short) is a tool for proving
   resource bounds for different formal systems. This package provides
   techniques for proving upper bounds on the derivational and runtime
   complexity of term rewriting systems automatically.
+build-type:    Simple
+cabal-version: >= 1.8
 
-Cabal-version: >= 1.8
-Build-type: Simple
-
-Executable trs
+executable trs
   main-is:
     Tct/Trs/Main.hs
   hs-source-dirs:
@@ -67,7 +60,7 @@ Executable trs
     -j -Wall -threaded -fforce-recomp -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
 
 
-Library
+library
   hs-source-dirs:
     src
   exposed-modules:
@@ -149,3 +142,4 @@ Library
     MultiParamTypeClasses,
     TypeFamilies,
     TypeOperators
+
