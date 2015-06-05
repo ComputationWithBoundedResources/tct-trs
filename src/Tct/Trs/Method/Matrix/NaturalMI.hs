@@ -92,9 +92,8 @@ import qualified Tct.Trs.Data.Trs                           as Trs
 import qualified Tct.Trs.Encoding.Interpretation            as I
 import qualified Tct.Trs.Encoding.UsableRules               as UREnc
 import qualified Tct.Trs.Encoding.UsablePositions           as UPEnc
-import qualified Tct.Trs.Method.Matrix.MatrixInterpretation as MI
--- should be  Encoding.Matrix
-import qualified Tct.Trs.Method.Matrix.Matrix               as EncM
+import qualified Tct.Trs.Encoding.Matrix.MatrixInterpretation as MI
+import qualified Tct.Trs.Encoding.Matrix.Matrix               as EncM
 
 ----------------------------------------------------------------------
 -- keywords for text search:
@@ -146,7 +145,7 @@ results.
 -- | Kind of the Matrix Interpretation
 data NaturalMIKind
   = Algebraic    -- ^ Count number of ones in diagonal to compute induced complexity function.
-  | Automaton    -- ^ Use automaton techniques to compute induced complexity function.
+  -- | Automaton    -- ^ Use automaton techniques to compute induced complexity function.
   | Triangular   -- ^ Use triangular matrices only.
   | Unrestricted -- ^ Put no further restrictions on the interpretations.
   deriving (DT.Typeable, Bounded, Enum, Eq, Show)
@@ -302,27 +301,6 @@ diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
       return v
     diags = List.transpose $ map diag' $ Map.elems (I.interpretations mi)
     diag'  = concatMap (DF.toList . EncM.diagonalEntries) . Map.elems . MI.coefficients
-
-
-    -- kind = toKind (miKind p)
-    -- -- matrix interpretation kind to matrix kind
-    -- toKind Unrestricted = MI.UnrestrictedMatrix
-    -- toKind Algebraic =
-    --   if Prob.isRCProblem prob
-    --   then MI.ConstructorBased cs md2
-    --   else MI.TriangularMatrix md2
-    -- toKind Triangular =
-    --   if Prob.isRCProblem prob
-    --   then MI.ConstructorBased cs Nothing
-    --   else MI.TriangularMatrix Nothing
-    -- toKind Automaton =
-    --   if Prob.isRCProblem prob
-    --   then MI.ConstructorEda cs (Just md1)
-    --   else MI.EdaMatrix (Just md1)
-
-    -- cs = Sig.constructors sig
-    -- md1 = max 0 (miDegree p)
-    -- md2 = if md1 < (miDimension p) then Just md1 else Nothing
 
 edaConstraints :: Int
                -> (Int -> Int -> SMT.Formula SMT.IFormula)
@@ -486,8 +464,8 @@ mxKind kind dim deg  st = case (kind, st) of
   (Triangular,   ProbK.AllTerms{})   -> MI.TriangularMatrix Nothing
   (Algebraic,    ProbK.BasicTerms{}) -> MI.ConstructorBased cs md
   (Algebraic,    ProbK.AllTerms{})   -> MI.TriangularMatrix md
-  (Automaton,    ProbK.BasicTerms{}) -> MI.ConstructorEda cs (min 1 `fmap` md)
-  (Automaton,    ProbK.AllTerms{})   -> MI.TriangularMatrix (min 1 `fmap` md)
+  -- (Automaton,    ProbK.BasicTerms{}) -> MI.ConstructorEda cs (min 1 `fmap` md)
+  -- (Automaton,    ProbK.AllTerms{})   -> MI.TriangularMatrix (min 1 `fmap` md)
   where
     cs = ProbK.constructors st
     md = let d = max 0 deg in if d < dim then Just d else Nothing
@@ -1070,7 +1048,6 @@ wgEntscheide p prob = do
       rs x = [ (r, (interpretf dim mint  lhs, interpretf dim mint rhs)) | r@(RR.Rule lhs rhs) <- Trs.toList x ]
 
 
-
 ----------------------------------------------------------------------
 -- ##WGS weightgap strategy declaration
 ----------------------------------------------------------------------
@@ -1115,7 +1092,6 @@ weightgap' = CD.declFun weightGapDeclaration
 ----------------------------------------------------------------------
 -- ##WGX weightgap prettyprint and xml
 ----------------------------------------------------------------------
-
 
 instance PP.Pretty WeightGapOrder where
   pretty p@WeightGapOrder{} = PP.vcat

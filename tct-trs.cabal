@@ -20,6 +20,10 @@ description:
 build-type:    Simple
 cabal-version: >= 1.8
 
+source-repository head
+  type:     git
+  location: git://github.com/ComputationWithBoundedResources/tct-trs
+
 executable trs
   main-is:
     Tct/Trs/Main.hs
@@ -85,6 +89,8 @@ library
     Tct.Trs.Encoding.Bounds.Violations.Find
     Tct.Trs.Encoding.Bounds.Violations.Fix
     Tct.Trs.Encoding.Interpretation
+    Tct.Trs.Encoding.Matrix.Matrix
+    Tct.Trs.Encoding.Matrix.MatrixInterpretation
     Tct.Trs.Encoding.UsablePositions
     Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interactive
@@ -104,8 +110,6 @@ library
     Tct.Trs.Method.Empty
     Tct.Trs.Method.InnermostRuleRemoval
     Tct.Trs.Method.Poly.NaturalPI
-    Tct.Trs.Method.Matrix.Matrix
-    Tct.Trs.Method.Matrix.MatrixInterpretation
     Tct.Trs.Method.Matrix.NaturalMI
     Tct.Trs.Method.ToInnermost
     Tct.Trs.Method.WithCertification

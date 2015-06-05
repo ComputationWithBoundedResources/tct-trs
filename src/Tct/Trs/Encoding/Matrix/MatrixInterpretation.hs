@@ -2,7 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 
 {-|
-Module      : Tct.Trs.Method.Matrix.MatrixInterpretation
+Module      : Tct.Trs.Encoding.Matrix.MatrixInterpretation
 Description : Defines a general matrix interpretation of a function
 Copyright   : (c) since tct-trs
                   Martin Avanzini <martin.avanzini@uibk.ac.at>,
@@ -20,7 +20,7 @@ Stability   : unstable
 Portability : unportable
 -}
 
-module Tct.Trs.Method.Matrix.MatrixInterpretation (
+module Tct.Trs.Encoding.Matrix.MatrixInterpretation (
   -- * data types
     LinearInterpretation(..)
   -- , MatrixInterpretation(..)
@@ -68,7 +68,7 @@ import qualified Tct.Core.Common.SemiRing         as SR
 
 
 -- should be  Encoding.Matrix
-import qualified Tct.Trs.Method.Matrix.Matrix     as EncM
+import qualified Tct.Trs.Encoding.Matrix.Matrix     as EncM
 --import qualified Tct.Trs.Encoding.UsablePositions as EncUP
 
 

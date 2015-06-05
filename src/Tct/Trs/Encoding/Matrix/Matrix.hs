@@ -1,5 +1,5 @@
 {-|
-Module      : Tct.Trs.Method.Matrix.Matrix
+Module      : Tct.Trs.Encoding.Matrix.Matrix
 Description : Defines matrix and vector data types and their operations.
 Copyright   : (c) since tct-trs
                   Martin Avanzini <martin.avanzini@uibk.ac.at>,
@@ -17,7 +17,7 @@ Stability   : unstable
 Portability : unportable
 -}
 
-module Tct.Trs.Method.Matrix.Matrix
+module Tct.Trs.Encoding.Matrix.Matrix
   (
   -- * data types
     Vector(..)
