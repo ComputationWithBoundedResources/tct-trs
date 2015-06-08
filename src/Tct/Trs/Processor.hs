@@ -3,11 +3,15 @@ module Tct.Trs.Processor
 
   , defaultDeclarations
 
+  -- * Abbreviations
   , (>>!)
   , (>>!!)
   , successive
   , whenNonTrivial
   , tew
+  , selAny
+  , selAnyRule
+  , selAllRules
 
   -- * Strategies
   , dpsimps
@@ -17,7 +21,6 @@ module Tct.Trs.Processor
   , toDP
   , removeLeaf
   ) where
-
 
 
 import           Tct.Core
@@ -47,8 +50,8 @@ import           Tct.Trs.Method.DP.UsableRules                   as M
 import           Tct.Trs.Method.Empty                            as M
 import           Tct.Trs.Method.InnermostRuleRemoval             as M
 import           Tct.Trs.Method.Matrix.NaturalMI                 as M
-import           Tct.Trs.Method.ToInnermost                      as M
 import           Tct.Trs.Method.Poly.NaturalPI                   as M
+import           Tct.Trs.Method.ToInnermost                      as M
 import           Tct.Trs.Method.WithCertification                as M
 
 
@@ -103,12 +106,24 @@ successive :: [TrsStrategy] -> TrsStrategy
 successive = chainWith (try empty)
 
 whenNonTrivial :: TrsStrategy -> TrsStrategy
-whenNonTrivial st = withProblem $ \p -> 
+whenNonTrivial st = withProblem $ \p ->
   if Prob.isTrivial p then M.empty else st
 
+-- | >tew == te . whenNonTrivial
 tew :: TrsStrategy -> TrsStrategy
 tew = te . whenNonTrivial
 
+-- | Select any strict rule.
+selAny :: ExpressionSelector F V
+selAny = RS.selAnyOf RS.selStricts
+
+-- | Select any strict trs rule.
+selAnyRule :: ExpressionSelector F V
+selAnyRule = RS.selAnyOf $ RS.selStricts `RS.selInter` RS.selRules
+
+-- | Select all strict trs rules.
+selAllRules :: ExpressionSelector F V
+selAllRules = RS.selAllOf RS.selRules
 
 --- * simplifications ------------------------------------------------------------------------------------------------
 
@@ -188,3 +203,4 @@ removeLeaf cp =
   >>> try usableRules
   >>> try trivial
   where anyStrictLeaf = RS.selAnyOf $ RS.selLeafCDG `RS.selInter` RS.selStricts
+

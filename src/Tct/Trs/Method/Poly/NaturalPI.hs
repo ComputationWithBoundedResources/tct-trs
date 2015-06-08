@@ -20,7 +20,6 @@ module Tct.Trs.Method.Poly.NaturalPI
 
 
 import Data.Maybe (fromMaybe)
-import           Control.Monad.Trans                 (liftIO)
 import qualified Data.List                           as L
 import qualified Data.Map.Strict                     as M
 import           Data.Monoid                         ((<>))
@@ -154,9 +153,8 @@ entscheide1 ::
 entscheide1 p aorder encoding decoding forceAny prob
   | Prob.isTrivial prob = return . I.toTree p prob $ T.Fail (Applicable Incompatible)
   | otherwise           = do
-    mto <- T.remainingTime `fmap` T.askStatus prob
     res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
-      <- liftIO $ SMT.solve (SMT.minismt mto) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+      <- SMT.solve (SMT.smtSolve prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
     case res of
       SMT.Sat a
         | Arg.useGreedy (greedy p) -> fmap T.flatten $ again `F.mapM` pt
