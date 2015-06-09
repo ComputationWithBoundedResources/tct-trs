@@ -73,7 +73,7 @@ description =
   , "The processor applies only to innermost problems." ]
 
 innermostRuleRemovalDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-innermostRuleRemovalDeclaration = T.declare "InnermostRuleRemoval" description () (T.Proc InnermostRuleRemoval)
+innermostRuleRemovalDeclaration = T.declare "innermostRuleRemoval" description () (T.Proc InnermostRuleRemoval)
 
 innermostRuleRemoval :: TrsStrategy
 innermostRuleRemoval = T.declFun innermostRuleRemovalDeclaration
