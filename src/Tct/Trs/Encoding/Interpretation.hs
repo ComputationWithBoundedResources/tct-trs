@@ -2,6 +2,10 @@
 module Tct.Trs.Encoding.Interpretation
   where
 
+-- TODO: MS remove Greedy Components
+-- we do not really gain anything from the greedy algorithm of the interpretations;
+-- a) they do not work well together with parallel invocations
+-- b) experiments (rc and certify) do not show really any improvement over NoGreedy (even when applied sequentially)
 
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S (empty)
@@ -88,6 +92,7 @@ class AbstractInterpretation i where
   gte         :: i -> C i -> C i -> SMT.Expr
 
 type ForceAny = [R.Rule F V] -> SMT.Expr
+
 
 orient :: AbstractInterpretation i => i
   -> TrsProblem
