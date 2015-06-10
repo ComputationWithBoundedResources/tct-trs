@@ -58,7 +58,7 @@ import qualified Tct.Trs.Encoding.UsableRules        as UREnc
 
 data NaturalPI = NaturalPI
   { shape    :: PI.Shape
-  , restrict :: Arg.Restrict
+  , restrict :: Arg.Restrict -- TODO: MS: combine with Shape
   , uargs    :: Arg.UsableArgs
   , urules   :: Arg.UsableRules
   , selector :: Maybe (ExpressionSelector F V)

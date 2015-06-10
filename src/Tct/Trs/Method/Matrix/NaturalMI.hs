@@ -818,7 +818,7 @@ instance CD.Processor NaturalMI where
 
 
 instance CP.IsComplexityPair NaturalMI where
-  solveComplexityPair p sel prob = fmap toResult `fmap` CD.evaluate (CD.Proc p{selector=Just sel, greedy=Greedy}) prob
+  solveComplexityPair p sel prob = fmap toResult `fmap` CD.evaluate (CD.Proc p{selector=Just sel, greedy=NoGreedy}) prob
     where
       toResult pt = case CD.open pt of
         [nprob] -> CP.ComplexityPairProof
