@@ -6,6 +6,7 @@ module Tct.Trs.Encoding.Interpretation
 -- we do not really gain anything from the greedy algorithm of the interpretations;
 -- a) they do not work well together with parallel invocations
 -- b) experiments (rc and certify) do not show really any improvement over NoGreedy (even when applied sequentially)
+-- c) there is a (rare case) where there encoding of Greedy would change; namely if all strict trs rules are shifted to the weak; we get besser uargs
 
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S (empty)

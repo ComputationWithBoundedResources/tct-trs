@@ -19,9 +19,10 @@ module Tct.Trs.Method.Poly.NaturalPI
   ) where
 
 
-import Data.Maybe (fromMaybe)
+import           Control.Monad.Error                 (throwError)
 import qualified Data.List                           as L
 import qualified Data.Map.Strict                     as M
+import           Data.Maybe                          (fromMaybe)
 import           Data.Monoid                         ((<>))
 import qualified Data.Set                            as S
 import qualified Data.Traversable                    as F
@@ -32,7 +33,7 @@ import qualified Data.Rewriting.Term                 as R
 import qualified Tct.Core.Common.Pretty              as PP
 import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Data                       as T
-import           Tct.Core.Parse     ()
+import           Tct.Core.Parse                      ()
 
 import qualified Tct.Common.Polynomial               as P
 import           Tct.Common.PolynomialInterpretation (Shape)
@@ -164,7 +165,8 @@ entscheide1 p aorder encoding decoding forceAny prob
           pt    = I.toTree p prob $ T.Success (I.newProblem prob (pint_ order)) (Applicable $ Order order) (certification order)
           order = mkOrder a
 
-      _ -> return $ I.toTree p prob $ T.Fail (Applicable Incompatible)
+      SMT.Error s -> throwError (userError s)
+      _           -> return $ I.toTree p prob $ T.Fail (Applicable Incompatible)
       where
         again = entscheide1 p aorder encoding decoding forceAny
 

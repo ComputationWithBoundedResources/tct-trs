@@ -46,7 +46,8 @@ module Tct.Trs.Method.Matrix.NaturalMI
   ) where
 
 -- general imports
-import Data.Monoid ((<>))
+import           Control.Monad.Error                        (throwError)
+import           Data.Monoid                                ((<>))
 import           Control.Monad.Trans                        (liftIO)
 import qualified Control.Monad                              as CM
 import qualified Data.Foldable                              as DF
@@ -610,7 +611,8 @@ entscheide1 p aorder encoding decoding forceAny prob
           pt    = I.toTree p prob $ CD.Success (I.newProblem prob (mint_ order)) (PC.Applicable $ PC.Order order) (certification p order)
           order = mkOrder a
 
-      _ -> return $ I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
+      SMT.Error s -> throwError (userError s)
+      _           -> return $ I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
       where
         again = entscheide1 p aorder encoding decoding forceAny
 
@@ -938,7 +940,9 @@ instance CD.Processor WeightGap where
             nprob = I.newProblem' prob (mint_ $ wgProof order)
             bound = upperbound (wgDimension p) (wgKind p) (kind_ $ wgProof order) (I.inter_ $ mint_ (wgProof order))
             cert  = (flip CD.updateTimeUBCert (`SR.add` bound) . CD.fromId)
-        _  -> return incompatible
+
+        SMT.Error s -> throwError (userError s)
+        _           -> return incompatible
       where incompatible = CD.Fail (PC.Applicable PC.Incompatible)
 
 wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)

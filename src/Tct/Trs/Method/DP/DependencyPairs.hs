@@ -66,10 +66,12 @@ markTerm :: Fun f => R.Term f v -> R.Term f v
 markTerm (R.Fun f fs) = R.Fun (Symb.markFun f) fs
 markTerm v            = v
 
+-- TODO: MS: check unit rhs optimisation
+-- certify strategy can solve Secret_05_TRS_cime4.trs only without this optimisation
 markRule :: Fun f => (R.Term f v -> [R.Term f v]) -> R.Rule f v -> State Int (R.Rule f v)
 markRule subtermsOf (R.Rule lhs rhs) =
   R.Rule (markTerm lhs) <$> case markTerm `fmap` subtermsOf rhs of
-    [t] -> return t
+    -- [t] -> return t
     ts  -> do
       i <- modify succ >> get
       return $ R.Fun (Symb.compoundFun i) ts
