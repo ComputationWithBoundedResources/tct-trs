@@ -40,7 +40,7 @@ import           Tct.Common.PolynomialInterpretation (Shape)
 import qualified Tct.Common.PolynomialInterpretation as PI
 import           Tct.Common.ProofCombinators
 import           Tct.Common.Ring
-import           Tct.Common.SMT                      ((.==>), (.>), (.>=))
+import           Tct.Common.SMT                      ((.=>), (.>), (.>=))
 import qualified Tct.Common.SMT                      as SMT
 
 import           Tct.Trs.Data
@@ -93,8 +93,8 @@ certification order cert = case cert of
 
 instance I.AbstractInterpretation NaturalPI where
   type (A NaturalPI) = P.PView (PI.CoefficientVar F) PI.SomeIndeterminate
-  type (B NaturalPI) = P.Polynomial SMT.IExpr PI.SomeIndeterminate
-  type (C NaturalPI) = P.Polynomial SMT.IExpr V
+  type (B NaturalPI) = P.Polynomial (SMT.IExpr Int) PI.SomeIndeterminate
+  type (C NaturalPI) = P.Polynomial (SMT.IExpr Int) V
 
   encode _ = P.fromViewWithM enc where
     enc c
@@ -106,7 +106,7 @@ instance I.AbstractInterpretation NaturalPI where
 
   setInFilter _ fpoly inFilter = afpoly (P.toView fpoly)
     where
-      afpoly po = SMT.bigAnd [ c .> zero .==> (afmono mo) | (c, mo) <- po ]
+      afpoly po = SMT.bigAnd [ c .> zero .=> (afmono mo) | (c, mo) <- po ]
       afmono mo = SMT.bigAnd [ inFilter (fromEnum vi) | (vi,_) <- mo ]
 
   interpret _ = interpretf
@@ -125,7 +125,7 @@ entscheide :: NaturalPI -> TrsProblem -> T.TctM (T.Return (T.ProofTree TrsProble
 entscheide p prob = do
   let
     orientM                   = I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
-    (ret, encoding)           = SMT.runSolverM orientM SMT.initialState
+    (ret, encoding)           = SMT.runSolverSt orientM SMT.initialState
     (apint,decoding,forceAny) = ret
     aorder = PolyOrder
       { kind_ = kind
@@ -146,8 +146,8 @@ entscheide p prob = do
 entscheide1 ::
   NaturalPI
   -> PolyOrder c
-  -> SMT.SolverState SMT.Expr
-  -> (I.Interpretation F (PI.SomePolynomial SMT.IExpr), Maybe (UREnc.UsableEncoder F))
+  -> SMT.SmtState Int
+  -> (I.Interpretation F (PI.SomePolynomial (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
   -> I.ForceAny
   -> Problem F V
   -> T.TctM (T.ProofTree (Problem F V))
@@ -155,7 +155,7 @@ entscheide1 p aorder encoding decoding forceAny prob
   | Prob.isTrivial prob = return . I.toTree p prob $ T.Fail (Applicable Incompatible)
   | otherwise           = do
     res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
-      <- SMT.solve (SMT.smtSolve prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+      <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
     case res of
       SMT.Sat a
         | Arg.useGreedy (greedy p) -> fmap T.flatten $ again `F.mapM` pt

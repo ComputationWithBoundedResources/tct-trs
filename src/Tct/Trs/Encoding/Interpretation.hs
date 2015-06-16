@@ -23,7 +23,7 @@ import qualified Tct.Core.Data as T
 import qualified Tct.Core.Common.Pretty             as PP
 import qualified Tct.Core.Common.Xml                as Xml
 
-import           Tct.Common.SMT                     as SMT (zero, (.&&), (.==>), (.>))
+import           Tct.Common.SMT                     as SMT (zero, (.&&), (.=>), (.>))
 import qualified Tct.Common.SMT                     as SMT
 
 import           Tct.Trs.Data
@@ -82,17 +82,17 @@ class AbstractInterpretation i where
   type (B i) :: *
   type (C i) :: *
 
-  encode      :: i -> A i -> SMT.SolverStM SMT.Expr (B i)
+  encode      :: i -> A i -> SMT.SmtSolverSt Int (B i)
 
-  setMonotone :: i -> B i -> [Int] -> SMT.Expr
-  setInFilter :: i -> B i -> (Int -> SMT.Expr) -> SMT.Expr
+  setMonotone :: i -> B i -> [Int] -> (SMT.Formula Int) 
+  setInFilter :: i -> B i -> (Int -> SMT.Formula Int) -> (SMT.Formula Int)
 
   interpret   :: i -> Interpretation F (B i) -> R.Term F V -> C i
 
-  addConstant :: i -> C i -> SMT.IExpr -> C i
-  gte         :: i -> C i -> C i -> SMT.Expr
+  addConstant :: i -> C i -> (SMT.IExpr Int) -> C i
+  gte         :: i -> C i -> C i -> (SMT.Formula Int)
 
-type ForceAny = [R.Rule F V] -> SMT.Expr
+type ForceAny = [R.Rule F V] -> (SMT.Formula Int) 
 
 
 orient :: AbstractInterpretation i => i
@@ -101,9 +101,9 @@ orient :: AbstractInterpretation i => i
   -> Shift
   -> Bool -- TODO: MS: Use Types
   -> Bool
-  -> SMT.SolverStM SMT.Expr (InterpretationProof a b , (Interpretation F (B i), Maybe (UREnc.UsableEncoder F)), ForceAny)
+  -> SMT.SmtSolverSt Int (InterpretationProof a b , (Interpretation F (B i), Maybe (UREnc.UsableEncoder F Int)), ForceAny)
 orient inter prob absi mselector useUP useUR = do
-  SMT.setFormat "QF_NIA"
+  SMT.setLogic SMT.QF_NIA
 
   -- encode abstract interpretation
   ebsi <- F.mapM (encode inter) absi
@@ -146,9 +146,9 @@ orient inter prob absi mselector useUP useUR = do
     (.>=.) = gte inter
     (.+.)  = addConstant inter
 
-    wOrderConstraints = SMT.bigAnd [ usable r .==> wOrder r | r <- wrules ]
+    wOrderConstraints = SMT.bigAnd [ usable r .=> wOrder r | r <- wrules ]
       where wOrder r = interpretf (R.lhs r) .>=. interpretf (R.rhs r)
-    sOrderConstraints = SMT.bigAnd [ usable r .==> sOrder r | r <- srules ]
+    sOrderConstraints = SMT.bigAnd [ usable r .=> sOrder r | r <- srules ]
       where sOrder r = interpretf (R.lhs r) .>=. (interpretf (R.rhs r) .+. strict r)
 
     -- MS: TODO: the greedy component should work on the expression selector; so we could express eg selAnyOf $ selRules `inter` selStricts 
@@ -158,7 +158,7 @@ orient inter prob absi mselector useUP useUR = do
     rulesConstraints = forceAny srules .&& forceSel
       where
         forceSel = case mselector of
-          All       -> SMT.bigAnd [ usable r .==> strict r .> zero | r <- srules ]
+          All       -> SMT.bigAnd [ usable r .=> strict r .> zero | r <- srules ]
           Shift sel -> orientSelected (RS.rsSelect sel prob)
 
     orientSelected (Trs.SelectDP r)  = strict r .> zero

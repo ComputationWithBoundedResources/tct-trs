@@ -85,12 +85,12 @@ instance T.Processor DecomposeDG where
         | not (any isCut unselectedNodes) = failx (Applicable $ DecomposeDGFail "no rule was cut")
         | prob `isSubsetDP` lowerProb     = failx (Applicable $ DecomposeDGFail "lower component not simpler")
         | otherwise                       = do
-          lowerProof <- mapply (onLower p) lowerProb
           upperProof <- mapply (onUpper p) upperProb
+          lowerProof <- mapply (onLower p) lowerProb
           case (lowerProof,upperProof) of
             (lpt, rpt)
               | T.isContinuing lpt && T.isContinuing rpt
-                          -> return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn lpt, T.fromReturn rpt))
+                          -> return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn rpt, T.fromReturn lpt))
               | otherwise -> failx (Applicable $ DecomposeDGFail "a strategy failed")
         where
           failx              = return . T.resultToTree p prob . T.Fail

@@ -31,14 +31,14 @@ import qualified Tct.Trs.Data.Signature         as Sig
 
 --- * usable rules ---------------------------------------------------------------------------------------------------
 
-data UsableEncoder f = UsableEncoder
+data UsableEncoder f w = UsableEncoder
   (Symbols f)         -- ^ containts initial symbols
-  (M.Map f SMT.Expr)  -- ^ maps functions symbol to variables
+  (M.Map f (SMT.Formula w))  -- ^ maps functions symbol to variables
 
 newtype UsableSymbols f = UsableSymbols { runUsableSymbols :: Symbols f }
 
 -- | Returns set of usable symbols.
-instance Ord f => SMT.Decode SMT.Environment (UsableEncoder f) (UsableSymbols f) where
+instance (Ord f, SMT.Storing w) => SMT.Decode (SMT.Environment w) (UsableEncoder f w) (UsableSymbols f) where
   decode (UsableEncoder fs m) = do
     m1 :: S.Set f <- SMT.decode (SMT.Property (fromMaybe False) m)
     return . UsableSymbols $ fs `S.union` m1
@@ -47,7 +47,7 @@ instance PP.Pretty f => PP.Pretty (UsableSymbols f) where
   pretty = PP.set . map PP.pretty . S.toList . runUsableSymbols
 
 -- | Provides a mapping from defined symbols to variables.
-usableEncoder :: (Ord f, Ord v) => Problem f v -> SMT.SolverStM SMT.Expr (UsableEncoder f)
+usableEncoder :: (SMT.Fresh w, Ord f) => Problem f v -> SMT.SmtSolverSt w (UsableEncoder f w)
 usableEncoder prob = UsableEncoder initialfs `liftM` mapping
   where
     mapping = M.fromAscList `liftM` F.mapM atom (S.toAscList $ defs `S.difference` initialfs)
@@ -59,14 +59,14 @@ usableEncoder prob = UsableEncoder initialfs `liftM` mapping
         st               -> Prob.defineds st
 
 -- | Lifts usable symbols to usable rules.
-usable :: Ord f => UsableEncoder f -> R.Rule f v -> SMT.Expr
+usable :: Ord f => UsableEncoder f w -> R.Rule f v -> (SMT.Formula w)
 usable (UsableEncoder _ m) = usable' . R.root . R.lhs
   where
     usable' (Right f) = SMT.top `fromMaybe` M.lookup f m
     usable' _         = SMT.top
 
 -- | The actual encoding.
-validUsableRules :: (Ord f, Ord v) => Trs f v -> (R.Rule f v -> SMT.Expr) -> (f -> Int -> SMT.Expr) -> SMT.Expr
+validUsableRules :: (Ord f, Ord v) => Trs f v -> (R.Rule f v -> SMT.Formula w) -> (f -> Int -> SMT.Formula w) -> SMT.Formula w
 validUsableRules trs usable' inFilter' =
   memo $ SMT.bigAndM [ usableM r `SMT.impliesM` omega (R.rhs r) | r <- Trs.toList trs ]
   where

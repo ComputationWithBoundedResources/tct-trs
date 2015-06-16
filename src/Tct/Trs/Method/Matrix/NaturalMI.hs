@@ -48,7 +48,6 @@ module Tct.Trs.Method.Matrix.NaturalMI
 -- general imports
 import           Control.Monad.Error                        (throwError)
 import           Data.Monoid                                ((<>))
-import           Control.Monad.Trans                        (liftIO)
 import qualified Control.Monad                              as CM
 import qualified Data.Foldable                              as DF
 import qualified Data.List                                  as List
@@ -67,7 +66,7 @@ import qualified Tct.Trs.Data                               as TD
 
 -- imports tct-common
 import qualified Tct.Common.ProofCombinators                as PC
-import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.==>), (.>), (.>=), (.&&))
+import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.=>), (.>), (.>=), (.&&))
 import qualified Tct.Common.SMT                             as SMT
 
 
@@ -195,24 +194,23 @@ certification mi order cert = case cert of
     bound = upperbound (miDimension mi) (miKind mi) (kind_ order) (I.inter_ $ mint_ order)
 
 {- | convert an abstract linear interpretation into an SMT interpretation -}
-toSMTLinearInterpretation :: SomeLInter (MI.MatrixInterpretationEntry fun)
-                          -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SomeLInter SMT.IExpr)
+toSMTLinearInterpretation :: SMT.Fresh w => SomeLInter (MI.MatrixInterpretationEntry fun) -> SMT.SmtSolverSt w (SomeLInter (SMT.IExpr w))
 toSMTLinearInterpretation li = do
   constant <- toSMTVector $ MI.constant li
   coefficients <- mapM toSMTMatrix $ Map.assocs $ MI.coefficients li
   return $ MI.LInter (Map.fromList coefficients) constant
   where
-    toSMTVector :: EncM.Vector (MI.MatrixInterpretationEntry fun)
-                -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (EncM.Vector SMT.IExpr)
+    -- toSMTVector :: EncM.Vector (MI.MatrixInterpretationEntry fun)
+    --                 -> SMT.SmtSolverSt w (EncM.Vector SMT.IExpr)
     toSMTVector (EncM.Vector vec) =
       fmap EncM.Vector (mapM entryToSMT vec)
-    toSMTMatrix :: (MI.SomeIndeterminate, EncM.Matrix (MI.MatrixInterpretationEntry fun))
-                -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (MI.SomeIndeterminate, EncM.Matrix SMT.IExpr)
+    -- toSMTMatrix :: (MI.SomeIndeterminate, EncM.Matrix (MI.MatrixInterpretationEntry fun))
+    --             -> SMT.SmtSolverSt w (SomeLInter SMT.IExpr) (EncM.Vector SMT.IExpr)(MI.SomeIndeterminate, EncM.Matrix SMT.IExpr)
     toSMTMatrix (i , EncM.Matrix vecs) = mapM toSMTVector vecs >>= (\m -> return (i, EncM.Matrix m))
 
 {- | converts an abstract interpretation variable into a SMT variable -}
-entryToSMT :: MI.MatrixInterpretationEntry fun
-           -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) SMT.IExpr
+entryToSMT :: SMT.Fresh w => MI.MatrixInterpretationEntry fun
+           -> SMT.SmtSolverSt w (SMT.IExpr w)
 entryToSMT ent@(MI.MIVar{}) =
   if MI.restrict ent
   then SMT.snvarM'
@@ -291,9 +289,9 @@ isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = allGEQ && EncM.vEntry 1 lco
 
 
 {- | assert the matrix diagonal to be greather one iff a variable is one -}
-diagOnesConstraint :: Int
-                   -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-                   -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+diagOnesConstraint :: SMT.Fresh w => Int
+                   -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+                   -> SMT.SmtSolverSt w (SMT.Formula w)
 diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
   where
     k ds = do
@@ -304,12 +302,12 @@ diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
     diag'  = concatMap (DF.toList . EncM.diagonalEntries) . Map.elems . MI.coefficients
 
 edaConstraints :: Int
-               -> (Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-               -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-               -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> Int -> Int -> SMT.Formula w)
+               -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+               -> SMT.SmtSolverSt w (SMT.Formula w)
 edaConstraints dim rel done dtwo gtwo mi =
   rConstraints dim rel mi
     `SMT.bandM` dConstraints dim rel done dtwo gtwo mi
@@ -318,14 +316,14 @@ edaConstraints dim rel done dtwo gtwo mi =
 
 idaConstraints :: Int
                -> Int
-               -> (Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-               -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-               -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-               ->  SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+               -> (Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> Int -> SMT.Formula w)
+               -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula w)
+               -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+               ->  SMT.SmtSolverSt w (SMT.Formula w)
 idaConstraints dim deg rel irel jrel hrel trel gthree mi =
   rConstraints dim rel mi
     `SMT.bandM` tConstraints dim rel trel gthree mi
@@ -336,54 +334,54 @@ idaConstraints dim deg rel irel jrel hrel trel gthree mi =
     -- edaConstraints are not needed
 
 dConstraints :: Int
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+             -> SMT.SmtSolverSt w (SMT.Formula w)
 dConstraints dim rel done dtwo gtwo _ =
   return $ foreapprox `SMT.band` forecompat `SMT.band` backapprox `SMT.band` backcompat `SMT.band` exactness
   where
     toD         = [1..dim]
-    foreapprox  = SMT.bigAnd [ rel 1 x .==>  done x x x | x <- toD ]
-    forecompat  = SMT.bigAnd [ (done i x y `SMT.band` gtwo x y z u) SMT..==> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
-    backapprox  = SMT.bigAnd [ rel 1 x .==> dtwo x x x | x <- toD ]
-    backcompat  = SMT.bigAnd [ (dtwo i x y `SMT.band` gtwo z u x y) .==> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    foreapprox  = SMT.bigAnd [ rel 1 x .=>  done x x x | x <- toD ]
+    forecompat  = SMT.bigAnd [ (done i x y `SMT.band` gtwo x y z u) .=> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    backapprox  = SMT.bigAnd [ rel 1 x .=> dtwo x x x | x <- toD ]
+    backcompat  = SMT.bigAnd [ (dtwo i x y `SMT.band` gtwo z u x y) .=> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
     exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y `SMT.band` dtwo i x y) | i <- toD, x <- toD, y <- toD ]
 
 
 
 hConstraints :: Int
              -> Int
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+             -> SMT.SmtSolverSt w (SMT.Formula w)
 hConstraints dim deg jrel hrel _ = return $ unaryNotation `SMT.band` jDecrease
   where
     toD = [1..dim]
-    unaryNotation = SMT.bigAnd [ hrel x h .==> hrel x (h - 1) | x <- toD, h <- [2..deg - 1] ]
+    unaryNotation = SMT.bigAnd [ hrel x h .=> hrel x (h - 1) | x <- toD, h <- [2..deg - 1] ]
     jDecrease = SMT.bigAnd [ f i j | i <- toD, j <- toD ]
-    f i j = jrel i j .==> SMT.bigOr (map (\ h -> hrel i h `SMT.band` SMT.bnot (hrel j h)) [1..deg - 1])
+    f i j = jrel i j .=> SMT.bigOr (map (\ h -> hrel i h `SMT.band` SMT.bnot (hrel j h)) [1..deg - 1])
 
 
 iConstraints :: Int
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+             -> SMT.SmtSolverSt w (SMT.Formula w)
 iConstraints dim irel trel _ = return $
-  SMT.bigAnd [ if x == y then SMT.top else trel x y y .==> irel x y | x <- toD, y <- toD ]
+  SMT.bigAnd [ if x == y then SMT.top else trel x y y .=> irel x y | x <- toD, y <- toD ]
   where
     toD = [1..dim]
 
 jConstraints :: Int
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+             -> SMT.SmtSolverSt w (SMT.Formula w)
 jConstraints dim rel irel jrel _ =
   return $ SMT.bigAnd [ f i j | i <- toD, j <- toD ]
   where
@@ -392,44 +390,44 @@ jConstraints dim rel irel jrel _ =
 
 
 rConstraints :: Int
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+             -> SMT.SmtSolverSt w (SMT.Formula w)
 rConstraints dim rel mi =
   return $ reflexivity `SMT.band` transitivity `SMT.band` compatibility `SMT.band` nocycle
   where
     toD = [1..dim]
     reflexivity   = SMT.bigAnd $ map (\ x -> rel x x) toD
-    transitivity  = SMT.bigAnd [ (rel x y `SMT.band` rel y z) .==> rel x z | x <- toD, y <- toD, z <- toD ]
-    compatibility = SMT.bigAnd [ ggeqConstraint mi x y .==> rel x y | x <- toD, y <- toD ]
-    nocycle       = SMT.bigAnd [ (rel 1 y `SMT.band` ggrtConstraint mi x y) .==> SMT.bnot (rel y x) | x <- toD, y <- toD ]
+    transitivity  = SMT.bigAnd [ (rel x y `SMT.band` rel y z) .=> rel x z | x <- toD, y <- toD, z <- toD ]
+    compatibility = SMT.bigAnd [ ggeqConstraint mi x y .=> rel x y | x <- toD, y <- toD ]
+    nocycle       = SMT.bigAnd [ (rel 1 y `SMT.band` ggrtConstraint mi x y) .=> SMT.bnot (rel y x) | x <- toD, y <- toD ]
 
 rcConstraints :: Int
-              -> (Int -> Int -> SMT.Formula SMT.IFormula)
-              -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-              -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
-rcConstraints dim rel mi = return $ SMT.bigAnd [ ggeqConstraint mi 1 x .==> rel 1 x | x <- toD ]
+              -> (Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+              -> SMT.SmtSolverSt w (SMT.Formula w)
+rcConstraints dim rel mi = return $ SMT.bigAnd [ ggeqConstraint mi 1 x .=> rel 1 x | x <- toD ]
   where
     toD = [1..dim]
 
 tConstraints :: Int
-             -> (Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-             -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> Int -> SMT.Formula w)
+             -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+             -> SMT.SmtSolverSt w (SMT.Formula w)
 tConstraints dim rel trel gthree _ =
   return $ initial `SMT.band` gThreeStep
   where
     toD = [1..dim]
-    initial = SMT.bigAnd [ if x == y then SMT.top else (rel 1 x `SMT.band` rel 1 y) .==> trel x x y | x <- toD, y <- toD ]
-    gThreeStep = SMT.bigAnd [ (trel x y z `SMT.band` gthree x y z u v w) .==> trel u v w | x <- toD, y <- toD, z <- toD, u <- toD, v <- toD, w <- toD ]
+    initial = SMT.bigAnd [ if x == y then SMT.top else (rel 1 x `SMT.band` rel 1 y) .=> trel x x y | x <- toD, y <- toD ]
+    gThreeStep = SMT.bigAnd [ (trel x y z `SMT.band` gthree x y z u v w) .=> trel u v w | x <- toD, y <- toD, z <- toD, u <- toD, v <- toD, w <- toD ]
 
 
 gThreeConstraints :: Int
-             -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-             -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-             -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+             -> (Int -> Int -> Int -> Int -> Int -> Int -> SMT.Formula w)
+             -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+             -> SMT.SmtSolverSt w (SMT.Formula w)
 gThreeConstraints dim gthree mi = return $
   SMT.bigAnd [ f i j k x y z | i <- toD, j <- toD, k <- toD, x <- toD, y <- toD, z <- toD ]
   where
@@ -439,9 +437,9 @@ gThreeConstraints dim gthree mi = return $
 
 
 gtwoConstraints :: Int
-                -> (Int -> Int -> Int -> Int -> SMT.Formula SMT.IFormula)
-                -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-                -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+                -> (Int -> Int -> Int -> Int -> SMT.Formula w)
+                -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+                -> SMT.SmtSolverSt w (SMT.Formula w)
 gtwoConstraints dim gtwo mi =
   return $ SMT.bigAnd [ f i j k l | i <- toD, j <- toD, k <- toD, l <- toD ]
   where
@@ -450,12 +448,12 @@ gtwoConstraints dim gtwo mi =
     g i j k l m = (EncM.mEntry i k m .>= one) `SMT.band` (EncM.mEntry j l m .>= one)
 
 
-ggeqConstraint :: I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr) -> Int -> Int
-     -> SMT.Formula SMT.IFormula
+ggeqConstraint :: I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w)) -> Int -> Int
+     -> SMT.Formula w
 ggeqConstraint mi i j = SMT.bigOr (map (SMT.bigOr . map (\ m -> EncM.mEntry i j m .>= SR.one) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
 
-ggrtConstraint :: I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr) -> Int -> Int
-     -> SMT.Formula SMT.IFormula
+ggrtConstraint :: I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w)) -> Int -> Int
+     -> SMT.Formula w
 ggrtConstraint mi i j = SMT.bigOr (map (SMT.bigOr . map (\ m -> EncM.mEntry i j m .> SR.one) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
 
 mxKind :: NaturalMIKind -> Int -> Int -> StartTerms fun -> MI.MatrixKind fun
@@ -474,12 +472,11 @@ mxKind kind dim deg  st = case (kind, st) of
 
 
 
-
 {- | build constraints for an interpretation depending on the matrix kind -}
-kindConstraints :: Ord fun
+kindConstraints :: (Ord fun, SMT.Fresh w)
                 => MI.MatrixKind fun
-                -> I.Interpretation fun (MI.LinearInterpretation a SMT.IExpr)
-                -> SMT.SolverM (SMT.SolverState (SMT.Formula SMT.IFormula)) (SMT.Formula SMT.IFormula)
+                -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
+                -> SMT.SmtSolverSt w (SMT.Formula w)
 kindConstraints MI.UnrestrictedMatrix _                   = return SMT.top
 kindConstraints (MI.TriangularMatrix Nothing) _           = return SMT.top
 kindConstraints (MI.TriangularMatrix (Just deg)) absmi    = diagOnesConstraint deg absmi
@@ -569,7 +566,7 @@ entscheide p prob = do
       res@(_, (pint,_), _) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
       SMT.assertM $ (kindConstraints kind pint)
       return $ res
-    (ret, encoding)           = SMT.runSolverM orientM SMT.initialState
+    (ret, encoding)           = SMT.runSolverSt orientM SMT.initialState
     (apint,decoding,forceAny) = ret
     aorder = MatrixOrder
       { kind_ = kind
@@ -592,8 +589,8 @@ entscheide p prob = do
 entscheide1 ::
   NaturalMI
   -> MatrixOrder c
-  -> SMT.SolverState SMT.Expr
-  -> (I.Interpretation F (SomeLInter SMT.IExpr), Maybe (UREnc.UsableEncoder F))
+  -> SMT.SmtState Int
+  -> (I.Interpretation F (SomeLInter (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
   -> I.ForceAny
   -> Prob.TrsProblem
   -> CD.TctM (CD.ProofTree (Prob.TrsProblem))
@@ -601,7 +598,7 @@ entscheide1 p aorder encoding decoding forceAny prob
   | Prob.isTrivial prob = return . I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
   | otherwise           = do
     res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
-      <- SMT.solve (SMT.smtSolve prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+      <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
     case res of
       SMT.Sat a
         | Arg.useGreedy (greedy p) -> fmap CD.flatten $ again `DT.mapM` pt
@@ -737,9 +734,9 @@ instance I.AbstractInterpretation NaturalMI where
   -- | Type of abstract matrix interpretations.
   type (A NaturalMI) = SomeLInter (MI.MatrixInterpretationEntry F)
   -- | Type of SMT interpretations. Abstract Varaibles replaced by SMT variables.
-  type (B NaturalMI) = SomeLInter SMT.IExpr
+  type (B NaturalMI) = SomeLInter (SMT.IExpr Int)
   -- | Type of concrete interpretations. SMT variables replaced by integers.
-  type (C NaturalMI) = MI.LinearInterpretation V SMT.IExpr
+  type (C NaturalMI) = MI.LinearInterpretation V (SMT.IExpr Int)
 
   {- transforms a single abstract interpretation of a function into an SMT interpretation. -}
   -- | encode :: NaturalMI -> A NaturalMI -> SMT.SolverStM SMT.Expr (B NaturalMI)
@@ -756,7 +753,7 @@ instance I.AbstractInterpretation NaturalMI where
   setInFilter _ (MI.LInter vmmap _) inFilter =
     SMT.bigAnd (Map.mapWithKey func vmmap)
     where
-      func (MI.SomeIndeterminate i) m = SMT.bigOr (fmap ( .> SMT.zero) m) .==> inFilter i
+      func (MI.SomeIndeterminate i) m = SMT.bigOr (fmap ( .> SMT.zero) m) .=> inFilter i
 
   {- | Given an abstract interpretation get a concrete interpretation  for a Trs-Term. -}
   -- interpret   :: NaturalMI -> I.Interpretation F (B NaturalMI) -> RT.Term F V -> C NaturalMI
@@ -775,7 +772,7 @@ instance I.AbstractInterpretation NaturalMI where
   -- gte :: NaturalMI -> C NaturalMI -> C NaturalMI -> SMT.Expr
   gte _ lint1 lint2 = gte lint1 lint2
 
-gte :: Ord f => MI.LinearInterpretation f SMT.IExpr -> MI.LinearInterpretation f SMT.IExpr -> SMT.Expr
+gte :: Ord f => MI.LinearInterpretation f (SMT.IExpr w) -> MI.LinearInterpretation f (SMT.IExpr w) -> SMT.Formula w
 gte (MI.LInter lcoeffs lconst) (MI.LInter rcoeffs rconst) =
   SMT.bigAnd zipmaps SMT..&& gteVec lconst rconst
   where
@@ -785,7 +782,7 @@ gte (MI.LInter lcoeffs lconst) (MI.LInter rcoeffs rconst) =
     gteVec (EncM.Vector v1) (EncM.Vector v2) =
       SMT.bigAnd $ zipWith (SMT..>=) v1 v2
 
-setMonotone :: MI.SomeLinearInterpretation SMT.IExpr -> [Int] -> SMT.Expr
+setMonotone :: MI.SomeLinearInterpretation (SMT.IExpr w) -> [Int] -> (SMT.Formula w)
 setMonotone (MI.LInter vmmap _) poss =
   SMT.bigAnd $ map setMonotonePos poss
   where
@@ -947,11 +944,10 @@ instance CD.Processor WeightGap where
 
 wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
 wgEntscheide p prob = do
-  mto <- CD.remainingTime `fmap` CD.askStatus prob
   res :: SMT.Result (I.Interpretation F (SomeLInter Int))
-    <- liftIO $ SMT.solveStM (SMT.minismt mto) $ do
+    <- SMT.smtSolveSt (SMT.smtSolveTctM prob) $ do
 
-    SMT.setFormat "QF_NIA"
+    SMT.setLogic SMT.QF_NIA
 
     amint <- DT.mapM toSMTLinearInterpretation absi
     strictVarEncoder <- Map.fromList `fmap` DT.mapM (\r -> SMT.bvarM' >>= \v -> return (r,v)) rules
@@ -972,7 +968,7 @@ wgEntscheide p prob = do
 
       wgOrderConstraints = SMT.bigAnd [ ruleConstraint r | r <- rules ]
         where
-          ruleConstraint r = wgConstraint .&& (strict r .==> orientConstraint)
+          ruleConstraint r = wgConstraint .&& (strict r .=> orientConstraint)
             where
               li = interpret (RR.lhs r)
               ri = interpret (RR.rhs r)
@@ -989,6 +985,7 @@ wgEntscheide p prob = do
         WgOnTrs -> SMT.bigAnd [ strict r  | r <- strs ]
         WgOnAny -> SMT.bigOr  [ strict r  | r <- srules ]
 
+    SMT.assert $ (SMT.top :: SMT.Formula Int)
     SMT.assert monotoneConstraints
     SMT.assert wOrderConstraints
     SMT.assert wgOrderConstraints
