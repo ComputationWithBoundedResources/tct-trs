@@ -68,8 +68,8 @@ modifyer (TrsOptions cc _) = updateCC cc
 -- | CeTA (partial proof output)
 answering :: TrsOptions -> T.Return (ProofTree TrsProblem) -> IO ()
 answering (TrsOptions _ cp) ret = case ret of
-  T.Halt _  -> PP.putPretty T.MaybeAnswer
-  r         -> PP.putPretty (answer pt) >> case prover pt of
+  T.Halt _  -> PP.putPretty T.MaybeDefaultAnswer
+  r         -> PP.putPretty (competitionAnswer pt) >> case prover pt of
     Left s    -> print s
     Right xml -> Xml.putXml xml
     where
