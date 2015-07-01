@@ -39,9 +39,9 @@ trsMode = TctMode
 
 -- | Parses a TrsProblem. Uses the @xml@ format if the file extension is @xml@, otherwise the WST format.
 parserIO :: FilePath -> IO (Either String TrsProblem)
-parserIO fn = case takeExtension fn of
-  "xml" -> fromRewriting <$> R.xmlFileToProblem fn
-  _     -> parser <$> readFile fn
+parserIO fn 
+  | takeExtension fn == ".xml" = fromRewriting <$> R.xmlFileToProblem fn
+  | otherwise                  = parser <$> readFile fn
 
 -- | WST format parser from 'Data.Rewriting'.
 parser :: String -> Either String TrsProblem
