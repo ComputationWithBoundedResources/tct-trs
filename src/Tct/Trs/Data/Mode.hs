@@ -7,8 +7,8 @@ module Tct.Trs.Data.Mode
 
 
 import           Control.Applicative
+import           System.FilePath            (takeExtension)
 
-import           Tct.Core.Common.Error      (TctError (..))
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml (putXml)
 import qualified Tct.Core.Data              as T
@@ -16,6 +16,7 @@ import           Tct.Core.Main
 import           Tct.Core.Processor.Failing (failing)
 
 import qualified Data.Rewriting.Problem     as R
+import qualified Data.Rewriting.Problem.Xml as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
@@ -27,19 +28,26 @@ type TrsMode = TctMode TrsProblem TrsProblem TrsOptions
 trsMode :: TrsMode
 trsMode = TctMode
   { modeId              = "trs"
-  , modeParser          = parser
+  , modeParser          = parserIO
   , modeStrategies      = defaultDeclarations
 
   , modeDefaultStrategy = failing
   , modeOptions         = options
   , modeModifyer        = modifyer
-  , modeAnswer          = answering }
+  , modeAnswer          = \_ _  -> return ()
+  , modeProof           = proofing }
+
+-- | Parses a TrsProblem. Uses the @xml@ format if the file extension is @xml@, otherwise the WST format.
+parserIO :: FilePath -> IO (Either String TrsProblem)
+parserIO fn = case takeExtension fn of
+  "xml" -> fromRewriting <$> R.xmlFileToProblem fn
+  _     -> parser <$> readFile fn
 
 -- | WST format parser from 'Data.Rewriting'.
-parser :: String -> Either TctError TrsProblem
+parser :: String -> Either String TrsProblem
 parser s = case R.fromString s of
-  Left e  -> Left $ TctParseError (show e)
-  Right p -> either (Left . TctParseError) Right (fromRewriting p)
+  Left e  -> Left (show e)
+  Right p -> fromRewriting p
 
 -- | Trs specific command line options.
 options :: Options TrsOptions
@@ -55,7 +63,7 @@ options = TrsOptions
     `withDefault` RCI)
   <*> option' readCP (eopt
       `withArgLong` "proofOutput"
-      `withCropped` 'p'
+      `withCropped` 'b'
       `withHelpDoc` PP.listing
         [ (PP.text (show TotalProof)   , PP.text "outputs the answer and then the CeTA proof")
         , (PP.text (show PartialProof) , PP.text "outputs the answer and then the CeTA (partial) proof") ]
@@ -66,14 +74,14 @@ modifyer :: TrsOptions -> TrsProblem -> TrsProblem
 modifyer (TrsOptions cc _) = updateCC cc
 
 -- | CeTA (partial proof output)
-answering :: TrsOptions -> T.Return (ProofTree TrsProblem) -> IO ()
-answering (TrsOptions _ cp) ret = case ret of
+proofing :: TrsOptions -> T.Return (ProofTree TrsProblem) -> IO ()
+proofing (TrsOptions _ cp) ret = case ret of
   T.Halt _  -> PP.putPretty T.MaybeDefaultAnswer
-  r         -> PP.putPretty (competitionAnswer pt) >> case prover pt of
+  r         -> case prover pt of
     Left s    -> print s
     Right xml -> Xml.putXml xml
     where
-      pt = T.fromReturn r
+      pt     = T.fromReturn r
       prover = if cp == TotalProof then totalProof else partialProof
 
 
