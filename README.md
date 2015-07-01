@@ -10,6 +10,7 @@ Requirements
   * [tct-core](https://github.com/ComputationWithBoundedResources/tct-core/)
   * [tct-common](https://github.com/ComputationWithBoundedResources/tct-common/)
   * [tct-trs](https://github.com/ComputationWithBoundedResources/tct-trs/)
+  * [term-rewriting-xml](https://github.com/ComputationWithBoundedResources/term-rewriting-xml/)
   * [minismt, version 0.6](http://cl-informatik.uibk.ac.at/software/minismt/)
 
 The tool is only tested under GNU/Linux.
@@ -27,6 +28,7 @@ install the packages and executables via `cabal`.
   git clone https://github.com/ComputationWithBoundedResources/tct-core
   git clone https://github.com/ComputationWithBoundedResources/tct-common
   git clone https://github.com/ComputationWithBoundedResources/tct-trs
+  git clone https://github.com/ComputationWithBoundedResources/term-rewriting-xml
   cabal install **/*.cabal
   ```
 
