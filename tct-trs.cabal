@@ -24,7 +24,7 @@ source-repository head
   type:     git
   location: git://github.com/ComputationWithBoundedResources/tct-trs
 
-executable trs
+executable tct-trs
   main-is:
     Tct/Trs/Main.hs
   hs-source-dirs:
