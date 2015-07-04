@@ -266,7 +266,7 @@ selAnyOf s = RuleSelector { rsName = "any " ++ rsName s, rsSelect = f }
           where rs = rsSelect s prob
 
 selAllOf :: (Ord f, Ord v) => RuleSetSelector f v -> ExpressionSelector f v
-selAllOf s = RuleSelector { rsName = "any " ++ rsName s, rsSelect = f }
+selAllOf s = RuleSelector { rsName = "all " ++ rsName s, rsSelect = f }
   where f prob = BigAnd $ [ SelectDP d | d <- Trs.toList $ Rs.sdps rs `Trs.union` Rs.wdps rs]
                          ++ [ SelectTrs r | r <- Trs.toList $ Rs.strs rs `Trs.union` Rs.wtrs rs]
           where rs = rsSelect s prob
