@@ -35,6 +35,6 @@ install the packages and executables via `cabal`.
 Usage
 -----
 
-The installation provides an executable `trs`. For full options, run `trs
---help`.
+The installation provides an executable `tct-trs`. For full options, run
+`tct-trs --help`.
 
