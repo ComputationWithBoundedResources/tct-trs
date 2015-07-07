@@ -7,7 +7,8 @@ module Tct.Trs.Encoding.ArgumentFiltering
   , ArgumentFiltering
   , empty
   , alter
-  , apply
+  , filterRule
+  , filterTrs
 
   -- * In Filter Encoding
   , InFilterEncoder
@@ -52,19 +53,18 @@ filtering (f,ar) (AF m) = Filtering (IS.fromList $ take ar [1..]) `fromMaybe` M.
 alter :: Ord f => (Maybe Filtering -> Maybe Filtering) -> f -> ArgumentFiltering f -> ArgumentFiltering f
 alter f s (AF m) = AF (M.alter f s m)
 
-apply :: (Ord f, Ord v) => Trs f v -> ArgumentFiltering f -> Trs f v
-apply trs af = filterRule `Trs.map` trs
+filterRule :: Ord f => ArgumentFiltering f -> R.Rule f v -> R.Rule f v
+filterRule af (R.Rule l r) = R.Rule (filterTerm l) (filterTerm r)
   where
-    filterRule (R.Rule l r) = R.Rule (filterTerm l) (filterTerm r)
     filterTerm (R.Fun f ts) = case filtering (f,length ts) af of
       Projection i -> filterTerm $ ts!!(i-1)
       Filtering is -> R.Fun f (map filterTerm . snd $ foldl k (1,[]) ts)
         where k (i,nts) ti = if i `IS.member` is then (i+1,ti:nts) else (i+1,nts)
     filterTerm v = v
 
-{-fold :: (Symbol -> Filtering -> b -> b) -> ArgumentFiltering -> b -> b-}
-{-fold f af@(AF (sig, _)) m = foldr f' m (Set.toList $ symbols sig)-}
-  {-where f' sym = f sym (filtering sym af)-}
+filterTrs :: (Ord f, Ord v) => ArgumentFiltering f -> Trs f v -> Trs f v
+filterTrs af trs = filterRule af `Trs.map` trs
+
 
 instance PP.Pretty f => PP.Pretty (ArgumentFiltering f) where
   pretty (AF m)
