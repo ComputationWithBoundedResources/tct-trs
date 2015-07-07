@@ -58,8 +58,8 @@ filterRule af (R.Rule l r) = R.Rule (filterTerm l) (filterTerm r)
   where
     filterTerm (R.Fun f ts) = case filtering (f,length ts) af of
       Projection i -> filterTerm $ ts!!(i-1)
-      Filtering is -> R.Fun f (map filterTerm . snd $ foldl k (1,[]) ts)
-        where k (i,nts) ti = if i `IS.member` is then (i+1,ti:nts) else (i+1,nts)
+      Filtering is -> R.Fun f (map filterTerm ts')
+        where ts' = fst . unzip . filter ((`IS.member` is) . snd) $ zip ts [1..]
     filterTerm v = v
 
 filterTrs :: (Ord f, Ord v) => ArgumentFiltering f -> Trs f v -> Trs f v
