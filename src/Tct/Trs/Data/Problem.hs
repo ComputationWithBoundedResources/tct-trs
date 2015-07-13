@@ -94,7 +94,11 @@ data Problem f v = Problem
   , weakTrs    :: Trs f v
 
   , dpGraph    :: DependencyGraph f v
-  } deriving (Show, Eq, Typeable)
+
+  -- original rules problem for ceta output
+  , srs :: [R.Rule f v]
+  , wrs :: [R.Rule f v]
+  } deriving (Show, Typeable)
 
 
 -- | Returns the dependency graph of the problem.
@@ -167,7 +171,11 @@ fromRewriting prob =
         , weakDPs    = Trs.empty
         , weakTrs    = wTrs
 
-        , dpGraph = DPG.empty }
+        , dpGraph = DPG.empty 
+        
+        , srs = fmap toFun . R.strictRules $ R.rules prob
+        , wrs = fmap toFun . R.weakRules   $ R.rules prob
+        }
     else
       Left "problem not wellformed."
   where
@@ -298,11 +306,13 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
 -- furthermore CeTA (2.2) only supports polynomial bounds; so we add the tag manually in the output
 instance (Ord f, Ord v, Xml.Xml f, Xml.Xml v) => Xml.Xml (Problem f v) where
   toXml prob =
-    Xml.elt "problem"
-      [ Xml.elt "strictTrs"         [Xml.toXml (strictTrs prob)]
-      , Xml.elt "weakTrs"           [Xml.toXml (strictTrs prob)]
-      , Xml.elt "strictDPs"         [Xml.toXml (strictTrs prob)]
-      , Xml.elt "weakDPs"           [Xml.toXml (strictTrs prob)] ]
+    Xml.elt "complexityInput"
+      [ Xml.elt "trsInput"
+          [ Xml.elt "trs" [xmlrules $ srs prob]
+          , Xml.toCeTA (strategy prob)
+          , Xml.elt "relativeRules" [xmlrules $ wrs prob] ]
+      , Xml.toCeTA (startTerms prob, signature prob) ]
+    where xmlrules rs = Xml.elt "rules" [ Xml.toXml r | r <- rs ]
   toCeTA prob =
     Xml.elt "complexityInput"
       [ Xml.elt "trsInput"
