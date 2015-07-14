@@ -62,11 +62,13 @@ instance (PP.Pretty f, PP.Pretty c)  => PP.Pretty (Interpretation f c) where
 data Shift = Shift (ExpressionSelector F V) | All
   deriving Show
 
+-- FIXME: MS: clean up proof construction; usable args returns empty if not set instead of all
 data InterpretationProof a b = InterpretationProof
   { sig_       :: Signature F
   , inter_     :: Interpretation F a
   , uargs_     :: UPEnc.UsablePositions F
   , ufuns_     :: Symbols F
+  , useURules_ :: Bool
   , shift_     :: Shift
   , strictDPs_ :: [(R.Rule F V, (b, b))]
   , strictTrs_ :: [(R.Rule F V, (b, b))]
@@ -189,6 +191,7 @@ orient inter prob absi mselector useUP useUR = do
       , inter_     = Interpretation M.empty
       , uargs_     = uposs
       , ufuns_     = S.empty
+      , useURules_ = allowUR
       , shift_     = mselector
       , strictDPs_ = []
       , strictTrs_ = []
@@ -278,7 +281,11 @@ xmlProof proof itype =
   Xml.elt "ruleShifting"
     [ orderingConstraintProof
     , Xml.elt "trs" [Xml.toXml $ Trs.fromList trs]          -- strict part
-    , Xml.elt "usableRules" [Xml.toXml $ Trs.fromList usr]] -- usable part
+    -- ceta complains if usableRules are set for non-innermost; even if all rules are given
+    , if useURules_ proof 
+        then Xml.elt "usableRules" [Xml.toXml $ Trs.fromList usr] -- usable part
+        else Xml.empty
+    ]
     where
       orderingConstraintProof =
         Xml.elt "orderingConstraintProof"
