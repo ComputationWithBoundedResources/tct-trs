@@ -1034,6 +1034,7 @@ wgEntscheide p prob = do
         , I.inter_     = mint
         , I.uargs_     = usablePositions
         , I.ufuns_     = Set.empty
+        , I.useURules_ = False
         , I.shift_     = I.Shift $ case wgOn p of
             WgOnAny -> RS.selAnyOf RS.selStricts
             WgOnTrs -> RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules
