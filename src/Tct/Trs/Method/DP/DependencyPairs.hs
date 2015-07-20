@@ -17,6 +17,7 @@ import           Data.Typeable
 import qualified Data.Set                    as S
 
 import qualified Data.Rewriting.Rule         as R
+import qualified Data.Rewriting.Term         as R
 
 import qualified Tct.Core.Common.Parser      as P
 import qualified Tct.Core.Common.Pretty      as PP
@@ -124,6 +125,7 @@ instance T.Processor DependencyPairs where
 
       sig      = Prob.signature prob
       defineds = Sig.defineds sig
+      -- defineds = S.fromList . map (either (const undefined) id . R.root . R.lhs) . Trs.toList $ Prob.allComponents prob
 
       (stricts, weaks) = flip evalState 0 $ do
         let

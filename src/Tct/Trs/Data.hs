@@ -14,6 +14,7 @@ import Tct.Trs.Data.Signature       as M (Signature, Symbols)
 import Tct.Trs.Data.Symbol          as M (F, V, Fun)
 import Tct.Trs.Data.Trs             as M (Trs)
 import Tct.Trs.Data.ComplexityPair  as M (IsComplexityPair, ComplexityPair, ComplexityPairProof)
+import Tct.Trs.Data.Precedence      as M (Order, Precedence)
 
 import qualified Tct.Core.Data      as T
 

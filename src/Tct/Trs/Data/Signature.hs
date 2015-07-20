@@ -77,6 +77,7 @@ symbols = M.keysSet . signature_
 defineds :: Signature f -> Symbols f
 defineds = defineds_
 
+-- TODO: MS: flip arguments
 -- | Checks wether the given symbol is a defined symbol.
 isDefined :: Ord f => f -> Signature f -> Bool
 isDefined f = S.member f . defineds
@@ -85,6 +86,7 @@ isDefined f = S.member f . defineds
 constructors :: Signature f -> Symbols f
 constructors = constructors_
 
+-- TODO: MS:flip arguments
 -- | Checks wether the given symbol is a constructor symbol.
 isConstructor :: Ord f => f -> Signature f -> Bool
 isConstructor f = S.member f . constructors

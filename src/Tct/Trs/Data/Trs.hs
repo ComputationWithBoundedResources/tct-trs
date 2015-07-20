@@ -24,10 +24,10 @@ module Tct.Trs.Data.Trs
   , isWellformed
   , isDuplicating, isLinear, isLeftLinear, isRightLinear, isCollapsing
   , isNonErasing, isNonSizeIncreasing, isNonDuplicating
-  , isOverlay
+  , isOverlay, isConstructorTrs
 
   , isLinear', isRightLinear', isNonErasing', isNonSizeIncreasing', isNonDuplicating'
-  , isOverlay'
+  , isOverlay', isConstructorTrs'
   ) where
 
 
@@ -178,6 +178,13 @@ isNonDuplicating    = not . isDuplicating
 isOverlay :: (Ord f, Ord v) => Trs f v -> Bool
 isOverlay = L.null . CP.cpsIn' . toList 
 
+isConstructorTrs :: Ord f => Sig.Signature f -> Trs f v -> Bool
+isConstructorTrs sig = all' ((`S.isSubsetOf` ds) . funsS . R.lhs)
+  where 
+    ds    = Sig.defineds sig
+    funsS = S.fromList . T.funs
+    
+
 -- * property-tests; return Just msg if property is not fulfilled.
 -- TODO: MS: this is confusing as we comine with <|> eg. isLinear' <|> isNonDuplicating'
 -- use Either, rename, fixed type?
@@ -196,6 +203,10 @@ isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is dupl
 
 isOverlay' :: (Ord f, Ord v) => Trs f v -> Maybe String
 isOverlay' trs = note (not $ isOverlay trs) " system is not overlay"
+
+isConstructorTrs' :: (Ord f, Ord v) => Sig.Signature f -> Trs f v -> Maybe String
+isConstructorTrs' sig trs = note (not $ isConstructorTrs sig trs) " system is not constructor system"
+
 
 --- * proofdata  -----------------------------------------------------------------------------------------------------
 
