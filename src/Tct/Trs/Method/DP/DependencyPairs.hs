@@ -17,7 +17,6 @@ import           Data.Typeable
 import qualified Data.Set                    as S
 
 import qualified Data.Rewriting.Rule         as R
-import qualified Data.Rewriting.Term         as R
 
 import qualified Tct.Core.Common.Parser      as P
 import qualified Tct.Core.Common.Pretty      as PP

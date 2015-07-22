@@ -171,7 +171,7 @@ fromRewriting prob =
     else
       Left "problem not wellformed."
   where
-    toFun (R.Rule l r) = let k = R.map (Symb.fun) (Symb.var) in R.Rule (k l) (k r)
+    toFun (R.Rule l r) = let k = R.map Symb.fun Symb.var in R.Rule (k l) (k r)
     sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)
     wTrs = Trs.fromList . map toFun $ R.weakRules (R.rules prob)
     trs  = sTrs `Trs.union` wTrs
@@ -183,15 +183,15 @@ fromRewriting prob =
 
 --- ** updates  ------------------------------------------------------------------------------------------------------
 
-sanitiseSignature :: (Ord f, Ord v) => Problem f v -> Problem f v
-sanitiseSignature prob = prob
-  { startTerms = case startTerms prob of
-      BasicTerms ds cs -> BasicTerms (restrict ds) (restrict cs)
-      AllTerms fs      -> AllTerms (restrict fs)
-  , signature  = sig }
-  where
-    sig = Trs.signature $ allComponents prob
-    restrict = Sig.restrictToSignature sig
+-- sanitiseSignature :: (Ord f, Ord v) => Problem f v -> Problem f v
+-- sanitiseSignature prob = prob
+--   { startTerms = case startTerms prob of
+--       BasicTerms ds cs -> BasicTerms (restrict ds) (restrict cs)
+--       AllTerms fs      -> AllTerms (restrict fs)
+--   , signature  = sig }
+--   where
+--     sig = Trs.signature $ allComponents prob
+--     restrict = Sig.restrictToSignature sig
 
 -- | Computes the dpGraph from the DP components of the problem and updates the dpGraph component of the Problem.
 sanitiseDPGraph :: (Fun f, Ord f, Ord v) => Problem f v -> Problem f v

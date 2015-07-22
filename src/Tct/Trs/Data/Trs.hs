@@ -179,7 +179,7 @@ isOverlay :: (Ord f, Ord v) => Trs f v -> Bool
 isOverlay = L.null . CP.cpsIn' . toList 
 
 isConstructorTrs :: Ord f => Sig.Signature f -> Trs f v -> Bool
-isConstructorTrs sig = all' ((`S.isSubsetOf` ds) . funsS . R.lhs)
+isConstructorTrs sig = all' (all (S.null . (`S.intersection` ds) . funsS) . R.directSubterms . R.lhs)
   where 
     ds    = Sig.defineds sig
     funsS = S.fromList . T.funs
