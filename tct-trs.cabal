@@ -64,8 +64,7 @@ executable tct-trs
     TypeOperators
 
   ghc-options:
-    -j -Wall -threaded -fforce-recomp -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
-
+    -Wall -threaded -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
 
 library
   hs-source-dirs:
@@ -140,7 +139,7 @@ library
     tct-core           == 3.*
 
   ghc-options:
-    -j -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+    -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
   extensions:
     ConstraintKinds,
     DataKinds,

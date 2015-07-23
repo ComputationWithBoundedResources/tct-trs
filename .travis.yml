@@ -5,10 +5,10 @@ ghc:
 notifications:
 email: true
 
+install: travis_wait mvn install
 before_install:
   - git clone https://github.com/ComputationWithBoundedResources/slogic
   - git clone https://github.com/ComputationWithBoundedResources/tct-core
   - git clone https://github.com/ComputationWithBoundedResources/tct-common
-  - git clone https://github.com/ComputationWithBoundedResources/tct-trs
   - git clone https://github.com/ComputationWithBoundedResources/term-rewriting-xml
   - cabal install **/*.cabal
