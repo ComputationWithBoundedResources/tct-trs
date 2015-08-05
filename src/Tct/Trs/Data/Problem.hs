@@ -49,7 +49,7 @@ import           Control.Applicative          ((<|>))
 import qualified Data.Set                     as S
 import           Data.Typeable
 
-import qualified Data.Rewriting.Problem       as R
+import qualified Data.Rewriting.Problem       as R hiding (map)
 import qualified Data.Rewriting.Rule          as R (Rule (..))
 import qualified Data.Rewriting.Term          as R
 
@@ -116,12 +116,7 @@ trsComponents prob = strictTrs prob `Trs.concat` weakTrs prob
 
 -- | Returns all rules a reduction wrt to the start terms can start with.
 startComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
-startComponents prob = case st of
-  AllTerms{}   -> k (trsComponents prob)
-  BasicTerms{} -> k (dpComponents prob)
-  where
-    st = startTerms prob
-    k  = Trs.filter (isStartTerm st . R.lhs)
+startComponents prob = Trs.filter (isStartTerm (startTerms prob) . R.lhs) (allComponents prob)
 
 -- | Returns all rules.
 ruleSet :: Problem f v -> RuleSet f v

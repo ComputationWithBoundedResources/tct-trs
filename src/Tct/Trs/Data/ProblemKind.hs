@@ -30,7 +30,9 @@ data StartTerms f
 
 -- | Checks wether a given term is a start term.
 isStartTerm :: Ord f => StartTerms f -> R.Term f v -> Bool
-isStartTerm AllTerms{} _         = True
+isStartTerm (AllTerms fs) t = case t of
+  (R.Var _)   -> True
+  (R.Fun f _) -> f `S.member` fs
 isStartTerm (BasicTerms ds cs) t = case t of
   (R.Var _)    -> True
   (R.Fun f ts) -> f `S.member` ds && all (`S.member` cs) (concatMap R.funs ts)
