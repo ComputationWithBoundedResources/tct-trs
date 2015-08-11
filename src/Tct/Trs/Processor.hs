@@ -159,7 +159,7 @@ cleanSuffix = force $
 -- if applicable.
 decomposeIndependent :: TrsStrategy
 decomposeIndependent =
-  decompose (RS.selAllOf RS.selIndependentSG) RelativeAdd
+  decompose' (RS.selAllOf RS.selIndependentSG) RelativeAdd
   >>> try simplifyRHS
   >>> try cleanSuffix
 
@@ -167,7 +167,7 @@ decomposeIndependent =
 -- dependency pairs above cycles in the dependency graph are not taken into account.
 decomposeIndependentSG :: TrsStrategy
 decomposeIndependentSG =
-  decompose (RS.selAllOf RS.selCycleIndependentSG) RelativeAdd
+  decompose' (RS.selAllOf RS.selCycleIndependentSG) RelativeAdd
   >>> try simplifyRHS
   >>> try cleanSuffix
 
@@ -176,9 +176,11 @@ decomposeIndependentSG =
 toDP :: TrsStrategy
 toDP =
   try (withProblem toDP')
+  >>> try usableRules
   >>> try removeInapplicable
   >>> try cleanSuffix
   >>> te removeHeads
+  >>> try usableRules
   >>> te (withProblem partIndep)
   >>> try cleanSuffix
   >>> try trivial

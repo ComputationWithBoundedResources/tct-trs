@@ -148,7 +148,7 @@ instance T.Processor PredecessorEstimationCP where
       estimate (CP.ComplexityPair cp) = do
         let
           rs = RS.RuleSelector
-            { RS.rsName   = "first alternative for predecessorEstimation " ++ RS.rsName (onSelectionCP p)
+            { RS.rsName   = "first alternative for predecessorEstimation on " ++ RS.rsName (onSelectionCP p)
             , RS.rsSelect = withPredecessors . RS.rsSelect (onSelectionCP p) }
 
         cpproof <- CP.solveComplexityPair cp rs prob
