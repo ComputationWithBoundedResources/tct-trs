@@ -1,9 +1,11 @@
 -- | This module provides the /Decompose/ processor.
+--
+-- [1] http://www.imn.htwk-leipzig.de/~waldmann/talk/06/rpt/rel/main.pdf>
+-- [2] A.~Stump, N.~Hirokawa, A Rewriting Approach to Automata-Based Parsing
 {-# LANGUAGE RecordWildCards #-}
 module Tct.Trs.Method.Decompose
-  ( 
-  DecomposeBound(..)
-  
+  ( DecomposeBound(..)
+
   , decomposeDeclaration
   , decompose
   , decompose'
@@ -60,13 +62,13 @@ isApplicableRandS prob compfn = case compfn of
 
 -- for Add and RelativeComp rules in rProb have to be non-size increasing
 selectForcedRules :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> SelectorExpression f v
-selectForcedRules prob compfn = BigAnd $ [ SelectDP r | r <- forcedDps ] ++ [SelectTrs r | r <- forcedTrs ]
+selectForcedRules prob compfn = BigAnd $ [ SelectDP r | r <- forcedDps ] ++ [ SelectTrs r | r <- forcedTrs ]
   where
     (forcedDps, forcedTrs) = case compfn of
       RelativeComp -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
       Add          -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
       _            -> ([],[])
-      where fsi f = [ rule | rule <- Trs.toList (f prob), not (R.isNonSizeIncreasing rule)]
+      where fsi f = [ rule | rule <- Trs.toList (f prob), not (R.isNonSizeIncreasing rule) ]
 
 -- for Add rProb and sProb commute
 isApplicableRModuloS :: (Ord f, Ord v) => Problem f v -> Problem f v -> DecomposeBound -> Maybe String
@@ -137,6 +139,13 @@ progress DecomposeCPProof{..} =
   not $ Trs.null (CP.removableDPs cpproof_) && Trs.null (CP.removableTrs cpproof_)
 progress DecomposeFail = False
 
+certfn :: DecomposeBound -> T.Pair T.Certificate -> T.Certificate
+certfn bnd (T.Pair (c1,c2)) = case bnd of
+  Add          -> T.timeUBCert $ T.timeUB $ c1 `add` c2
+  RelativeAdd  -> T.timeUBCert $ T.timeUB $ c1 `add` c2
+  RelativeMul  -> T.timeUBCert $ T.timeUB $ c1 `mul` c2
+  RelativeComp -> T.timeUBCert (T.timeUB c1 `T.compose` T.timeUB c2)
+
 
 --- * decompose static -----------------------------------------------------------------------------------------------
 
@@ -155,7 +164,7 @@ instance T.Processor Decompose where
     maybe decomposition (T.Fail . Inapplicable) maybeApplicable
     where
       decomposition
-        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) (cert (fromBound withBound))
+        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) (certfn withBound)
         | otherwise      = T.Fail (Applicable DecomposeFail)
       maybeApplicable = isApplicableRandS prob withBound <|> isApplicableRModuloS rProb sProb withBound
 
@@ -167,11 +176,6 @@ instance T.Processor Decompose where
         , selectedDPs_ = dps
         , rProb_       = rProb
         , sProb_       = sProb }
-      fromBound Add          = add
-      fromBound RelativeAdd  = add
-      fromBound RelativeMul  = mul
-      fromBound RelativeComp = T.compose
-      cert f (T.Pair (c1,c2)) = T.timeUBCert (T.timeUB c1 `f` T.timeUB c2)
 
 
 --- * decompose dynamic ----------------------------------------------------------------------------------------------
@@ -212,10 +216,10 @@ instance T.Processor DecomposeCP where
               , cpproof_     = cpp
               , cpcert_      = T.certificate rProof }
           test (isApplicableRModuloS rProb sProb withBoundCP_)
-
           if not (progress proof)
             then return $ T.resultToTree p prob $ T.Fail (Applicable proof)
-            else return . T.Continue $ T.Progress (pn $ Applicable proof) certfn (T.Pair (rProof, T.Open sProb))
+            else return $ T.Continue $ T.Progress (pn $ Applicable proof) (certfn withBoundCP_) (T.Pair (rProof, T.Open sProb))
+
     case app of
       Applicable pt  -> return $ pt
       Inapplicable s -> return $ T.resultToTree p prob $ T.Fail (Inapplicable s)
@@ -226,11 +230,6 @@ instance T.Processor DecomposeCP where
         { T.processor = p
         , T.problem   = prob
         , T.proof     = proof }
-      certfn (T.Pair (c1,c2)) = case withBoundCP_ of
-        Add          -> c1 `add` c2
-        RelativeAdd  -> c1 `add` c2
-        RelativeMul  -> c1 `mul` c2
-        RelativeComp -> T.timeUBCert (T.timeUB c1 `T.compose` T.timeUB c2)
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
