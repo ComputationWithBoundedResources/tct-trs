@@ -292,14 +292,13 @@ isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = allGEQ && EncM.vEntry 1 lco
 diagOnesConstraint :: SMT.Fresh w => Int
                    -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
                    -> SMT.SmtSolverSt w (SMT.Formula w)
-diagOnesConstraint deg mi = SMT.bigAddM (map k diags) `SMT.lteM` SMT.numM deg
+diagOnesConstraint deg mi = return $ SMT.num deg .>= SMT.bigAdd diagOnes
   where
-    k ds = do
-      v <- SMT.snvarM'
-      SMT.assert $ (SMT.bigAdd ds .> SMT.zero) .<=> (v .== SMT.one)
-      return v
-    diags = List.transpose $ map diag' $ Map.elems (I.interpretations mi)
-    diag'  = concatMap (DF.toList . EncM.diagonalEntries) . Map.elems . MI.coefficients
+    mis      = I.interpretations mi
+    dim      = if Map.null mis then 0 else EncM.vDim $ MI.constant $ head $ Map.elems mis
+    toD      = [1..dim]
+    diagOnes = [ SMT.ite (f x) SMT.one SMT.zero | x <- toD ]
+    f x      = SMT.bigOr $ map (SMT.bigOr . map (\ m -> EncM.mEntry x x m .>= SMT.one) . Map.elems . MI.coefficients) $ Map.elems mis
 
 edaConstraints :: Int
                -> (Int -> Int -> SMT.Formula w)
