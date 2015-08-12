@@ -328,7 +328,7 @@ decomposeCPDeclaration :: T.Declaration (
    , T.Argument 'T.Optional DecomposeBound
    , T.Argument 'T.Required ComplexityPair ]
    T.:-> TrsStrategy)
-decomposeCPDeclaration = T.declare "decompose" desc (selArg, bndArg, CP.complexityPairArg) (\x y z -> T.Proc (decomposeCPProcessor x y z))
+decomposeCPDeclaration = T.declare "decomposeCP" desc (selArg, bndArg, CP.complexityPairArg) (\x y z -> T.Proc (decomposeCPProcessor x y z))
 
 decomposeCP :: ComplexityPair -> TrsStrategy
 decomposeCP = T.deflFun decomposeCPDeclaration

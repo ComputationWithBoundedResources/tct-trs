@@ -62,6 +62,7 @@ defaultDeclarations =
   , T.SD withCertificationDeclaration
 
   , T.SD decomposeDeclaration
+  , T.SD decomposeCPDeclaration
 
   , T.SD boundsDeclaration
 
