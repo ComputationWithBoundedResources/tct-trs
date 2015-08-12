@@ -140,11 +140,12 @@ progress DecomposeCPProof{..} =
 progress DecomposeFail = False
 
 certfn :: DecomposeBound -> T.Pair T.Certificate -> T.Certificate
-certfn bnd (T.Pair (c1,c2)) = case bnd of
-  Add          -> T.timeUBCert $ T.timeUB $ c1 `add` c2
-  RelativeAdd  -> T.timeUBCert $ T.timeUB $ c1 `add` c2
-  RelativeMul  -> T.timeUBCert $ T.timeUB $ c1 `mul` c2
-  RelativeComp -> T.timeUBCert (T.timeUB c1 `T.compose` T.timeUB c2)
+certfn bnd (T.Pair (rCert,sCert)) = case bnd of
+  Add          -> T.timeUBCert $ rUb `add` sUb
+  RelativeAdd  -> T.timeUBCert $ rUb `add` sUb
+  RelativeMul  -> T.timeUBCert $ rUb `mul` sUb
+  RelativeComp -> T.timeUBCert $ rUb `mul` (sUb `T.compose` (T.Poly (Just 1) `add` rUb))
+  where (rUb, sUb) = (T.timeUB rCert, T.timeUB sCert)
 
 
 --- * decompose static -----------------------------------------------------------------------------------------------
