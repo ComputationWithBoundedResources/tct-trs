@@ -4,6 +4,7 @@ module Tct.Trs.Processor
   , defaultDeclarations
 
   -- * Abbreviations
+  , degreeArg
   , (>>!)
   , (>>!!)
   , successive
@@ -14,6 +15,8 @@ module Tct.Trs.Processor
   , selAllRules
 
   -- * Strategies
+  , matrices
+  , polys
   , dpsimps
   , decomposeIndependent
   , decomposeIndependentSG
@@ -91,6 +94,10 @@ defaultDeclarations =
   , T.SD simplifyRHSDeclaration
   , T.SD trivialDeclaration
 
+  -- Interpretations
+  , T.SD $ T.strategy "matrices"               luArg matrices
+  , T.SD $ T.strategy "polys"                  luArg polys
+
   -- Simplifications
   , T.SD $ T.strategy "dpsimps"                () dpsimps
   , T.SD $ T.strategy "cleanSuffix"            () cleanSuffix
@@ -100,6 +107,8 @@ defaultDeclarations =
   , T.SD $ T.strategy "removeLeaf"             (OneTuple CP.complexityPairArg) removeLeaf
   ]
 
+degreeArg :: Argument 'Required T.Nat
+degreeArg = nat `withName` "degree" `withHelp` ["max degree"]
 
 (>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
 s1 >>! s2 = s1 >>> try empty >>> s2
@@ -129,6 +138,43 @@ selAnyRule = RS.selAnyOf $ RS.selStricts `RS.selInter` RS.selRules
 -- | Select all strict trs rules.
 selAllRules :: ExpressionSelector F V
 selAllRules = RS.selAllOf RS.selRules
+
+
+--- * interpretations ------------------------------------------------------------------------------------------------
+
+luArg :: (Argument 'Optional (Maybe T.Nat), Argument 'Required T.Nat)
+luArg = (T.some lArg `T.optional` Nothing, uArg)
+  where
+    lArg = nat `withName` "from" `withHelp` ["from degree"]
+    uArg = nat `withName` "to"   `withHelp` ["to degree"]
+
+shift :: (Int -> TrsStrategy) -> Maybe Int -> Int -> TrsStrategy
+shift s ml u = chain [ tew (s n) | n <- [max 0 l .. max 0 u] ]
+  where l = maybe u (min u) ml
+
+matrices :: Maybe Int -> Int -> TrsStrategy
+matrices = shift mxs
+  where
+    mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny) NoGreedy
+    wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
+
+    mxs 0 = mx 1 0 <||> wg 1 0
+    mxs 1 = mx 1 1 <||> mx 2 1 <||> mx 3 1 <||> wg 2 1 <||> wg 1 1
+    mxs 2 = mx 2 2 <||> mx 3 2 <||> mx 4 2 <||> wg 2 2
+    mxs 3 = mx 3 3 <||> mx 4 3 <||> wg 3 3
+    mxs 4 = mx 4 4 <||> wg 4 4
+    mxs n = mx n n
+
+polys :: Maybe Int -> Int -> TrsStrategy
+polys = shift pxs
+  where
+    px sh res = poly' sh res UArgs URules (Just selAny) NoGreedy
+
+    pxs 0 = px (Mixed 0) NoRestrict
+    pxs 1 = px StronglyLinear NoRestrict <||> px Linear NoRestrict
+    pxs 2 = px Quadratic NoRestrict <||> px (Mixed 2) NoRestrict
+    pxs n = px (Mixed n) Restrict
+
 
 --- * simplifications ------------------------------------------------------------------------------------------------
 
@@ -189,14 +235,14 @@ toDP =
   where
     toDP' prob
       -- | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> wgOnUsable) <|> dependencyTuples
-      | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> shift) <|> dependencyTuples
+      | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> shiftt) <|> dependencyTuples
       | otherwise                    = dependencyPairs >>> try usableRules >>> try wgOnUsable
 
     partIndep prob
       | Prob.isInnermostProblem prob = decomposeIndependentSG
       | otherwise                    = linearPathAnalysis
 
-    shift = matrix' 2 1 Algebraic UArgs URules (Just $ RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules) NoGreedy
+    shiftt = matrix' 2 1 Algebraic UArgs URules (Just $ RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules) NoGreedy
     wgOnUsable = failing
 
 -- | Tries to remove leafs in the congruence graph,
