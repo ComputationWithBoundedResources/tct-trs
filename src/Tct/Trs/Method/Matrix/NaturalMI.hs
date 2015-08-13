@@ -282,10 +282,11 @@ maxNonIdMatrix dim mi =
 
 
 {- | Checks if an concrete interpretation is of left-hand-side term and right-hand-side term is strict -}
-isStrict :: MI.LinearInterpretation a Int
-         -> MI.LinearInterpretation a Int -> Bool
-isStrict (MI.LInter _ lconst) (MI.LInter _ rconst) = allGEQ && EncM.vEntry 1 lconst  > EncM.vEntry 1 rconst
-  where allGEQ = and $ zipWith (>=) (DF.toList lconst) (DF.toList rconst)
+isStrict :: MI.LinearInterpretation a Int -> MI.LinearInterpretation a Int -> Bool
+isStrict l@(MI.LInter _ lconst) r@(MI.LInter _ rconst) = isWeak l r &&  EncM.vEntry 1 lconst  > EncM.vEntry 1 rconst
+
+isWeak :: MI.LinearInterpretation a Int -> MI.LinearInterpretation a Int -> Bool
+isWeak (MI.LInter _ lconst) (MI.LInter _ rconst) = and $ zipWith (>=) (DF.toList lconst) (DF.toList rconst)
 
 
 {- | assert the matrix diagonal to be greather one iff a variable is one -}
@@ -621,13 +622,15 @@ entscheide1 p aorder encoding decoding forceAny prob
           , I.ufuns_     = maybe Set.empty UREnc.runUsableSymbols ufuns
           , I.strictDPs_ = sDPs
           , I.strictTrs_ = sTrs
-          , I.weakDPs_   = wDPs
-          , I.weakTrs_   = wTrs }
+          , I.weakDPs_   = wDPs'
+          , I.weakTrs_   = wTrs' }
           where
 
 
           (sDPs,wDPs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
           (sTrs,wTrs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
+          wDPs' = filter (uncurry isWeak . snd) wDPs
+          wTrs' = filter (uncurry isWeak . snd) wTrs
           rs trs =
             [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
             | r@(RR.Rule lhs rhs) <- Trs.toList trs
