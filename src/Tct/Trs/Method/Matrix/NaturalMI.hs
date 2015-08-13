@@ -619,7 +619,7 @@ entscheide1 p aorder encoding decoding forceAny prob
         mkOrder (inter, ufuns) = aorder { mint_ = mkInter (mint_ aorder) inter ufuns }
         mkInter aproof inter ufuns = aproof
           { I.inter_     = inter
-          , I.ufuns_     = maybe Set.empty UREnc.runUsableSymbols ufuns
+          , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
           , I.strictDPs_ = sDPs
           , I.strictTrs_ = sTrs
           , I.weakDPs_   = wDPs'
@@ -870,7 +870,7 @@ matrixCP' = CD.declFun matrixCPDeclaration
 instance PP.Pretty (MatrixOrder Int) where
   pretty order = PP.vcat
     [ PP.text "We apply a matrix interpretation of kind " PP.<> PP.pretty (kind_ order) PP.<> PP.char ':'
-    , PP.pretty $ I.prettyProof (mint_ order) ]
+    , PP.pretty $ PP.pretty (mint_ order) ]
 
 instance Xml.Xml (MatrixOrder Int) where
   toXml order = I.xmlProof (mint_ order) xtype where
@@ -1035,7 +1035,7 @@ wgEntscheide p prob = do
         { I.sig_       = sig
         , I.inter_     = mint
         , I.uargs_     = usablePositions
-        , I.ufuns_     = Set.empty
+        , I.ufuns_     = Nothing
         , I.useURules_ = False
         , I.shift_     = I.Shift $ case wgOn p of
             WgOnAny -> RS.selAnyOf RS.selStricts

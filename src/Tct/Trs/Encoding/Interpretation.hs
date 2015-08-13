@@ -9,7 +9,6 @@ module Tct.Trs.Encoding.Interpretation
 -- c) there is a (rare case) where there encoding of Greedy would change; namely if all strict trs rules are shifted to the weak; we get besser uargs
 
 import Data.Maybe (fromMaybe)
-import qualified Data.Set as S (empty)
 import           Control.Monad                      (liftM)
 import qualified Data.Foldable                      as F
 import qualified Data.Map.Strict                    as M
@@ -67,7 +66,7 @@ data InterpretationProof a b = InterpretationProof
   { sig_       :: Signature F
   , inter_     :: Interpretation F a
   , uargs_     :: UPEnc.UsablePositions F
-  , ufuns_     :: Symbols F
+  , ufuns_     :: Maybe (Symbols F)
   , useURules_ :: Bool
   , shift_     :: Shift
   , strictDPs_ :: [(R.Rule F V, (b, b))]
@@ -190,7 +189,7 @@ orient inter prob absi mselector useUP useUR = do
       { sig_       = Prob.signature prob
       , inter_     = Interpretation M.empty
       , uargs_     = uposs
-      , ufuns_     = S.empty
+      , ufuns_     = Nothing
       , useURules_ = allowUR
       , shift_     = mselector
       , strictDPs_ = []
@@ -228,7 +227,7 @@ instance (PP.Pretty a, PP.Pretty b) => PP.Pretty (InterpretationProof a b) where
           , PP.empty ]
         else PP.empty
     , PP.text "Following symbols are considered usable:"
-    , PP.indent 2 $ PP.set' (ufuns_ proof)
+    , PP.indent 2 $ maybe (PP.text "all") PP.set' (ufuns_ proof)
     , PP.text "TcT has computed the following interpretation:"
     , PP.indent 2 (PP.pretty (inter_ proof))
     , PP.empty
@@ -246,34 +245,6 @@ instance (PP.Pretty a, PP.Pretty b) => PP.Pretty (InterpretationProof a b) where
             , (PP.empty   , ppOrd        , PP.pretty rhs)
             , (PP.empty   , PP.text " = ", PP.pretty r)
             , (PP.empty   , PP.empty     , PP.empty) ]
-
-prettyProof :: (PP.Pretty a, PP.Pretty b) => InterpretationProof a b -> PP.Doc
-prettyProof proof = PP.vcat
-  [ if uargs_ proof /= UPEnc.fullWithSignature (sig_ proof)
-      then PP.vcat
-        [ PP.text "The following argument positions are considered usable:"
-        , PP.indent 2 $ PP.pretty (uargs_ proof)
-        , PP.empty ]
-      else PP.empty
-  , PP.text "Following symbols are considered usable:"
-  , PP.indent 2 $ PP.set' (ufuns_ proof)
-  , PP.text "TcT has computed the following interpretation:"
-  , PP.indent 2 (PP.pretty (inter_ proof))
-  , PP.empty
-  , PP.text "Following rules are strictly oriented:"
-  , ppproof (PP.text " > ") (strictDPs_ proof ++ strictTrs_ proof)
-  , PP.text ""
-  , PP.text "Following rules are (at-least) weakly oriented:"
-  , ppproof (PP.text " >= ") (weakDPs_ proof ++ weakTrs_ proof) ]
-  where
-    ppproof ppOrd rs = PP.table [(PP.AlignRight, as), (PP.AlignLeft, bs), (PP.AlignLeft, cs)]
-      where
-        (as,bs,cs) = unzip3 $ concatMap ppRule rs
-        ppRule (R.Rule l r,(lhs,rhs)) =
-          [ (PP.pretty l, PP.text " = ", PP.pretty lhs)
-          , (PP.empty   , ppOrd        , PP.pretty rhs)
-          , (PP.empty   , PP.text " = ", PP.pretty r)
-          , (PP.empty   , PP.empty     , PP.empty) ]
 
 
 xmlProof :: Xml.Xml a => InterpretationProof a b -> Xml.XmlContent -> Xml.XmlContent

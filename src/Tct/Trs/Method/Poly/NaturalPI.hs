@@ -176,7 +176,7 @@ entscheide1 p aorder encoding decoding forceAny prob
         mkOrder (inter, ufuns) = aorder { pint_ = mkInter (pint_ aorder) inter ufuns }
         mkInter aproof inter ufuns = aproof
           { I.inter_     = inter
-          , I.ufuns_     = maybe S.empty UREnc.runUsableSymbols ufuns
+          , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
           , I.strictDPs_ = sDPs
           , I.strictTrs_ = sTrs
           , I.weakDPs_   = wDPs
@@ -288,7 +288,7 @@ polyCP' = T.declFun polyCPDeclaration
 instance PP.Pretty (PolyOrder Int) where
   pretty order = PP.vcat
     [ PP.text "We apply a polynomial interpretation of kind " <> PP.pretty (kind_ order) <> PP.char ':'
-    , PP.pretty $ I.prettyProof (pint_ order) ]
+    , PP.pretty $ PP.pretty (pint_ order) ]
 
 instance Xml.Xml (PolyOrder Int) where
   toXml order = I.xmlProof (pint_ order) xtype where
