@@ -4,6 +4,7 @@ module Tct.Trs.Method.DP.DPGraph.PathAnalysis
   , pathAnalysis
   , pathAnalysis'
   , linearPathAnalysis
+  , quadraticPathAnalysis
   ) where
 
 -- notes:
@@ -17,7 +18,7 @@ module Tct.Trs.Method.DP.DPGraph.PathAnalysis
 -- the weak/strict dp rules of each node are collected on the path
 -- optimisation: r1 is subsumed by r2 if nodes(r1) is a subset of nodes(r2)
 
--- path analysis:
+-- quadratic path analysis:
 -- we consider all paths starting from root nodes
 -- each path constitutes to a problem, where
 -- * weak dps: consits of all rules peviously visited along the path + the weak rules of the current node
@@ -147,14 +148,17 @@ pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) path
       `T.withHelp` ["If this flag is set, linear path analysis is employed."]
       `T.optional` True
 
-pathAnalysis :: Bool -> TrsStrategy
-pathAnalysis = T.declFun pathAnalysisDeclaration
+pathAnalysis' :: Bool -> TrsStrategy
+pathAnalysis' = T.declFun pathAnalysisDeclaration
 
-pathAnalysis' :: TrsStrategy
-pathAnalysis' = T.deflFun pathAnalysisDeclaration
+pathAnalysis :: TrsStrategy
+pathAnalysis = T.deflFun pathAnalysisDeclaration
 
 linearPathAnalysis :: TrsStrategy
 linearPathAnalysis = pathAnalysisStrategy True
+
+quadraticPathAnalysis :: TrsStrategy
+quadraticPathAnalysis = pathAnalysisStrategy False
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

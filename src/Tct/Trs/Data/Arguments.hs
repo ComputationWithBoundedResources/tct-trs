@@ -42,7 +42,7 @@ import           Tct.Trs.Data
 class HasSelection p where
   withSelection :: p -> ExpressionSelector F V -> p
 
-data UsableArgs = UArgs | NoUargs
+data UsableArgs = UArgs | NoUArgs
   deriving (Bounded, Enum, Eq, Typeable, Show)
 
 instance T.SParsable i i UsableArgs where

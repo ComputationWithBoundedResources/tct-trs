@@ -1084,7 +1084,7 @@ weightGapDeclaration = CD.declare  "weightgap" wgDescription (argDim,argDeg, arg
                     , "Here 'trs' refers to all strict non-dependency-pair rules of the considered problem, "
                     , "while 'any' only demands any rule at all to be strictly oriented. "
                     , "The default value is 'trs'."]
-     `CD.optional` WgOnTrs
+     `CD.optional` WgOnAny
 
 weightgap :: TrsStrategy
 weightgap = CD.deflFun weightGapDeclaration
