@@ -59,8 +59,7 @@ options = TrsOptions
       [ (PP.text (show DC)  , PP.text "derivational complexity")
       , (PP.text (show DCI) , PP.text "derivational complexity innermost")
       , (PP.text (show RC)  , PP.text "runtime complexity")
-      , (PP.text (show RCI) , PP.text "runtime complexity innermost") ]
-    `withDefault` RCI))
+      , (PP.text (show RCI) , PP.text "runtime complexity innermost") ] ))
   <*> option' readCP (eopt
       `withArgLong` "proofOutput"
       `withCropped` 'b'
