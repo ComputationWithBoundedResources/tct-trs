@@ -52,7 +52,7 @@ parser s = case R.fromString s of
 -- | Trs specific command line options.
 options :: Options TrsOptions
 options = TrsOptions
-  <$> option' readCC (eopt
+  <$> alt (option' readCC (eopt
     `withArgLong` "complexity"
     `withCropped` 'c'
     `withHelpDoc` PP.listing
@@ -60,7 +60,7 @@ options = TrsOptions
       , (PP.text (show DCI) , PP.text "derivational complexity innermost")
       , (PP.text (show RC)  , PP.text "runtime complexity")
       , (PP.text (show RCI) , PP.text "runtime complexity innermost") ]
-    `withDefault` RCI)
+    `withDefault` RCI))
   <*> option' readCP (eopt
       `withArgLong` "proofOutput"
       `withCropped` 'b'
@@ -85,7 +85,7 @@ proofing (TrsOptions _ cp) ret = case ret of
       prover = if cp == TotalProof then totalProof else partialProof
 
 
-data TrsOptions =  TrsOptions CC CP
+data TrsOptions =  TrsOptions (Maybe CC) CP
 
 data CC = DC | DCI | RC | RCI deriving Eq
 
@@ -111,10 +111,10 @@ readCP cp
   | cp == show PartialProof = return PartialProof
   | otherwise               = fail $ "Tct.Trs.Data.Mode:" ++ cp
 
-updateCC :: CC -> TrsProblem -> TrsProblem
+updateCC :: Maybe CC -> TrsProblem -> TrsProblem
 updateCC cc = case cc of
-  DC  -> toDC . toFull
-  DCI -> toDC . toInnermost
-  RC  -> toRC . toFull
-  RCI -> toRC . toInnermost
-
+  Nothing    -> id
+  (Just DC)  -> toDC . toFull
+  (Just DCI) -> toDC . toInnermost
+  (Just RC)  -> toRC . toFull
+  (Just RCI) -> toRC . toInnermost
