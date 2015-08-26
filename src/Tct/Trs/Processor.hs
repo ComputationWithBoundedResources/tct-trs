@@ -17,6 +17,7 @@ module Tct.Trs.Processor
   -- * Strategies
   , matrices
   , polys
+  , ints
   , dpsimps
   , decomposeIndependent
   , decomposeIndependentSG
@@ -97,6 +98,7 @@ defaultDeclarations =
   -- Interpretations
   , T.SD $ T.strategy "matrices"               luArg matrices
   , T.SD $ T.strategy "polys"                  luArg polys
+  , T.SD $ T.strategy "ints"                   luArg ints
 
   -- Simplifications
   , T.SD $ T.strategy "dpsimps"                () dpsimps
@@ -142,6 +144,42 @@ selAllRules = RS.selAllOf RS.selRules
 
 --- * interpretations ------------------------------------------------------------------------------------------------
 
+mxs0,mxs1,mxs2,mxs3,mxs4 :: TrsStrategy
+mxs0 = mx 1 0 <||> wg 1 0
+mxs1 = mx 1 1 <||> mx 2 1 <||> mx 3 1 <||> wg 2 1 <||> wg 1 1
+mxs2 = mx 2 2 <||> mx 3 2 <||> mx 4 2 <||> wg 2 2
+mxs3 = mx 3 3 <||> mx 4 3 <||> wg 3 3
+mxs4 = mx 4 4 <||> wg 4 4
+
+mxs :: Int -> TrsStrategy
+mxs 0 = mxs0
+mxs 1 = mxs1
+mxs 2 = mxs2
+mxs 3 = mxs3
+mxs 4 = mxs4
+mxs n = mx n n
+
+px :: Shape -> Restrict -> TrsStrategy
+px sh res = poly' sh res UArgs URules (Just selAny) NoGreedy
+
+pxs0, pxs1, pxs2 :: TrsStrategy
+pxs0 = px (Mixed 0) NoRestrict
+pxs1 = px StronglyLinear NoRestrict <||> px Linear NoRestrict
+pxs2 = px Quadratic NoRestrict <||> px (Mixed 2) NoRestrict
+
+pxs :: Int -> TrsStrategy
+pxs 0 = pxs0
+pxs 1 = pxs1
+pxs 2 = pxs2
+pxs n = px (Mixed n) Restrict
+
+ixs :: Int -> TrsStrategy
+ixs 0 = mxs 0
+ixs 1 = mxs 1
+ixs 2 = mxs 2 <||> pxs 2
+ixs 3 = mxs 3 <||> pxs 3
+ixs n = mxs n
+
 luArg :: (Argument 'Optional (Maybe T.Nat), Argument 'Required T.Nat)
 luArg = (T.some lArg `T.optional` Nothing, uArg)
   where
@@ -152,28 +190,18 @@ shift :: (Int -> TrsStrategy) -> Maybe Int -> Int -> TrsStrategy
 shift s ml u = chain [ tew (s n) | n <- [max 0 l .. max 0 u] ]
   where l = maybe u (min u) ml
 
+mx,wg :: Int -> Int -> TrsStrategy
+mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny) NoGreedy
+wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
+
 matrices :: Maybe Int -> Int -> TrsStrategy
 matrices = shift mxs
-  where
-    mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny) NoGreedy
-    wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
-
-    mxs 0 = mx 1 0 <||> wg 1 0
-    mxs 1 = mx 1 1 <||> mx 2 1 <||> mx 3 1 <||> wg 2 1 <||> wg 1 1
-    mxs 2 = mx 2 2 <||> mx 3 2 <||> mx 4 2 <||> wg 2 2
-    mxs 3 = mx 3 3 <||> mx 4 3 <||> wg 3 3
-    mxs 4 = mx 4 4 <||> wg 4 4
-    mxs n = mx n n
 
 polys :: Maybe Int -> Int -> TrsStrategy
 polys = shift pxs
-  where
-    px sh res = poly' sh res UArgs URules (Just selAny) NoGreedy
 
-    pxs 0 = px (Mixed 0) NoRestrict
-    pxs 1 = px StronglyLinear NoRestrict <||> px Linear NoRestrict
-    pxs 2 = px Quadratic NoRestrict <||> px (Mixed 2) NoRestrict
-    pxs n = px (Mixed n) Restrict
+ints :: Maybe Int -> Int -> TrsStrategy
+ints = shift ixs
 
 
 --- * simplifications ------------------------------------------------------------------------------------------------
