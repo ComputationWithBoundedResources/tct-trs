@@ -60,8 +60,8 @@ The installation provides an executable `tct-trs`. For full options, run
 `tct-trs --help`.
 
 
-Known error codes and solutions
--------------------------------
+Known errors and possible solutions
+-----------------------------------
 
 
     Fatal error: the file '/usr/local/bin/camlidl' is not a bytecode executable file
@@ -170,3 +170,11 @@ MiniSmt.
 You need at least ghc-7.8 for TcT!
 
 
+    /usr/bin/ld: cannot find -lcamlidl
+
+ld cannot find the library camlidl. Ensure you have camlidl installed. If so
+ensure ld can find it by either adopting LD_LIBRARY_PATH or setting a symbolic
+link. To do so find the library with `find /usr/lib/ -name '*camlidl*'` and then
+link it using `ln -s
+[path-to-camlidl-library like /usr/lib/ocaml/caml/camlidlruntime.h]
+/usr/lib/camlidlruntime.h`.
