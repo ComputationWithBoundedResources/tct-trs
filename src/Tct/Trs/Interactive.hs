@@ -1,31 +1,39 @@
--- | This module extends 'Tct.Core.Interactive' with TRS specific commands.
+-- | This module re-exports 'Tct.Core.Interactive' and provide Trs specific commands.
 module Tct.Trs.Interactive
-  ( loadDC
+  ( module M
+
+  , loadTrs
+  , loadDC
   , loadRC
-  , loadIDC
-  , loadIRC
+  , loadDCI
+  , loadRCI
 
   , wdg
   ) where
 
 
-import           Tct.Core.Interactive
-import qualified Tct.Core.Main        as T
+import Control.Applicative 
 import qualified Tct.Core.Common.Pretty as PP
+import           Tct.Core.Interactive   as M
+import qualified Tct.Core.Main          as T
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.Problem as Prob
+import           Tct.Trs.Data.Mode      (trsConfig)
+import qualified Tct.Trs.Data.Problem   as Prob
 
 
-loadX :: T.TctMode TrsProblem TrsProblem o -> FilePath -> (TrsProblem -> TrsProblem) -> IO ()
-loadX tm f k = load tm f >> modifyProblem k >> state
+loadX :: (TrsProblem -> TrsProblem) -> FilePath -> IO ()
+loadX k fp = load parse fp >> printState
+  where parse fp' = fmap k <$> T.parseProblem trsConfig fp'
 
-loadDC, loadIDC, loadRC, loadIRC :: T.TctMode TrsProblem TrsProblem o -> FilePath -> IO ()
-loadDC tm f  = loadX tm f (Prob.toDC . Prob.toFull)
-loadIDC tm f = loadX tm f (Prob.toDC . Prob.toInnermost)
-loadRC tm f  = loadX tm f (Prob.toRC . Prob.toFull)
-loadIRC tm f = loadX tm f (Prob.toRC . Prob.toInnermost)
+-- | Load a Trs problem. Uses the parser defined in 'trsConfig'.
+loadTrs, loadDC, loadDCI, loadRC, loadRCI :: FilePath -> IO ()
+loadTrs = loadX id
+loadDC  = loadX (Prob.toDC . Prob.toFull)
+loadDCI = loadX (Prob.toDC . Prob.toInnermost)
+loadRC  = loadX (Prob.toRC . Prob.toFull)
+loadRCI = loadX (Prob.toRC . Prob.toInnermost)
 
 wdg :: IO ()
-wdg = onProblem $ PP.putPretty . (Prob.dependencyGraph :: TrsProblem -> DG F V)
+wdg = onProblems $ PP.putPretty . (Prob.dependencyGraph :: TrsProblem -> DG F V)
 
