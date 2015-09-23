@@ -2,6 +2,7 @@
 module Tct.Trs.Data 
   ( module M 
   , TrsStrategy
+  , TrsDeclaration
   ) where
 
 
@@ -18,5 +19,9 @@ import Tct.Trs.Data.Precedence      as M (Order, Precedence)
 
 import qualified Tct.Core.Data      as T
 
-type TrsStrategy = T.Strategy TrsProblem TrsProblem
+-- | Specified strategy type for Trs.
+type TrsStrategy    = T.Strategy TrsProblem TrsProblem
+
+-- | Specified declaration for Trs.
+type TrsDeclaration = T.StrategyDeclaration TrsProblem TrsProblem
 

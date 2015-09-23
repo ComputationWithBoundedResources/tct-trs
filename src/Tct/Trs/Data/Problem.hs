@@ -49,7 +49,7 @@ import           Control.Applicative          ((<|>))
 import qualified Data.Set                     as S
 import           Data.Typeable
 
-import qualified Data.Rewriting.Problem       as R hiding (map)
+import qualified Data.Rewriting.Problem       as R
 import qualified Data.Rewriting.Rule          as R (Rule (..))
 import qualified Data.Rewriting.Term          as R
 
