@@ -1,5 +1,5 @@
 name:          tct-trs
-version:       3.0.0
+version:       3.1.0
 stability:     experimental
 author:
   Martin Avanzini, Andreas Kochesser, Georg Moser, Michael Schaper, Maria Schett
@@ -26,9 +26,9 @@ source-repository head
 
 executable tct-trs
   main-is:
-    Tct/Trs/Main.hs
+    Main.hs
   hs-source-dirs:
-    src
+    exe
   build-depends:
     array              == 0.5.*,
     bytestring         >= 0.10.4 && < 0.10.7,
@@ -45,8 +45,8 @@ executable tct-trs
 
     slogic             == 0.*,
     tct-common         == 3.*,
-    tct-core           == 3.*,
-    tct-trs            == 3.*
+    tct-core           == 3.1.*,
+    tct-trs            == 3.1.*
 
   extensions:
     ConstraintKinds,
@@ -86,6 +86,7 @@ library
     Tct.Trs.Data.Signature
     Tct.Trs.Data.Symbol
     Tct.Trs.Data.Trs
+    Tct.Trs.Declarations
     Tct.Trs.Encoding.ArgumentFiltering
     Tct.Trs.Encoding.Bounds.Automata
     Tct.Trs.Encoding.Bounds.Violations
@@ -114,11 +115,14 @@ library
     Tct.Trs.Method.Empty
     Tct.Trs.Method.EpoStar
     Tct.Trs.Method.InnermostRuleRemoval
-    Tct.Trs.Method.Poly.NaturalPI
     Tct.Trs.Method.Matrix.NaturalMI
+    Tct.Trs.Method.Poly.NaturalPI
     Tct.Trs.Method.ToInnermost
     Tct.Trs.Method.WithCertification
-    Tct.Trs.Processor
+    Tct.Trs.Processors
+    Tct.Trs.Strategy.Certify
+    Tct.Trs.Strategy.Runtime
+    Tct.Trs.Strategy.Derivational
   build-depends:
     array              == 0.5.*,
     base               == 4.*,
@@ -136,7 +140,7 @@ library
 
     slogic             == 0.*,
     tct-common         == 3.*,
-    tct-core           == 3.*
+    tct-core           == 3.1.*
 
   ghc-options:
     -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
