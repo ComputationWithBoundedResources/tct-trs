@@ -49,7 +49,7 @@ import           Control.Applicative          ((<|>))
 import qualified Data.Set                     as S
 import           Data.Typeable
 
-import qualified Data.Rewriting.Problem       as R
+import qualified Data.Rewriting.Problem       as RP
 import qualified Data.Rewriting.Rule          as R (Rule (..))
 import qualified Data.Rewriting.Term          as R
 
@@ -143,18 +143,18 @@ type TrsProblem = Problem F V
 -- the current implementation is not designed to deal with them; we catch them in 'fromRewriting'
 
 -- | Transforms a 'Data.Rewriting.Problem' into a 'TrsProblem'.
-fromRewriting :: R.Problem String String -> Either String TrsProblem
+fromRewriting :: RP.Problem String String -> Either String TrsProblem
 fromRewriting prob =
   if Trs.isWellformed sTrs && Trs.isWellformed wTrs
     then
       Right Problem
-        { startTerms   = case R.startTerms prob of
-            R.AllTerms   -> AllTerms (defs `S.union` cons)
-            R.BasicTerms -> BasicTerms defs cons
-        , strategy = case R.strategy prob of
-            R.Innermost -> Innermost
-            R.Full      -> Full
-            R.Outermost -> Outermost
+        { startTerms   = case RP.startTerms prob of
+            RP.AllTerms   -> AllTerms (defs `S.union` cons)
+            RP.BasicTerms -> BasicTerms defs cons
+        , strategy = case RP.strategy prob of
+            RP.Innermost -> Innermost
+            RP.Full      -> Full
+            RP.Outermost -> Outermost
         , signature  = sig
 
         , strictDPs  = Trs.empty
@@ -167,8 +167,8 @@ fromRewriting prob =
       Left "problem not wellformed."
   where
     toFun (R.Rule l r) = let k = R.map Symb.fun Symb.var in R.Rule (k l) (k r)
-    sTrs = Trs.fromList . map toFun $ R.strictRules (R.rules prob)
-    wTrs = Trs.fromList . map toFun $ R.weakRules (R.rules prob)
+    sTrs = Trs.fromList . map toFun $ RP.strictRules (RP.rules prob)
+    wTrs = Trs.fromList . map toFun $ RP.weakRules (RP.rules prob)
     trs  = sTrs `Trs.union` wTrs
 
     sig  = Trs.signature trs
