@@ -38,7 +38,7 @@ instance T.Processor ToInnermost where
   type I ToInnermost           = TrsProblem
   type O ToInnermost           = TrsProblem
   solve p prob = return . T.resultToTree p prob $
-    maybe ti (T.Fail . Inapplicable) (maybeApplicable)
+    maybe ti (T.Fail . Inapplicable) maybeApplicable
     where
        ti
           -- no progress if prob is already innermost

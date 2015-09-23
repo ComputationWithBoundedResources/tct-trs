@@ -115,7 +115,7 @@ instance T.Processor DependencyPairs where
       maybeApplicable =
         Prob.isRCProblem' prob
         <|> Prob.note (not . Trs.null $ Prob.dpComponents prob) " already contains dependency paris"
-        -- <|> if useTuples then Prob.isInnermostProblem' prob else Nothing
+        -- .<|> if useTuples then Prob.isInnermostProblem' prob else Nothing
 
       dpKind
         | Prob.strategy prob == Prob.Innermost = dpKind_ p

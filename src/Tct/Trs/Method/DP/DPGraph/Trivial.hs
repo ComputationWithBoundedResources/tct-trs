@@ -13,7 +13,7 @@ module Tct.Trs.Method.DP.DPGraph.Trivial
   ) where
 
 
-import           Tct.Core                     ((>>>))
+import           Tct.Core                     ((.>>>))
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
 import qualified Tct.Core.Data                as T
@@ -58,7 +58,7 @@ instance T.Processor Trivial where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 trivialStrategy :: TrsStrategy
-trivialStrategy = T.toStrategy Trivial >>> E.empty
+trivialStrategy = T.toStrategy Trivial .>>> E.empty
 
 -- | Checks whether the DP problem is trivial, i.e., does not contain any cycles.
 --

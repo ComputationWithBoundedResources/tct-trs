@@ -78,12 +78,12 @@ withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, T
       `T.withDomain` fmap show [(minBound :: TotalProof)..]
 
 -- | 
--- > withCertification (dependencyTuples >>> matrix >>> empty)
--- > dependencyPairs' WIDP >>> withCertification (matrix >>> empty)
+-- > withCertification (dependencyTuples .>>> matrix .>>> empty)
+-- > dependencyPairs' WIDP .>>> withCertification (matrix .>>> empty)
 withCertification :: TrsStrategy -> TrsStrategy
 withCertification = T.deflFun withCertificationDeclaration
 
--- | > (withCertification' PartialProof dependencyTuples) >>> matrix >>> empty
+-- | > (withCertification' PartialProof dependencyTuples) .>>> matrix >>> empty
 withCertification' :: TotalProof -> TrsStrategy -> TrsStrategy
 withCertification' = T.declFun withCertificationDeclaration
 
