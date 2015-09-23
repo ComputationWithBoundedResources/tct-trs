@@ -71,7 +71,7 @@ trsConfig = defaultTctConfig parserIO
     , ":module +Tct.Trs.Interactive"]
 
 -- | Trs specific command line arguments.
-data TrsOptions =  TrsOptions (Maybe CC) CP
+data TrsOptions =  TrsOptions (Maybe CC) (Maybe CP)
 
 -- | Trs specific command line options.
 trsOptions :: Options TrsOptions
@@ -83,12 +83,11 @@ trsOptions = TrsOptions
       , (PP.text (show DCI) , PP.text "derivational complexity innermost")
       , (PP.text (show RC)  , PP.text "runtime complexity")
       , (PP.text (show RCI) , PP.text "runtime complexity innermost") ] ))
-  <*> option' readCP (eopt
+  <*> alt (option' readCP (eopt
       `withArgLong` "ceta"
       `withHelpDoc` PP.listing
         [ (PP.text (show TotalProof)   , PP.text "outputs the proof in the CeTA format")
-        , (PP.text (show PartialProof) , PP.text "outputs the proof in the CeTA (partial) format") ]
-      `withDefault` TotalProof)
+        , (PP.text (show PartialProof) , PP.text "outputs the proof in the CeTA (partial) format") ]))
 
 data CC = DC | DCI | RC | RCI deriving Eq
 
@@ -119,10 +118,10 @@ readCP cp
 -- Updates the parsed problem if a @complexity@ argument is set.
 -- Updates the proof output if the @proofOUtput@ argument is set.
 trsUpdate :: TrsConfig -> TrsOptions -> TrsConfig
-trsUpdate cfg (TrsOptions ccM cp) = setParseProblem $ setPutProof cfg
+trsUpdate cfg (TrsOptions ccM cpM) = setParseProblem $ setPutProof cfg
   where
     setParseProblem cfg' = cfg' { parseProblem = \fp -> fmap (updateCC ccM) <$> parseProblem cfg' fp }
-    setPutProof cfg'     = cfg' { putProof     = proofing }
+    setPutProof cfg'     = cfg' { putProof     = proofing cpM }
 
     updateCC cc = case cc of
       Nothing    -> id
@@ -130,12 +129,14 @@ trsUpdate cfg (TrsOptions ccM cp) = setParseProblem $ setPutProof cfg
       (Just DCI) -> toDC . toInnermost
       (Just RC)  -> toRC . toFull
       (Just RCI) -> toRC . toInnermost
-    proofing ret = case ret of
-      T.Halt _  -> PP.putPretty $ PP.text "MAYBE"
-      r         -> case prover pt of
-        Left s    -> print s
-        Right xml -> Xml.putXml xml
-        where
-          pt     = T.fromReturn r
-          prover = if cp == TotalProof then totalProof else partialProof
+    proofing cp ret = case cp of
+      Nothing  -> putProof cfg ret
+      Just cp' -> case ret of
+        T.Halt _  -> PP.putPretty $ PP.text "MAYBE"
+        r         -> case prover pt of
+          Left s    -> print s
+          Right xml -> Xml.putXml xml
+          where
+            pt     = T.fromReturn r
+            prover = if cp' == TotalProof then totalProof else partialProof
 
