@@ -1,12 +1,18 @@
-module Tct.Trs.Processor
+{-# LANGUAGE DeriveDataTypeable #-}
+module Tct.Trs.Processors
   ( module M
 
-  , defaultDeclarations
+  -- * Arguments
+  , Degree
+  , degreeArg
+  , boundedArgs
+  , timeoutArg
+  , CombineWith (..)
+  , combineWithArg
 
   -- * Abbreviations
-  , degreeArg
-  , (>>!)
-  , (>>!!)
+  , (.>>!)
+  , (.>>!!)
   , successive
   , whenNonTrivial
   , tew
@@ -14,7 +20,7 @@ module Tct.Trs.Processor
   , selAnyRule
   , selAllRules
 
-  -- * Strategies
+  -- * Basic Strategies
   , matrices
   , polys
   , ints
@@ -26,9 +32,11 @@ module Tct.Trs.Processor
   , removeLeaf
   ) where
 
+import           Data.Typeable
 
 import           Tct.Core
 import qualified Tct.Core.Data                                   as T
+import qualified Tct.Core.Common.Parser       as P
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.DependencyGraph                    as DG
@@ -37,10 +45,9 @@ import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.Trs                                as Trs
 
-import qualified Tct.Trs.Method.ComplexityPair                   as CP
-
 import           Tct.Trs.Method.Bounds                           as M
 import           Tct.Trs.Method.Decompose                        as M
+import           Tct.Trs.Method.ComplexityPair                   as M
 import           Tct.Trs.Method.DP.DependencyPairs               as M
 import           Tct.Trs.Method.DP.DPGraph.DecomposeDG           as M
 import           Tct.Trs.Method.DP.DPGraph.PathAnalysis          as M
@@ -60,63 +67,40 @@ import           Tct.Trs.Method.ToInnermost                      as M
 import           Tct.Trs.Method.WithCertification                as M
 
 
-defaultDeclarations :: [T.StrategyDeclaration TrsProblem TrsProblem]
-defaultDeclarations =
-  [ T.SD emptyDeclaration
-  , T.SD withCertificationDeclaration
+type Degree = Int
 
-  , T.SD decomposeDeclaration
-  , T.SD decomposeCPDeclaration
-
-  , T.SD boundsDeclaration
-
-  , T.SD innermostRuleRemovalDeclaration
-  , T.SD toInnermostDeclaration
-
-  -- Path Orders
-  , T.SD epoStarDeclaration
-
-  -- Semantic
-  , T.SD polyDeclaration
-  , T.SD matrixDeclaration
-  , T.SD weightGapDeclaration
-
-  -- DP
-  , T.SD dependencyPairsDeclaration
-  , T.SD usableRulesDeclaration
-
-  -- DP graph
-  , T.SD decomposeDGDeclaration
-  , T.SD pathAnalysisDeclaration
-  , T.SD predecessorEstimationDeclaration
-  , T.SD removeHeadsDeclaration
-  , T.SD removeInapplicableDeclaration
-  , T.SD removeWeakSuffixesDeclaration
-  , T.SD simplifyRHSDeclaration
-  , T.SD trivialDeclaration
-
-  -- Interpretations
-  , T.SD $ T.strategy "matrices"               luArg matrices
-  , T.SD $ T.strategy "polys"                  luArg polys
-  , T.SD $ T.strategy "ints"                   luArg ints
-
-  -- Simplifications
-  , T.SD $ T.strategy "dpsimps"                () dpsimps
-  , T.SD $ T.strategy "cleanSuffix"            () cleanSuffix
-  , T.SD $ T.strategy "decomposeIndependent"   () decomposeIndependent
-  , T.SD $ T.strategy "decomposeIndependentSG" () decomposeIndependentSG
-  , T.SD $ T.strategy "toDP"                   () toDP
-  , T.SD $ T.strategy "removeLeaf"             (OneTuple CP.complexityPairArg) removeLeaf
-  ]
-
+-- | Argument for degree. @:degree nat@
 degreeArg :: Argument 'Required T.Nat
-degreeArg = nat `withName` "degree" `withHelp` ["max degree"]
+degreeArg = nat `withName` "degree" `withHelp` ["set max degree"]
 
-(>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
-s1 >>! s2 = s1 >>> try empty >>> s2
+-- | Arguments for bounded degrees. @:form nat :to nat@
+boundedArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat)
+boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
+  where
+    lArg = nat `withName` "from" `withHelp` ["from degree"]
+    uArg = nat `withName` "to"   `withHelp` ["to degree"]
 
-(>>!!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
-s1 >>!! s2 = s1 >>> try empty >||> s2
+-- | Argument for timeout. @:timeout nat@
+timeoutArg :: Argument 'Required T.Nat
+timeoutArg = nat `withName` "timeout" `withHelp` ["set a timeout"]
+
+-- | Parsable Flag. Usually used to dynamically select 'fastest' or 'best' combinator.
+data CombineWith = Best | Fastest    deriving (Show, Enum, Bounded, Typeable)
+instance T.SParsable i i CombineWith where parseS = P.enum
+
+-- | Argument for combine. @comine <Best|Fastest>@
+combineWithArg :: Argument 'Required a
+combineWithArg = T.arg
+  `withName` "combineWith"
+  `T.withDomain` fmap show [(minBound :: CombineWith) ..]
+  `withHelp` ["combine with"]
+
+
+(.>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
+s1 .>>! s2 = s1 .>>> try empty .>>> s2
+
+(.>>!!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
+s1 .>>!! s2 = s1 .>>> try empty .>||> s2
 
 successive :: [TrsStrategy] -> TrsStrategy
 successive = chainWith (try empty)
@@ -145,11 +129,11 @@ selAllRules = RS.selAllOf RS.selRules
 --- * interpretations ------------------------------------------------------------------------------------------------
 
 mxs0,mxs1,mxs2,mxs3,mxs4 :: TrsStrategy
-mxs0 = mx 1 0 <||> wg 1 0
-mxs1 = mx 1 1 <||> mx 2 1 <||> mx 3 1 <||> wg 2 1 <||> wg 1 1
-mxs2 = mx 2 2 <||> mx 3 2 <||> mx 4 2 <||> wg 2 2
-mxs3 = mx 3 3 <||> mx 4 3 <||> wg 3 3
-mxs4 = mx 4 4 <||> wg 4 4
+mxs0 = mx 1 0 .<||> wg 1 0
+mxs1 = mx 1 1 .<||> mx 2 1 .<||> mx 3 1 .<||> wg 2 1 .<||> wg 1 1
+mxs2 = mx 2 2 .<||> mx 3 2 .<||> mx 4 2 .<||> wg 2 2
+mxs3 = mx 3 3 .<||> mx 4 3 .<||> wg 3 3
+mxs4 = mx 4 4 .<||> wg 4 4
 
 mxs :: Int -> TrsStrategy
 mxs 0 = mxs0
@@ -164,8 +148,8 @@ px sh res = poly' sh res UArgs URules (Just selAny) NoGreedy
 
 pxs0, pxs1, pxs2 :: TrsStrategy
 pxs0 = px (Mixed 0) NoRestrict
-pxs1 = px StronglyLinear NoRestrict <||> px Linear NoRestrict
-pxs2 = px Quadratic NoRestrict <||> px (Mixed 2) NoRestrict
+pxs1 = px StronglyLinear NoRestrict .<||> px Linear NoRestrict
+pxs2 = px Quadratic NoRestrict .<||> px (Mixed 2) NoRestrict
 
 pxs :: Int -> TrsStrategy
 pxs 0 = pxs0
@@ -176,31 +160,27 @@ pxs n = px (Mixed n) Restrict
 ixs :: Int -> TrsStrategy
 ixs 0 = mxs 0
 ixs 1 = mxs 1
-ixs 2 = mxs 2 <||> pxs 2
-ixs 3 = mxs 3 <||> pxs 3
+ixs 2 = mxs 2 .<||> pxs 2
+ixs 3 = mxs 3 .<||> pxs 3
 ixs n = mxs n
 
-luArg :: (Argument 'Optional (Maybe T.Nat), Argument 'Required T.Nat)
-luArg = (T.some lArg `T.optional` Nothing, uArg)
-  where
-    lArg = nat `withName` "from" `withHelp` ["from degree"]
-    uArg = nat `withName` "to"   `withHelp` ["to degree"]
+shift :: (Degree -> TrsStrategy) -> Degree -> Degree -> TrsStrategy
+shift s l u = chain [ tew (s n) | n <- [max 0 (min l u)..max 0 u] ]
 
-shift :: (Int -> TrsStrategy) -> Maybe Int -> Int -> TrsStrategy
-shift s ml u = chain [ tew (s n) | n <- [max 0 l .. max 0 u] ]
-  where l = maybe u (min u) ml
-
-mx,wg :: Int -> Int -> TrsStrategy
+mx,wg :: Degree -> Degree -> TrsStrategy
 mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny) NoGreedy
 wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
 
-matrices :: Maybe Int -> Int -> TrsStrategy
+-- | Like 'ints' but applies only matrix interpretations.
+matrices :: Degree -> Degree -> TrsStrategy
 matrices = shift mxs
 
-polys :: Maybe Int -> Int -> TrsStrategy
+-- | Like 'ints' but applies only polynomial interpretations.
+polys :: Degree -> Degree -> TrsStrategy
 polys = shift pxs
 
-ints :: Maybe Int -> Int -> TrsStrategy
+-- | Applies a selection of interpretations, depending on the given lower and uppper bound.
+ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
 
 
@@ -210,11 +190,11 @@ ints = shift ixs
 dpsimps :: TrsStrategy
 dpsimps = force $
   try cleanSuffix
-  >>> te removeHeads
-  >>> te removeInapplicable
-  >>> try simplifyRHS
-  >>> try usableRules
-  >>> try trivial
+  .>>> te removeHeads
+  .>>> te removeInapplicable
+  .>>> try simplifyRHS
+  .>>> try usableRules
+  .>>> try trivial
 
 -- | Use 'predecessorEstimationOn' and 'removeWeakSuffixes' to remove leafs from the dependency graph.
 -- If successful, right-hand sides of dependency pairs are simplified ('simplifyRHS')
@@ -222,7 +202,7 @@ dpsimps = force $
 cleanSuffix :: TrsStrategy
 cleanSuffix = force $
   te (predecessorEstimation sel)
-  >>> try (removeWeakSuffixes >>> try (simplifyRHS >>> try usableRules))
+  .>>> try (removeWeakSuffixes .>>> try (simplifyRHS .>>> try usableRules))
   where
     sel = RS.selAllOf (RS.selFromWDG f) { RS.rsName = "simple predecessor estimation selector" }
     f wdg = Prob.emptyRuleSet { Prob.sdps = Trs.fromList rs }
@@ -235,36 +215,36 @@ cleanSuffix = force $
 decomposeIndependent :: TrsStrategy
 decomposeIndependent =
   decompose' (RS.selAllOf RS.selIndependentSG) RelativeAdd
-  >>> try simplifyRHS
-  >>> try cleanSuffix
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
 
 -- | Similar to 'decomposeIndependent', but in the computation of the independent sets,
 -- dependency pairs above cycles in the dependency graph are not taken into account.
 decomposeIndependentSG :: TrsStrategy
 decomposeIndependentSG =
   decompose' (RS.selAllOf RS.selCycleIndependentSG) RelativeAdd
-  >>> try simplifyRHS
-  >>> try cleanSuffix
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
 
 -- | Tries dependency pairs for RC, and dependency pairs with weightgap, otherwise uses dependency tuples for IRC.
 -- Simpifies the resulting DP problem as much as possible.
 toDP :: TrsStrategy
 toDP =
   try (withProblem toDP')
-  >>> try usableRules
-  >>> try removeInapplicable
-  >>> try cleanSuffix
-  >>> te removeHeads
-  >>> try usableRules
-  >>> te (withProblem partIndep)
-  >>> try cleanSuffix
-  >>> try trivial
-  >>> try usableRules
+  .>>> try usableRules
+  .>>> try removeInapplicable
+  .>>> try cleanSuffix
+  .>>> te removeHeads
+  .>>> try usableRules
+  .>>> te (withProblem partIndep)
+  .>>> try cleanSuffix
+  .>>> try trivial
+  .>>> try usableRules
   where
     toDP' prob
-      -- | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> wgOnUsable) <|> dependencyTuples
-      | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs >>> try usableRules >>> shiftt) <|> dependencyTuples
-      | otherwise                    = dependencyPairs >>> try usableRules >>> try wgOnUsable
+      -- | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs .>>> try usableRules >>> wgOnUsable) .<|> dependencyTuples
+      | Prob.isInnermostProblem prob = timeoutIn 7 (dependencyPairs .>>> try usableRules .>>> shiftt) .<|> dependencyTuples
+      | otherwise                    = dependencyPairs .>>> try usableRules .>>> try wgOnUsable
 
     partIndep prob
       | Prob.isInnermostProblem prob = decomposeIndependentSG
@@ -280,8 +260,8 @@ toDP =
 removeLeaf :: ComplexityPair -> T.Strategy TrsProblem TrsProblem
 removeLeaf cp =
   predecessorEstimationCP anyStrictLeaf cp
-  >>> try (removeWeakSuffixes >>> try simplifyRHS)
-  >>> try usableRules
-  >>> try trivial
+  .>>> try (removeWeakSuffixes .>>> try simplifyRHS)
+  .>>> try usableRules
+  .>>> try trivial
   where anyStrictLeaf = RS.selAnyOf $ RS.selLeafCDG `RS.selInter` RS.selStricts
 
