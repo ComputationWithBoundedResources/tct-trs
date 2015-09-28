@@ -39,10 +39,10 @@ dcfast =
     , composition ]
   where
 
-  withMini = withSolver "minismt" ["-m", "-v2", "-neg", "-ib", "8", "-ob", "10"]
-  combine = best cmpTimeUB
-  ideg    = 4
-  mdeg    = 6
+  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "8", "-ob", "10"])
+  combine  = best cmpTimeUB
+  ideg     = 4
+  mdeg     = 6
 
   basics          = fastest $ timeoutIn 5 matchbounds : [ mx' d d | d <- [succ ideg .. mdeg] ]
   -- interpretations = tew . fastest $ [ mx d d | d <- [1 .. ideg] ] ++ [ wg d d | d <- [1 .. ideg] ] -- ++ [ whenSRS (withMini $ mx 1 1 <||> mx 2 2) ]

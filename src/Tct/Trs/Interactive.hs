@@ -12,13 +12,13 @@ module Tct.Trs.Interactive
   ) where
 
 
-import Control.Applicative 
+import           Control.Applicative
 import qualified Tct.Core.Common.Pretty as PP
 import           Tct.Core.Interactive   as M
 import qualified Tct.Core.Main          as T
 
+import           Tct.Trs.Config         (trsConfig)
 import           Tct.Trs.Data
-import           Tct.Trs.Data.Mode      (trsConfig)
 import qualified Tct.Trs.Data.Problem   as Prob
 
 

@@ -8,7 +8,7 @@ The configuration is meant to work with 'Tct.Core.Main.tct3'
     * this argument overrides the complexity problem returned by the parser
   * provides @--ceta <total|partial>@ argument to set the complexity problem
 -}
-module Tct.Trs.Data.Mode
+module Tct.Trs.Config
   (
   trs
   -- * Problem parser
@@ -22,6 +22,8 @@ module Tct.Trs.Data.Mode
   , trsOptions
   -- * Trs update hook
   , trsUpdate
+  -- * Runtime Options
+  , setSolver
   ) where
 
 
@@ -69,6 +71,15 @@ trsConfig = defaultTctConfig parserIO
   `appendGHCiScript`
     [ ":module +Tct.Trs.Processors"
     , ":module +Tct.Trs.Interactive"]
+
+
+-- | Set solver.
+-- Only works if a Processor uses 'Tct.Common.SMT.smtSolveTctM'.
+--
+-- > setSolver cfg ("z3",[])
+-- > setSolver cfg ("minismt",["-neg"])
+setSolver :: TrsConfig -> (String, [String]) -> TrsConfig
+setSolver cfg (cmd,args) = addRuntimeOption cfg "solver" (cmd:args)
 
 -- | Trs specific command line arguments.
 data TrsOptions =  TrsOptions (Maybe CC) (Maybe CP)
