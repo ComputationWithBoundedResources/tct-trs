@@ -64,16 +64,16 @@ data PathAnalysisProof
 
 instance T.Processor PathAnalysis where
   type ProofObject PathAnalysis = ApplicationProof PathAnalysisProof
-  type I PathAnalysis           = TrsProblem
-  type O PathAnalysis           = TrsProblem
+  type In PathAnalysis          = TrsProblem
+  type Out PathAnalysis         = TrsProblem
   type Forking PathAnalysis     = []
 
-  solve p prob =  return . T.resultToTree p prob $
-    maybe computePaths (T.Fail . Inapplicable) (Prob.isDPProblem' prob)
+  execute p prob = 
+    maybe computePaths (\s -> T.abortWith $ (Inapplicable s :: ApplicationProof PathAnalysisProof)) (Prob.isDPProblem' prob)
     where
       computePaths
-        | null (drop 1 paths) = T.Fail (Applicable PathAnalysisFail)
-        | otherwise           = T.Success (map nprob probPaths) (Applicable proof) (foldl add (T.timeUBCert T.linear))
+        | null (drop 1 paths) = T.abortWith (Applicable PathAnalysisFail)
+        | otherwise           = T.succeedWith (Applicable proof) (foldl add (T.timeUBCert T.linear)) (map nprob probPaths) 
         where
 
           wdg = Prob.dependencyGraph prob
@@ -137,7 +137,7 @@ walkFromQ cdg root = walkFromQ' [] Prob.emptyRuleSet root where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 pathAnalysisStrategy :: Bool -> TrsStrategy
-pathAnalysisStrategy b = T.Proc $ PathAnalysis { onlyLinear=b }
+pathAnalysisStrategy b = T.Apply $ PathAnalysis { onlyLinear=b }
 
 pathAnalysisDeclaration :: T.Declaration ('[T.Argument 'T.Optional Bool] T.:-> TrsStrategy)
 pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) pathAnalysisStrategy

@@ -73,28 +73,29 @@ certfn (T.Pair (c1,c2)) = zero { T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.tim
 
 instance T.Processor DecomposeDG where
   type ProofObject DecomposeDG = ApplicationProof DecomposeDGProof
-  type I DecomposeDG           = TrsProblem
-  type O DecomposeDG           = TrsProblem
+  type In DecomposeDG          = TrsProblem
+  type Out DecomposeDG         = TrsProblem
   type Forking DecomposeDG     = T.Pair
 
-  solve p prob = do
-    maybe decomposition (return . T.resultToTree p prob . T.Fail . Inapplicable) (Prob.isDPProblem' prob)
-    where
-      decomposition
-        | Trs.null initialDPs             = failx (Applicable $ DecomposeDGFail "no rules were selected")
-        | not (any isCut unselectedNodes) = failx (Applicable $ DecomposeDGFail "no rule was cut")
-        | prob `isSubsetDP` lowerProb     = failx (Applicable $ DecomposeDGFail "lower component not simpler")
-        | otherwise                       = do
-          upperProof <- mapply (onUpper p) upperProb
-          lowerProof <- mapply (onLower p) lowerProb
-          case (lowerProof,upperProof) of
-            (lpt, rpt)
-              | T.isContinuing lpt && T.isContinuing rpt
-                          -> return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn rpt, T.fromReturn lpt))
-              | otherwise -> failx (Applicable $ DecomposeDGFail "a strategy failed")
+  execute p prob = undefined -- do
+    -- maybe decomposition (return . T.resultToTree p prob . T.Fail . Inapplicable) (Prob.isDPProblem' prob)
+    -- where
+    --   decomposition
+    --     | Trs.null initialDPs             = failx (Applicable $ DecomposeDGFail "no rules were selected")
+    --     | not (any isCut unselectedNodes) = failx (Applicable $ DecomposeDGFail "no rule was cut")
+    --     | prob `isSubsetDP` lowerProb     = failx (Applicable $ DecomposeDGFail "lower component not simpler")
+    --     | otherwise                       = do
+    --       upperProof <- mapply (onUpper p) upperProb
+    --       lowerProof <- mapply (onLower p) lowerProb
+    --       undefined -- MS:TODO
+          -- case (lowerProof,upperProof) of
+          --   (lpt, rpt)
+          --     | T.isContinuing lpt && T.isContinuing rpt
+          --                 -> return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn rpt, T.fromReturn lpt))
+          --     | otherwise -> failx (Applicable $ DecomposeDGFail "a strategy failed")
         where
-          failx              = return . T.resultToTree p prob . T.Fail
-          mapply s pr        = maybe (return . T.Continue $ T.Open pr) (flip T.evaluate pr) s
+          -- failx              = return . T.resultToTree p prob . T.Fail
+          -- mapply s pr        = maybe (return . T.Continue $ T.Open pr) (flip T.evaluate pr) s
           p1 `isSubsetDP` p2 = Prob.strictDPs p1 `Trs.isSubset` Prob.strictDPs p2 && Prob.weakDPs p1 `Trs.isSubset` Prob.weakDPs p2
 
           wdg = Prob.dependencyGraph prob
@@ -253,7 +254,7 @@ decomposeDGDeclaration :: T.Declaration (
    , T.Argument 'T.Optional (Maybe TrsStrategy)
    , T.Argument 'T.Optional (Maybe TrsStrategy) ]
   T.:-> TrsStrategy)
-decomposeDGDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) (\x y z -> T.Proc (decomposeDGProcessor x y z))
+decomposeDGDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) (\x y z -> T.Apply (decomposeDGProcessor x y z))
 
 decomposeDG :: ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy -> TrsStrategy
 decomposeDG = T.declFun decomposeDGDeclaration

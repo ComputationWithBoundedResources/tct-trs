@@ -35,15 +35,16 @@ data ToInnermostProof
 -- trs is not rightlinear, not overlay or contains weak components
 instance T.Processor ToInnermost where
   type ProofObject ToInnermost = ApplicationProof ToInnermostProof
-  type I ToInnermost           = TrsProblem
-  type O ToInnermost           = TrsProblem
-  solve p prob = return . T.resultToTree p prob $
-    maybe ti (T.Fail . Inapplicable) maybeApplicable
+  type In  ToInnermost         = TrsProblem
+  type Out ToInnermost         = TrsProblem
+
+  execute ToInnermost prob =
+    maybe ti (\s -> T.abortWith (Inapplicable s :: ApplicationProof ToInnermostProof)) maybeApplicable
     where
        ti
           -- no progress if prob is already innermost
-          | Prob.isInnermostProblem prob = T.Fail (Applicable IsAlreadyInnermost)
-          | otherwise                    = T.Success (T.toId (Prob.toInnermost prob)) (Applicable ToInnermostSuccess) T.fromId
+          | Prob.isInnermostProblem prob = T.abortWith (Applicable IsAlreadyInnermost)
+          | otherwise                    = T.succeedWith1 (Applicable ToInnermostSuccess) T.fromId (Prob.toInnermost prob)
        maybeApplicable =
          Trs.isRightLinear' (Prob.allComponents prob)
          <|>
@@ -60,7 +61,7 @@ description =
   ["Switches to innermost rewriting for overlay and right linear input."]
 
 toInnermostDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-toInnermostDeclaration = T.declare "toInnermost" description () (T.Proc ToInnermost)
+toInnermostDeclaration = T.declare "toInnermost" description () (T.Apply ToInnermost)
 
 toInnermost :: TrsStrategy
 toInnermost = T.declFun toInnermostDeclaration

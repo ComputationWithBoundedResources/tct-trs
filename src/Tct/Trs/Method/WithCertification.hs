@@ -40,29 +40,32 @@ data WithCertification = WithCertification
 
 instance T.Processor WithCertification where
   type ProofObject WithCertification = ()
-  type I WithCertification           = TrsProblem
-  type O WithCertification           = TrsProblem
+  type In  WithCertification         = TrsProblem
+  type Out WithCertification         = TrsProblem
 
-  solve p prob = do
-    ret <- T.evaluate (onStrategy p) prob
-    tmp <- T.tempDirectory `fmap` T.askState
-    res <- case ret of
-      T.Halt _ -> return (Left "Halting computation.")
-      rpt
-        | kind p == PartialProof -> CeTA.partialProofIO' tmp pt
-        | T.isOpen pt            -> return (Right pt)
-        | otherwise              -> CeTA.totalProofIO' tmp pt
-        where pt = T.fromReturn rpt
-    let
-      toRet = case ret of
-        T.Continue _ -> T.Continue
-        T.Abort _    -> T.Abort
-        T.Halt pt    -> const (T.Halt pt)
+  execute p prob = do
+    undefined
+    -- ret <- T.evaluate (onStrategy p) prob
+    -- tmp <- T.tempDirectory `fmap` T.askState
+    -- undefined
+      rpt 
+    -- res <- undefined -- case ret of
+      -- T.Halt _ -> return (Left "Halting computation.")
+      -- rpt
+      --   | kind p == PartialProof -> CeTA.partialProofIO' tmp pt
+      --   | T.isOpen pt            -> return (Right pt)
+      --   | otherwise              -> CeTA.totalProofIO' tmp pt
+      --   where pt = T.fromReturn rpt
+    -- let
+      -- toRet = case ret of
+      --   T.Continue _ -> T.Continue
+      --   T.Abort _    -> T.Abort
+      --   T.Halt pt    -> const (T.Halt pt)
 
-    either (throwError . userError) (return . toRet) res
+    -- either (throwError . userError) (return . toRet) res
 
 withCertificationStrategy :: TotalProof -> TrsStrategy -> TrsStrategy
-withCertificationStrategy t st = T.Proc $ WithCertification { kind = t, onStrategy = st }
+withCertificationStrategy t st = T.Apply $ WithCertification { kind = t, onStrategy = st }
 
 withCertificationDeclaration :: T.Declaration(
   '[ T.Argument 'T.Optional TotalProof

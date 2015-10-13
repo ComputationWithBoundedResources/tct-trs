@@ -43,15 +43,15 @@ data RemoveInapplicableProof
 
 instance T.Processor RemoveInapplicable where
   type ProofObject RemoveInapplicable = ApplicationProof RemoveInapplicableProof
-  type I RemoveInapplicable     = TrsProblem
-  type O RemoveInapplicable     = TrsProblem
+  type In  RemoveInapplicable         = TrsProblem
+  type Out RemoveInapplicable         = TrsProblem
 
-  solve p prob =  T.resultToTree p prob `fmap`
-    maybe reminapp (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  execute RemoveInapplicable prob =
+    maybe reminapp (\s -> T.abortWith (Inapplicable s :: ApplicationProof RemoveInapplicableProof)) (Prob.isDTProblem' prob)
     where
       reminapp
-        | null unreachable = return $ T.Fail (Applicable RemoveInapplicableFail)
-        | otherwise        = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | null unreachable = T.abortWith (Applicable RemoveInapplicableFail)
+        | otherwise        = T.succeedWith1 (Applicable proof) T.fromId nprob
         where
           wdg = Prob.dependencyGraph prob
           st  = Prob.startTerms prob
@@ -88,7 +88,7 @@ removeInapplicable = T.declFun removeInapplicableDeclaration
 --
 -- We check wether nodes are reachable from starting terms.
 removeInapplicableDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-removeInapplicableDeclaration = T.declare "removeInapplicable" desc () (T.Proc RemoveInapplicable)
+removeInapplicableDeclaration = T.declare "removeInapplicable" desc () (T.Apply RemoveInapplicable)
   where desc = ["Removes rules that are not applicable in DP derivations."]
 
 

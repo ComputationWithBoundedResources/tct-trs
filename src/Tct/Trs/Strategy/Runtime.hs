@@ -92,7 +92,7 @@ withDP =
 
     wgOnTrs = withProblem $ \ prob ->
       if Trs.null (Prob.strictTrs prob)
-        then succeeding
+        then identity
         else wgOnUsable 1 1 .<||> wgOnUsable 2 1
 
 trivialDP =
@@ -110,20 +110,19 @@ withCWDG s = withProblem $ \ prob -> s (Prob.congruenceGraph prob)
 rci =
   try innermostRuleRemoval
   .>>! ?combine
-    [ named "TRIVIAL" $ timeoutIn 7 $ trivialDP   .>>> empty
-    , named "BOUNDS"  $ timeoutIn 7 $ matchbounds .>>> empty
-    , named "SHIFT"   $
-      ?combine
-        [ named "DIRECT"  $ interpretations .>>> empty
-        , named "WITHDP"  $ withDP .>>!! dpi .>>> empty ]
+    [ timeoutIn 7 $ trivialDP   .>>> empty
+    , timeoutIn 7 $ matchbounds .>>> empty
+    , ?combine
+        [ interpretations .>>> empty
+        , withDP .>>!! dpi .>>> empty ]
     ]
   where
 
 interpretations =
   tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
   .>>> fastest
-    [ named "POLYS"    $ tew (px 2) .>>> tew (px 3)
-    , named "MATRICES" $ tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 ]
+    [ tew (px 2) .>>> tew (px 3)
+    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 ]
   where
     mxs1 = mx 2 1 .<||> mx 3 1
     mxs2 = mx 2 2 .<||> mx 3 2 .<||> wg 2 2
@@ -168,12 +167,11 @@ dpi =
 
 rc =
   ?combine
-    [ named "TRIVIAL" $ timeoutIn 7 $ trivialDP .>>> empty
-    , named "BOUNDS"  $ timeoutIn 7 $ matchbounds .>>> empty
-    , named "SHIFT"   $
-      ?combine
-        [ named "DIRECT"  $ interpretations .>>> empty
-        , named "WITHDP"  $ withDP .>>!! dp .>>> empty ]
+    [ timeoutIn 7 $ trivialDP .>>> empty
+    , timeoutIn 7 $ matchbounds .>>> empty
+    , ?combine
+        [ interpretations .>>> empty
+        , withDP .>>!! dp .>>> empty ]
     ]
   where
 

@@ -14,8 +14,6 @@ module Tct.Trs.Method.InnermostRuleRemoval
   ) where
 
 
-import           Control.Applicative          ((<$>))
-
 import           Data.Rewriting.Rule          (lhs)
 import           Data.Rewriting.Rules.Rewrite (fullRewrite)
 
@@ -42,15 +40,15 @@ data InnermostRuleRemovalProof
 
 instance T.Processor InnermostRuleRemoval where
   type ProofObject InnermostRuleRemoval = ApplicationProof InnermostRuleRemovalProof
-  type I InnermostRuleRemoval           = TrsProblem
-  type O InnermostRuleRemoval           = TrsProblem
+  type In InnermostRuleRemoval          = TrsProblem
+  type Out InnermostRuleRemoval         = TrsProblem
 
-  solve p prob = T.resultToTree p prob <$>
-    maybe irr (return . T.Fail . Inapplicable) (Prob.isInnermostProblem' prob)
+  execute InnermostRuleRemoval prob =
+    maybe irr (\s -> T.abortWith (Inapplicable s :: ApplicationProof InnermostRuleRemovalProof)) (Prob.isInnermostProblem' prob)
     where
       irr
-        | Trs.null removed = return $ T.Fail (Applicable InnermostRuleRemovalFail)
-        | otherwise        = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | Trs.null removed = T.abortWith (Applicable InnermostRuleRemovalFail)
+        | otherwise        = T.succeedWith1 (Applicable proof) T.fromId nprob
 
         where
           trsRules  = Trs.toList $ Prob.trsComponents prob
@@ -73,7 +71,7 @@ description =
   , "The processor applies only to innermost problems." ]
 
 innermostRuleRemovalDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-innermostRuleRemovalDeclaration = T.declare "innermostRuleRemoval" description () (T.Proc InnermostRuleRemoval)
+innermostRuleRemovalDeclaration = T.declare "innermostRuleRemoval" description () (T.Apply InnermostRuleRemoval)
 
 innermostRuleRemoval :: TrsStrategy
 innermostRuleRemoval = T.declFun innermostRuleRemovalDeclaration

@@ -60,10 +60,11 @@ cetaProblem partial prob pt = do
   c <- isFeasible partial pt
   return $ Xml.addChildren (Xml.toCeTA prob) [c]
 
+-- MS TODO
 cetaSubProblem :: Xml.Xml t => Bool -> T.ProofTree t -> Result Xml.XmlContent
 cetaSubProblem partial pt@(T.Open prob)       = cetaProblem partial prob pt
-cetaSubProblem partial pt@(T.NoProgress pn _) = cetaProblem partial (T.problem pn) pt
-cetaSubProblem partial pt@(T.Progress pn _ _) = cetaProblem partial (T.problem pn) pt
+-- cetaSubProblem partial pt@(T.NoProgress pn _) = cetaProblem partial (T.problem pn) pt
+cetaSubProblem partial pt@(T.Success pn _ _) = cetaProblem partial (T.problem pn) pt
 
 isCertifiable :: Xml.XmlContent -> Bool
 isCertifiable c = Xml.rootTag c /= "unsupported"
@@ -81,8 +82,7 @@ partialProof pt = toDoc <$> partialProofM1 pt <*> subProblem pt
 
     partialProofM1 r = C.complexityProof <$> partialProofM2 r
     partialProofM2 n@(T.Open _)           = mkAssumption n
-    partialProofM2 (T.NoProgress _ spt)   = partialProofM2 spt
-    partialProofM2 (T.Progress pn _ spts) = case F.toList spts of
+    partialProofM2 (T.Success pn _ spts) = case F.toList spts of
       []  | isCertifiable xmlpn -> return xmlpn
       [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn . (:[]) <$> partialProofM1 t
       ts                        -> C.unknownProof "description" <$> subProblem pt  <*> mapM mkSubProofs ts
@@ -101,12 +101,11 @@ totalProof pt = toDoc <$> totalProofM1 pt <*> subProblem pt
     subProblem = cetaSubProblem False
 
     totalProofM1 r = C.complexityProof <$> totalProofM2 r
-    totalProofM2 (T.Open _)             = Left $ Unsupported "open problem"
-    totalProofM2 (T.NoProgress _ spt)   = totalProofM2 spt
-    totalProofM2 (T.Progress pn _ spts) = case F.toList spts of
+    totalProofM2 (T.Open _)            = Left $ Unsupported "open problem"
+    totalProofM2 (T.Success pn _ spts) = case F.toList spts of
       []  | isCertifiable xmlpn -> return xmlpn
       [t] | isCertifiable xmlpn -> Xml.addChildren xmlpn . (:[]) <$> totalProofM1 t
-      _   -> Left $ Unsupported (show $ T.processor pn)
+      _   -> Left $ undefined -- MS: TODO: MSUnsupported (show $ T.processor pn)
       where xmlpn = Xml.toCeTA (T.proof pn)
 
 

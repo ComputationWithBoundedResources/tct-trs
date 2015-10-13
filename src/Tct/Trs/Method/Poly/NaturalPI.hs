@@ -77,13 +77,13 @@ type NaturalPIProof = OrientationProof (PolyOrder Int)
 
 instance T.Processor NaturalPI where
   type ProofObject NaturalPI = ApplicationProof NaturalPIProof
-  type I NaturalPI           = TrsProblem
-  type O NaturalPI           = TrsProblem
+  type In  NaturalPI         = TrsProblem
+  type Out NaturalPI         = TrsProblem
   type Forking NaturalPI     = T.Optional T.Id
 
-  solve p prob
-    | Prob.isTrivial prob = return . T.resultToTree p prob $ T.Fail Closed
-    | otherwise           = entscheide p prob
+  execute p prob
+    | Prob.isTrivial prob = undefined -- return . T.resultToTree p prob $ T.Fail Closed
+    | otherwise           = undefined -- entscheide p prob
 
 certification :: PolyOrder Int -> T.Optional T.Id T.Certificate -> T.Certificate
 certification order cert = case cert of
@@ -133,7 +133,7 @@ entscheide p prob = do
 
   toResult `fmap` entscheide1 p aorder encoding decoding forceAny prob
   where
-    toResult pt = if T.progress pt then T.Continue pt else T.Abort pt
+    toResult pt = undefined -- if T.progress pt then T.Continue pt else T.Abort pt
 
     sig   = Prob.signature prob
     kind  = case Prob.startTerms prob of
@@ -152,7 +152,7 @@ entscheide1 ::
   -> Problem F V
   -> T.TctM (T.ProofTree (Problem F V))
 entscheide1 p aorder encoding decoding forceAny prob
-  | Prob.isTrivial prob = return . I.toTree p prob $ T.Fail (Applicable Incompatible)
+  | Prob.isTrivial prob = undefined -- return . I.toTree p prob $ T.Fail (Applicable Incompatible)
   | otherwise           = do
     res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
       <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
@@ -162,11 +162,11 @@ entscheide1 p aorder encoding decoding forceAny prob
         | otherwise                -> return pt
 
         where
-          pt    = I.toTree p prob $ T.Success (I.newProblem prob (pint_ order)) (Applicable $ Order order) (certification order)
+          pt    = undefined -- I.toTree p prob $ T.Success (I.newProblem prob (pint_ order)) (Applicable $ Order order) (certification order)
           order = mkOrder a
 
       SMT.Error s -> throwError (userError s)
-      _           -> return $ I.toTree p prob $ T.Fail (Applicable Incompatible)
+      _           -> undefined -- return $ I.toTree p prob $ T.Fail (Applicable Incompatible)
       where
         again = entscheide1 p aorder encoding decoding forceAny
 
@@ -209,7 +209,7 @@ selectorArg = RS.selectorArg
 --- ** strategy ------------------------------------------------------------------------------------------------------
 
 polyStrategy :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
-polyStrategy sh li ua ur sl gr = T.Proc $ NaturalPI
+polyStrategy sh li ua ur sl gr = T.Apply $ NaturalPI
   { shape    = sh
   , restrict = li 
   , uargs    = ua
@@ -244,7 +244,7 @@ poly' = T.declFun polyDeclaration
 --- ** complexity pair -----------------------------------------------------------------------------------------------
 
 instance IsComplexityPair NaturalPI where
-  solveComplexityPair p sel prob = fmap toResult `fmap` T.evaluate (T.Proc p{selector=Just sel, greedy=NoGreedy}) prob
+  solveComplexityPair p sel prob = undefined -- fmap toResult `fmap` T.evaluate (T.Apply p{selector=Just sel, greedy=NoGreedy}) prob
     where
       toResult pt = case T.open pt of
         [nprob] -> CP.ComplexityPairProof

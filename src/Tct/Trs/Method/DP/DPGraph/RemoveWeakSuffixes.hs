@@ -41,17 +41,17 @@ data RemoveWeakSuffixesProof
 
 instance T.Processor RemoveWeakSuffixes where
   type ProofObject RemoveWeakSuffixes = ApplicationProof RemoveWeakSuffixesProof
-  type I RemoveWeakSuffixes           = TrsProblem
-  type O RemoveWeakSuffixes           = TrsProblem
+  type In  RemoveWeakSuffixes         = TrsProblem
+  type Out RemoveWeakSuffixes         = TrsProblem
 
   -- an scc in the congruence graph is considered weak if all rules in the scc are weak
   -- compute maximal weak suffix bottom-up
-  solve p prob =  T.resultToTree p prob `fmap`
-    maybe remtail (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  execute RemoveWeakSuffixes prob = 
+    maybe remtail (\s -> T.abortWith (Inapplicable s :: ApplicationProof RemoveWeakSuffixesProof)) (Prob.isDTProblem' prob)
     where
       remtail
-        | null initials = return $ T.Fail (Applicable RemoveWeakSuffixesFail)
-        | otherwise     = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | null initials = T.abortWith (Applicable RemoveWeakSuffixesFail)
+        | otherwise     = T.succeedWith1 (Applicable proof) T.fromId nprob
         where
           onlyWeaks = not . any (isStrict . snd) . theSCC
 
@@ -88,7 +88,7 @@ instance T.Processor RemoveWeakSuffixes where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 removeWeakSuffixesDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-removeWeakSuffixesDeclaration = T.declare "removeWeakSuffixes" desc () (T.Proc RemoveWeakSuffixes) where
+removeWeakSuffixesDeclaration = T.declare "removeWeakSuffixes" desc () (T.Apply RemoveWeakSuffixes) where
   desc =
     [ "Removes trailing paths that do not need to be oriented."
     , "Only applicable if the strict component is empty."]

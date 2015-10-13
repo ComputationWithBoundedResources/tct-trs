@@ -105,13 +105,13 @@ data DependencyPairsProof = DependencyPairsProof
 
 instance T.Processor DependencyPairs where
   type ProofObject DependencyPairs = ApplicationProof DependencyPairsProof
-  type I DependencyPairs           = TrsProblem
-  type O DependencyPairs           = TrsProblem
+  type In  DependencyPairs         = TrsProblem
+  type Out DependencyPairs         = TrsProblem
 
-  solve p prob                 = return . T.resultToTree p prob $
-    maybe dp (T.Fail . Inapplicable) maybeApplicable
+  execute p prob                 =
+    maybe dp (\s -> T.abortWith (Inapplicable s :: ApplicationProof DependencyPairsProof)) maybeApplicable
     where
-      dp = T.Success (T.toId nprob) (Applicable nproof) T.fromId
+      dp = T.succeedWith1 (Applicable nproof) T.fromId nprob
       maybeApplicable =
         Prob.isRCProblem' prob
         <|> Prob.note (not . Trs.null $ Prob.dpComponents prob) " already contains dependency paris"
@@ -209,7 +209,7 @@ description :: [String]
 description = ["Applies the (weak) dependency pairs transformation."]
 
 dependencyPairsDeclaration :: T.Declaration ('[T.Argument 'T.Optional DPKind] T.:-> TrsStrategy)
-dependencyPairsDeclaration = T.declare "dependencyPairs" description (T.OneTuple dpArg) (T.Proc . DependencyPairs)
+dependencyPairsDeclaration = T.declare "dependencyPairs" description (T.OneTuple dpArg) (T.Apply . DependencyPairs)
   where dpArg = dpKindArg `T.optional` WIDP
 
 dependencyPairs :: TrsStrategy

@@ -114,7 +114,7 @@ certifyRCI deg =
         ,                                 shifts 3 deg .>>> empty ]
 
     dt = dependencyTuples
-    wdp p1 = withProblem $ \p2 -> if Sig.defineds (Prob.signature p1) == Sig.defineds (Trs.signature (Prob.allComponents p2)) then dependencyPairs' WDP else failing
+    wdp p1 = withProblem $ \p2 -> if Sig.defineds (Prob.signature p1) == Sig.defineds (Trs.signature (Prob.allComponents p2)) then dependencyPairs' WDP else abort
     trivialRCI = shifts 0 0 .>>> dependencyTuples .>>> try usableRules .>>> shifts 0 0 .>>> empty
 
 certifyDC :: Degree -> TrsStrategy

@@ -70,15 +70,15 @@ data UsableRulesProof
 
 instance T.Processor UsableRules where
   type ProofObject UsableRules = ApplicationProof UsableRulesProof
-  type I UsableRules           = TrsProblem
-  type O UsableRules           = TrsProblem
+  type In  UsableRules         = TrsProblem
+  type Out UsableRules         = TrsProblem
 
-  solve p prob = progress `seq` return . T.resultToTree p prob $
-    maybe usables (T.Fail . Inapplicable) (Prob.isDPProblem' prob)
+  execute UsableRules prob =
+    maybe usables (\s -> T.abortWith (Inapplicable s :: ApplicationProof UsableRulesProof)) (Prob.isDPProblem' prob)
     where
       usables
-        | progress  = T.Success (T.toId nprob) (Applicable proof) T.fromId
-        | otherwise = T.Fail (Applicable UsableRulesFail)
+        | progress  = T.succeedWith1 (Applicable proof) T.fromId nprob
+        | otherwise = T.abortWith (Applicable UsableRulesFail)
 
       rules    = Prob.allComponents prob
       usable   = usableRulesOf' (Prob.startComponents prob) rules
@@ -117,7 +117,7 @@ instance Xml.Xml UsableRulesProof where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 usableRulesDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-usableRulesDeclaration = T.declare "usableRules" description () (T.Proc UsableRules) where
+usableRulesDeclaration = T.declare "usableRules" description () (T.Apply UsableRules) where
   description =
     [ "This processor restricts the strict- and weak-rules to usable rules with"
     ,"respect to the dependency pairs." ]

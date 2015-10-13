@@ -26,7 +26,6 @@ import qualified Tct.Core.Common.Parser       as P
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
 import qualified Tct.Core.Data                as T
-import qualified Tct.Core.Processor.Timeout   as T
 
 import           SLogic.Smt.Solver            (minismt)
 
@@ -64,12 +63,12 @@ data EpoStarProof f v = EpoStarProof
 
 instance T.Processor EpoStar where
   type ProofObject EpoStar = ApplicationProof (OrientationProof (EpoStarProof F V))
-  type I EpoStar           = TrsProblem
-  type O EpoStar           = TrsProblem
+  type In  EpoStar         = TrsProblem
+  type Out EpoStar         = TrsProblem
   type Forking EpoStar     = T.Judgement
 
-  solve p prob = T.resultToTree p prob <$>
-    maybe epo (return . T.Fail . Inapplicable) maybeApplicable
+  execute p prob =
+    maybe epo (\s -> T.abortWith (Inapplicable s :: ApplicationProof (OrientationProof (EpoStarProof F V)))) maybeApplicable
     where
 
       maybeApplicable = Prob.isRCProblem' prob <|> Prob.isInnermostProblem' prob <|> Trs.isConstructorTrs' sig trs
@@ -82,8 +81,8 @@ instance T.Processor EpoStar where
       epo = do
         res <- entscheide solver trs sig (extComp_ p)
         case res of
-          SMT.Sat m -> return $ T.Success T.Judgement (Applicable . Order $ nproof m) (const $ T.timeUBCert (T.Exp Nothing))
-          _         -> return $ T.Fail (Applicable Incompatible)
+          SMT.Sat m -> T.succeedWith0 (Applicable . Order $ nproof m) (const $ T.timeUBCert (T.Exp Nothing))
+          _         -> T.abortWith (Applicable (Incompatible :: OrientationProof (EpoStarProof F V)))
 
       nproof (prec,safe,mu) = EpoStarProof
         { stricts_             = trs
@@ -459,10 +458,11 @@ description = [ unwords
   , "Exponential path orders are a miniaturisation of 'lexicographic path orders',"
   , "restricted so that compatibility assesses exponential runtime complexity."] ]
 
--- FIXME: MS: timeout shouldn't be necessary; for some reason
+-- FIXME: MS: TODO: timeout shouldn't be necessary; for some reason
 -- @timeoutInt 5 (timeoutIn 5 epostar)@ works fine but @timeoutIn 5 not@
 epoStarStrategy :: ExtComp -> TrsStrategy
-epoStarStrategy = T.timeoutRemaining . T.Proc . EpoStar
+-- epoStarStrategy = T.timeoutRemaining . T.meoutRemaining . Proc . EpoStar
+epoStarStrategy = T.Apply . EpoStar
 
 epoStarDeclaration :: T.Declaration ('[T.Argument 'T.Optional ExtComp] T.:-> TrsStrategy)
 epoStarDeclaration = T.declare "epostar" description (T.OneTuple exArg) epoStarStrategy

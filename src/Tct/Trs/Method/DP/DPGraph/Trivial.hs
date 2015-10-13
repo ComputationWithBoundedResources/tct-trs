@@ -36,15 +36,15 @@ data TrivialProof
 
 instance T.Processor Trivial where
   type ProofObject Trivial = ApplicationProof TrivialProof
-  type I Trivial           = TrsProblem
-  type O Trivial           = TrsProblem
+  type In  Trivial         = TrsProblem
+  type Out Trivial         = TrsProblem
 
-  solve p prob = T.resultToTree p prob `fmap`
-    maybe cyclic (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  execute Trivial prob =
+    maybe cyclic (\s -> T.abortWith (Inapplicable s :: ApplicationProof TrivialProof)) (Prob.isDTProblem' prob)
     where
       cyclic
-        | any (isCyclicNode cdg) (nodes cdg) = return $ T.Fail (Applicable TrivialFail)
-        | otherwise                          = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | any (isCyclicNode cdg) (nodes cdg) = T.abortWith (Applicable TrivialFail)
+        | otherwise                          = T.succeedWith1 (Applicable proof) T.fromId nprob
         where
           cdg = Prob.congruenceGraph prob
 
@@ -58,7 +58,7 @@ instance T.Processor Trivial where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 trivialStrategy :: TrsStrategy
-trivialStrategy = T.toStrategy Trivial .>>> E.empty
+trivialStrategy = T.Apply Trivial .>>> E.empty
 
 -- | Checks whether the DP problem is trivial, i.e., does not contain any cycles.
 --

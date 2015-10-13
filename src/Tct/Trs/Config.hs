@@ -140,14 +140,13 @@ trsUpdate cfg (TrsOptions ccM cpM) = setParseProblem $ setPutProof cfg
       (Just DCI) -> toDC . toInnermost
       (Just RC)  -> toRC . toFull
       (Just RCI) -> toRC . toInnermost
-    proofing cp ret = case cp of
-      Nothing  -> putProof cfg ret
-      Just cp' -> case ret of
-        T.Halt _  -> PP.putPretty $ PP.text "MAYBE"
-        r         -> case prover pt of
+    proofing cp pt = case cp of
+      Nothing  -> putProof cfg pt
+      Just cp' -> case pt of
+        T.Failure r -> PP.putPretty r
+        pt'         -> case prover pt' of
           Left s    -> print s
           Right xml -> Xml.putXml xml
           where
-            pt     = T.fromReturn r
             prover = if cp' == TotalProof then totalProof else partialProof
 

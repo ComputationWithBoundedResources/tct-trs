@@ -34,7 +34,7 @@ import qualified Tct.Core.Common.Pretty             as PP
 import           Tct.Core.Common.SemiRing           as PP (add)
 import qualified Tct.Core.Common.Xml                as Xml
 import qualified Tct.Core.Data                      as T
-import           Tct.Core.Combinators               ((.>>>))
+import           Tct.Core.Data                      ((.>>>))
 
 import           Tct.Common.ProofCombinators        (ApplicationProof(..))
 
@@ -112,14 +112,14 @@ data BoundsProof = BoundsProof
 
 instance T.Processor Bounds where
   type ProofObject Bounds = ApplicationProof BoundsProof
-  type I Bounds           = TrsProblem
-  type O Bounds           = TrsProblem
+  type In  Bounds         = TrsProblem
+  type Out Bounds         = TrsProblem
 
-  solve p prob =  fmap (T.resultToTree p prob) $
-    maybe apply (return . T.Fail . Inapplicable) maybeApplicable
+  execute p prob = 
+    maybe apply (\s -> T.abortWith (Inapplicable s :: ApplicationProof BoundsProof)) maybeApplicable
     where
       apply = boundHeight_ automaton `seq`
-        return $ T.Success (T.toId nprob) (Applicable proof) (flip T.updateTimeUBCert (`add` T.linear) . T.fromId)
+        T.succeedWith1 (Applicable proof) (flip T.updateTimeUBCert (`add` T.linear) . T.fromId) nprob
       maybeApplicable = Trs.isRightLinear' (strict `Trs.union` weak)
 
       strict = Prob.strictComponents prob
@@ -204,7 +204,7 @@ description =
   , "For non-right-linear problems this processor fails immediately."]
 
 boundsStrategy :: InitialAutomaton -> Enrichment -> TrsStrategy
-boundsStrategy i e = T.Proc (Bounds { initialAutomaton = i, enrichment = e }) .>>> E.empty
+boundsStrategy i e = T.Apply (Bounds { initialAutomaton = i, enrichment = e }) .>>> E.empty
 
 boundsDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional InitialAutomaton

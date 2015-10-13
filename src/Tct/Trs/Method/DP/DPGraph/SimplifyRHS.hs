@@ -45,15 +45,15 @@ data SimplifyRHSProof
 
 instance T.Processor SimplifyRHS where
   type ProofObject SimplifyRHS = ApplicationProof SimplifyRHSProof
-  type I SimplifyRHS           = TrsProblem
-  type O SimplifyRHS           = TrsProblem
+  type In  SimplifyRHS         = TrsProblem
+  type Out SimplifyRHS         = TrsProblem
 
-  solve p prob =  T.resultToTree p prob `fmap`
-    maybe simpRHS (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  execute SimplifyRHS prob =
+    maybe simpRHS (\s -> T.abortWith (Inapplicable s :: ApplicationProof SimplifyRHSProof)) (Prob.isDTProblem' prob)
     where
       simpRHS
-        | null simplified = return $ T.Fail (Applicable SimplifyRHSFail)
-        | otherwise       = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | null simplified = T.abortWith (Applicable SimplifyRHSFail)
+        | otherwise       = T.succeedWith1 (Applicable proof) T.fromId nprob
         where
           wdg = Prob.dependencyGraph prob
 
@@ -92,7 +92,7 @@ instance T.Processor SimplifyRHS where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 simplifyRHSDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-simplifyRHSDeclaration = T.declare "simplifyRHS" desc () (T.Proc SimplifyRHS) where
+simplifyRHSDeclaration = T.declare "simplifyRHS" desc () (T.Apply SimplifyRHS) where
   desc =
     [ "Simplify right hand sides of dependency pairs by removing marked subterms "
     , "whose root symbols are undefined."

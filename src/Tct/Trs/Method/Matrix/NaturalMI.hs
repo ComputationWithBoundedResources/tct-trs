@@ -575,7 +575,7 @@ entscheide p prob = do
 
   toResult `fmap` entscheide1 p aorder encoding decoding forceAny prob
   where
-    toResult pt = if CD.progress pt then CD.Continue pt else CD.Abort pt
+    toResult pt = undefined -- MS:TODO if CD.isProgressing pt then CD.Continue pt else CD.Abort pt
 
     absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (miDimension p)) (Sig.toMap sig)
 
@@ -595,7 +595,7 @@ entscheide1 ::
   -> Prob.TrsProblem
   -> CD.TctM (CD.ProofTree (Prob.TrsProblem))
 entscheide1 p aorder encoding decoding forceAny prob
-  | Prob.isTrivial prob = return . I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
+  | Prob.isTrivial prob = return . I.toTree p prob $ undefined -- MS:TODO CD.Fail (PC.Applicable PC.Incompatible)
   | otherwise           = do
     res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
       <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
@@ -605,11 +605,11 @@ entscheide1 p aorder encoding decoding forceAny prob
         | otherwise                -> return pt
 
         where
-          pt    = I.toTree p prob $ CD.Success (I.newProblem prob (mint_ order)) (PC.Applicable $ PC.Order order) (certification p order)
+          pt    = undefined -- MS:TODO -- unI.toTree p prob $ CD.Success (I.newProblem prob (mint_ order)) (PC.Applicable $ PC.Order order) (certification p order)
           order = mkOrder a
 
       SMT.Error s -> throwError (userError s)
-      _           -> return $ I.toTree p prob $ CD.Fail (PC.Applicable PC.Incompatible)
+      _           -> return $ I.toTree p prob $ undefined -- MS:TODO CD.Fail (PC.Applicable PC.Incompatible)
       where
         again = entscheide1 p aorder encoding decoding forceAny
 
@@ -650,7 +650,7 @@ matrixStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRul
                -> Maybe (TD.ExpressionSelector F V)
                -> Arg.Greedy
                -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
-matrixStrategy dim deg nmiKind ua ur sl gr = CD.Proc $
+matrixStrategy dim deg nmiKind ua ur sl gr = CD.Apply $
   NaturalMI { miDimension = dim
             , miDegree = deg
             , miKind = nmiKind
@@ -802,14 +802,14 @@ setStronglyLinear dim (MI.LInter vmmap cs) poss = MI.LInter (foldr k vmmap poss)
 
 instance CD.Processor NaturalMI where
   type ProofObject NaturalMI = PC.ApplicationProof NaturalMIProof
-  type I NaturalMI           = Prob.TrsProblem
-  type O NaturalMI           = Prob.TrsProblem
+  type In  NaturalMI         = Prob.TrsProblem
+  type Out NaturalMI         = Prob.TrsProblem
   type Forking NaturalMI     = CD.Optional CD.Id
 
   {- | Decides whether applying the NaturalMI processor makes progress or not -}
-  solve p prob
-    | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
-    | otherwise           = entscheide p prob
+  execute p prob
+    | Prob.isTrivial prob = undefined -- MS: TODOCD.resultToTree p prob $ un-- undCD.Fail PC.Closed
+    | otherwise           = undefined -- entscheide p prob
 
 
 
@@ -819,7 +819,7 @@ instance CD.Processor NaturalMI where
 
 
 instance CP.IsComplexityPair NaturalMI where
-  solveComplexityPair p sel prob = fmap toResult `fmap` CD.evaluate (CD.Proc p{selector=Just sel, greedy=NoGreedy}) prob
+  solveComplexityPair p sel prob = undefined -- fmap toResult `fmap` undefined -- MS:TODO undefined CD.evaluate (CD.Proc p{selector=Just sel, greedy=NoGreedy}) prob
     where
       toResult pt = case CD.open pt of
         [nprob] -> CP.ComplexityPairProof
@@ -925,24 +925,26 @@ type WeightGapProof = PC.OrientationProof WeightGapOrder
 
 instance CD.Processor WeightGap where
   type ProofObject WeightGap = PC.ApplicationProof WeightGapProof
-  type I WeightGap           = Prob.TrsProblem
-  type O WeightGap           = Prob.TrsProblem
+  type In  WeightGap         = Prob.TrsProblem
+  type Out WeightGap         = Prob.TrsProblem
 
-  solve p prob
-    | Prob.isTrivial prob = return . CD.resultToTree p prob $ CD.Fail PC.Closed
-    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictTrs prob) = return . CD.resultToTree p prob $ incompatible
+  execute p prob
+    | Prob.isTrivial prob = undefined -- MS:TODO CD.resultToTree p prob $ CD.Fail PC.Closed
+    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictTrs prob) = undefined -- MS:TODO return . CD.resultToTree p prob $ incompatible
     | otherwise = do
       res <- wgEntscheide p prob
-      CD.resultToTree p prob `fmap` case res of
-        SMT.Sat order -> return $ CD.Success (CD.toId nprob) (PC.Applicable $ PC.Order order)  cert
-          where 
-            nprob = I.newProblem' prob (mint_ $ wgProof order)
-            bound = upperbound (wgDimension p) (wgKind p) (kind_ $ wgProof order) (I.inter_ $ mint_ (wgProof order))
-            cert  = (flip CD.updateTimeUBCert (`SR.add` bound) . CD.fromId)
+      undefined -- MS:TODO
+      -- CD.resultToTree p prob `fmap` case res of
+      -- CD.resultToTree p prob `fmap` case res of
+      --   SMT.Sat order -> return $ CD.Success (CD.toId nprob) (PC.Applicable $ PC.Order order)  cert
+      --     where 
+      --       nprob = I.newProblem' prob (mint_ $ wgProof order)
+      --       bound = upperbound (wgDimension p) (wgKind p) (kind_ $ wgProof order) (I.inter_ $ mint_ (wgProof order))
+      --       cert  = (flip CD.updateTimeUBCert (`SR.add` bound) . CD.fromId)
 
-        SMT.Error s -> throwError (userError s)
-        _           -> return incompatible
-      where incompatible = CD.Fail (PC.Applicable PC.Incompatible)
+      --   SMT.Error s -> throwError (userError s)
+      --   _           -> return incompatible
+      -- where incompatible = undefined -- MS:TODO CD.Fail (PC.Applicable PC.Incompatible)
 
 wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
 wgEntscheide p prob = do
@@ -1056,7 +1058,7 @@ wgEntscheide p prob = do
 ----------------------------------------------------------------------
 
 weightGapStrategy :: Int -> Int -> NaturalMIKind -> UsableArgs -> WgOn -> TrsStrategy
-weightGapStrategy dim deg nmiKind ua on = CD.Proc WeightGap
+weightGapStrategy dim deg nmiKind ua on = CD.Apply WeightGap
   { wgDimension = dim
   , wgDegree    = deg
   , wgKind      = nmiKind

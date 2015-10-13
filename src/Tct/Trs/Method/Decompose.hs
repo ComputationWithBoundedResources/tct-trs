@@ -157,16 +157,16 @@ data Decompose = Decompose
 
 instance T.Processor Decompose where
   type ProofObject Decompose = ApplicationProof DecomposeProof
-  type I Decompose           = TrsProblem
-  type O Decompose           = TrsProblem
+  type In  Decompose         = TrsProblem
+  type Out Decompose         = TrsProblem
   type Forking Decompose     = T.Pair
 
-  solve p@Decompose{..} prob = return . T.resultToTree p prob $
-    maybe decomposition (T.Fail . Inapplicable) maybeApplicable
+  execute p@Decompose{..} prob =
+    maybe decomposition (\s -> T.abortWith (Inapplicable s :: ApplicationProof DecomposeProof)) maybeApplicable
     where
       decomposition
-        | progress proof = T.Success (T.Pair (rProb,sProb)) (Applicable proof) (certfn withBound)
-        | otherwise      = T.Fail (Applicable DecomposeFail)
+        | progress proof = T.succeedWith (Applicable proof) (certfn withBound) (T.Pair (rProb,sProb))
+        | otherwise      = T.abortWith (Applicable DecomposeFail)
       maybeApplicable = isApplicableRandS prob withBound <|> isApplicableRModuloS rProb sProb withBound
 
       (dps,trs) = rules $ BigAnd [ rsSelect onSelection prob, selectForcedRules prob withBound]
@@ -189,48 +189,48 @@ data DecomposeCP = DecomposeCP
 
 instance T.Processor DecomposeCP where
   type ProofObject DecomposeCP = ApplicationProof DecomposeProof
-  type I DecomposeCP           = TrsProblem
-  type O DecomposeCP           = TrsProblem
+  type In  DecomposeCP         = TrsProblem
+  type Out DecomposeCP         = TrsProblem
   type Forking DecomposeCP     = T.Pair
 
-  solve p@DecomposeCP{..} prob = do
-    app <- runApplicationT $ do
-      test (isApplicableRandS prob withBoundCP_)
-      let
-        rs = RuleSelector
-          { rsName   = "first alternative for decompose on " ++ rsName (onSelectionCP_)
-          , rsSelect = \pr -> (BigAnd [rsSelect (selAnyOf selStricts) pr, rsSelect onSelectionCP_ pr, selectForcedRules pr withBoundCP_]) }
-      ComplexityPair cp <- return withCP_
+  execute p@DecomposeCP{..} prob = undefined -- do
+    -- app <- runApplicationT $ do
+    --   test (isApplicableRandS prob withBoundCP_)
+    --   let
+    --     rs = RuleSelector
+    --       { rsName   = "first alternative for decompose on " ++ rsName (onSelectionCP_)
+    --       , rsSelect = \pr -> (BigAnd [rsSelect (selAnyOf selStricts) pr, rsSelect onSelectionCP_ pr, selectForcedRules pr withBoundCP_]) }
+    --   ComplexityPair cp <- return withCP_
 
-      cpproof <- lift $ CP.solveComplexityPair cp rs prob
-      case cpproof of
-        T.Abort _      -> return . T.resultToTree p prob $ T.Fail (Applicable DecomposeFail)
-        T.Halt pt      -> return (T.Halt pt)
-        T.Continue cpp -> do
-          let
-            (rProb, sProb) = mkProbs prob withBoundCP_ (CP.removableDPs cpp) (CP.removableTrs cpp)
-            rProof = assumeWith (T.timeUBCert zero) (CP.result cpp)
-            proof = DecomposeCPProof
-              { bound_       = withBoundCP_
-              , sProb_       = sProb
-              , cp_          = withCP_
-              , cpproof_     = cpp
-              , cpcert_      = T.certificate rProof }
-          test (isApplicableRModuloS rProb sProb withBoundCP_)
-          if not (progress proof)
-            then return $ T.resultToTree p prob $ T.Fail (Applicable proof)
-            else return $ T.Continue $ T.Progress (pn $ Applicable proof) (certfn withBoundCP_) (T.Pair (rProof, T.Open sProb))
+    --   cpproof <- undefined -- lift $ CP.solveComplexityPair cp rs prob
+      -- case cpproof of
+      --   T.Abort _      -> return . T.resultToTree p prob $ T.Fail (Applicable DecomposeFail)
+      --   T.Halt pt      -> return (T.Halt pt)
+      --   T.Continue cpp -> do
+      --     let
+      --       (rProb, sProb) = mkProbs prob withBoundCP_ (CP.removableDPs cpp) (CP.removableTrs cpp)
+      --       rProof = assumeWith (T.timeUBCert zero) (CP.result cpp)
+      --       proof = DecomposeCPProof
+      --         { bound_       = withBoundCP_
+      --         , sProb_       = sProb
+      --         , cp_          = withCP_
+      --         , cpproof_     = cpp
+      --         , cpcert_      = T.certificate rProof }
+      --     test (isApplicableRModuloS rProb sProb withBoundCP_)
+      --     if not (progress proof)
+      --       then return $ T.resultToTree p prob $ T.Fail (Applicable proof)
+      --       else return $ T.Continue $ T.Progress (pn $ Applicable proof) (certfn withBoundCP_) (T.Pair (rProof, T.Open sProb))
 
-    case app of
-      Applicable pt  -> return $ pt
-      Inapplicable s -> return $ T.resultToTree p prob $ T.Fail (Inapplicable s)
-      Closed         -> return $ T.resultToTree p prob $ T.Fail (Inapplicable "already closed")
-    where
-      test = maybe (return ()) (ApplicationT . return . Inapplicable)
-      pn proof = T.ProofNode
-        { T.processor = p
-        , T.problem   = prob
-        , T.proof     = proof }
+    -- case app of
+      -- Applicable pt  -> return $ pt
+      -- Inapplicable s -> return $ T.resultToTree p prob $ T.Fail (Inapplicable s)
+      -- Closed         -> return $ T.resultToTree p prob $ T.Fail (Inapplicable "already closed")
+    -- where
+      -- test = maybe (return ()) (ApplicationT . return . Inapplicable)
+      -- pn proof = T.ProofNode
+      --   { T.processor = p
+      --   , T.problem   = prob
+      --   , T.proof     = proof }
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
@@ -312,7 +312,7 @@ decomposeDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional DecomposeBound ]
    T.:-> TrsStrategy)
-decomposeDeclaration = T.declare "decompose" desc (selArg, bndArg) (\x y -> T.Proc (decomposeProcessor x y ))
+decomposeDeclaration = T.declare "decompose" desc (selArg, bndArg) (\x y -> T.Apply (decomposeProcessor x y ))
 
 decompose' :: ExpressionSelector F V -> DecomposeBound -> TrsStrategy
 decompose' = T.declFun decomposeDeclaration
@@ -328,7 +328,7 @@ decomposeCPDeclaration :: T.Declaration (
    , T.Argument 'T.Optional DecomposeBound
    , T.Argument 'T.Required ComplexityPair ]
    T.:-> TrsStrategy)
-decomposeCPDeclaration = T.declare "decomposeCP" desc (selArg, bndArg, CP.complexityPairArg) (\x y z -> T.Proc (decomposeCPProcessor x y z))
+decomposeCPDeclaration = T.declare "decomposeCP" desc (selArg, bndArg, CP.complexityPairArg) (\x y z -> T.Apply (decomposeCPProcessor x y z))
 
 decomposeCP :: ComplexityPair -> TrsStrategy
 decomposeCP = T.deflFun decomposeCPDeclaration

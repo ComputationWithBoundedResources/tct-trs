@@ -43,15 +43,15 @@ data RemoveHeadsProof
 
 instance T.Processor RemoveHeads where
   type ProofObject RemoveHeads = ApplicationProof RemoveHeadsProof
-  type I RemoveHeads           = TrsProblem
-  type O RemoveHeads           = TrsProblem
+  type In RemoveHeads          = TrsProblem
+  type Out RemoveHeads         = TrsProblem
 
-  solve p prob =  T.resultToTree p prob <$>
-    maybe remhead (return . T.Fail . Inapplicable) (Prob.isDTProblem' prob)
+  execute p prob =
+    maybe remhead (\s -> T.abortWith (Inapplicable s :: ApplicationProof RemoveHeadsProof)) (Prob.isDTProblem' prob)
     where
       remhead
-        | null heads = return $ T.Fail (Applicable RemoveHeadsFail)
-        | otherwise  = return $ T.Success (T.toId nprob) (Applicable proof) T.fromId
+        | null heads = T.abortWith (Applicable RemoveHeadsFail)
+        | otherwise  = T.succeedWith (Applicable proof) T.fromId (T.toId nprob) 
         where
           wdg = Prob.dependencyGraph prob
 
@@ -79,7 +79,7 @@ instance T.Processor RemoveHeads where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 removeHeadsDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
-removeHeadsDeclaration = T.declare "removeHeads" desc () (T.Proc RemoveHeads)
+removeHeadsDeclaration = T.declare "removeHeads" desc () (T.Apply RemoveHeads)
   where desc = ["Removes roots from the dependency graph that lead to starting terms only."]
 
 removeHeads :: TrsStrategy

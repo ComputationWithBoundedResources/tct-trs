@@ -251,7 +251,7 @@ toDP =
       | otherwise                    = linearPathAnalysis
 
     shiftt = matrix' 2 1 Algebraic UArgs URules (Just $ RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules) NoGreedy
-    wgOnUsable = failing
+    wgOnUsable = abort
 
 -- | Tries to remove leafs in the congruence graph,
 -- by (i) orienting using predecessor extimation and the given processor,
