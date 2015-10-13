@@ -77,25 +77,22 @@ instance T.Processor DecomposeDG where
   type Out DecomposeDG         = TrsProblem
   type Forking DecomposeDG     = T.Pair
 
-  execute p prob = undefined -- do
-    -- maybe decomposition (return . T.resultToTree p prob . T.Fail . Inapplicable) (Prob.isDPProblem' prob)
-    -- where
-    --   decomposition
-    --     | Trs.null initialDPs             = failx (Applicable $ DecomposeDGFail "no rules were selected")
-    --     | not (any isCut unselectedNodes) = failx (Applicable $ DecomposeDGFail "no rule was cut")
-    --     | prob `isSubsetDP` lowerProb     = failx (Applicable $ DecomposeDGFail "lower component not simpler")
-    --     | otherwise                       = do
-    --       upperProof <- mapply (onUpper p) upperProb
-    --       lowerProof <- mapply (onLower p) lowerProb
-    --       undefined -- MS:TODO
-          -- case (lowerProof,upperProof) of
-          --   (lpt, rpt)
-          --     | T.isContinuing lpt && T.isContinuing rpt
-          --                 -> return . T.Continue $ T.Progress (T.ProofNode p prob (Applicable proof)) certfn (T.Pair (T.fromReturn rpt, T.fromReturn lpt))
-          --     | otherwise -> failx (Applicable $ DecomposeDGFail "a strategy failed")
+  execute p prob = do
+    maybe decomposition (\s -> T.abortWith (Inapplicable s :: ApplicationProof DecomposeDGProof)) (Prob.isDPProblem' prob)
+    where
+      decomposition
+        | Trs.null initialDPs             = abortx (DecomposeDGFail "no rules were selected")
+        | not (any isCut unselectedNodes) = abortx (DecomposeDGFail "no rule was cut")
+        | prob `isSubsetDP` lowerProb     = abortx (DecomposeDGFail "lower component not simpler")
+        | otherwise                       = do
+          lowerProof <- mapply (onLower p) lowerProb
+          upperProof <- mapply (onUpper p) upperProb
+          if T.isFailure lowerProof || T.isFailure upperProof
+            then abortx (DecomposeDGFail "a strategy failed")
+            else return $ T.Progress (Applicable proof) certfn (T.Pair (upperProof, lowerProof))
         where
-          -- failx              = return . T.resultToTree p prob . T.Fail
-          -- mapply s pr        = maybe (return . T.Continue $ T.Open pr) (flip T.evaluate pr) s
+          abortx              = T.abortWith  . Applicable
+          mapply stM pr      = maybe (return $ T.Open pr) (\st -> T.evaluate st (T.Open pr)) stM
           p1 `isSubsetDP` p2 = Prob.strictDPs p1 `Trs.isSubset` Prob.strictDPs p2 && Prob.weakDPs p1 `Trs.isSubset` Prob.weakDPs p2
 
           wdg = Prob.dependencyGraph prob
