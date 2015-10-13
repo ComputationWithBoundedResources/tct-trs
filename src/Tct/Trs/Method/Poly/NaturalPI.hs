@@ -25,7 +25,6 @@ import qualified Data.Map.Strict                     as M
 import           Data.Maybe                          (fromMaybe)
 import           Data.Monoid                         ((<>))
 import qualified Data.Set                            as S
-import qualified Data.Traversable                    as F
 
 import qualified Data.Rewriting.Rule                 as R (Rule (..))
 import qualified Data.Rewriting.Term                 as R
@@ -82,8 +81,8 @@ instance T.Processor NaturalPI where
   type Forking NaturalPI     = T.Optional T.Id
 
   execute p prob
-    | Prob.isTrivial prob = undefined -- return . T.resultToTree p prob $ T.Fail Closed
-    | otherwise           = undefined -- entscheide p prob
+    | Prob.isTrivial prob = T.abortWith (Closed :: ApplicationProof NaturalPIProof)
+    | otherwise           = entscheide p prob
 
 certification :: PolyOrder Int -> T.Optional T.Id T.Certificate -> T.Certificate
 certification order cert = case cert of
@@ -121,7 +120,7 @@ interpretf ebsi = I.interpretTerm interpretFun interpretVar
       where k m g = error ("NaturalPI.interpretf: " ++ show g) `fromMaybe` M.lookup g m
     interpretVar v = P.variable v
 
-entscheide :: NaturalPI -> TrsProblem -> T.TctM (T.Return (T.ProofTree TrsProblem))
+entscheide :: NaturalPI -> TrsProblem -> T.TctM (T.Return NaturalPI)
 entscheide p prob = do
   let
     orientM                   = I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
@@ -131,9 +130,8 @@ entscheide p prob = do
       { kind_ = kind
       , pint_ = apint }
 
-  toResult `fmap` entscheide1 p aorder encoding decoding forceAny prob
+  entscheide1 p aorder encoding decoding forceAny prob
   where
-    toResult pt = undefined -- if T.progress pt then T.Continue pt else T.Abort pt
 
     sig   = Prob.signature prob
     kind  = case Prob.startTerms prob of
@@ -150,25 +148,21 @@ entscheide1 ::
   -> (I.Interpretation F (PI.SomePolynomial (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
   -> I.ForceAny
   -> Problem F V
-  -> T.TctM (T.ProofTree (Problem F V))
-entscheide1 p aorder encoding decoding forceAny prob
-  | Prob.isTrivial prob = undefined -- return . I.toTree p prob $ T.Fail (Applicable Incompatible)
+  -> T.TctM (T.Return NaturalPI)
+entscheide1 _ aorder encoding decoding forceAny prob
+  | Prob.isTrivial prob = T.abortWith (Applicable Incompatible :: ApplicationProof NaturalPIProof)
   | otherwise           = do
     res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
       <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
     case res of
-      SMT.Sat a
-        | Arg.useGreedy (greedy p) -> fmap T.flatten $ again `F.mapM` pt
-        | otherwise                -> return pt
+      SMT.Sat a -> T.succeedWith (Applicable $ Order order) (certification order) (I.newProblem prob (pint_ order))
 
         where
-          pt    = undefined -- I.toTree p prob $ T.Success (I.newProblem prob (pint_ order)) (Applicable $ Order order) (certification order)
           order = mkOrder a
 
       SMT.Error s -> throwError (userError s)
-      _           -> undefined -- return $ I.toTree p prob $ T.Fail (Applicable Incompatible)
+      _           -> T.abortWith (Applicable Incompatible :: ApplicationProof NaturalPIProof)
       where
-        again = entscheide1 p aorder encoding decoding forceAny
 
         assertx st e = st {SMT.asserts = e: SMT.asserts st}
         srules = Trs.toList $ Prob.strictComponents prob
@@ -244,14 +238,16 @@ poly' = T.declFun polyDeclaration
 --- ** complexity pair -----------------------------------------------------------------------------------------------
 
 instance IsComplexityPair NaturalPI where
-  solveComplexityPair p sel prob = undefined -- fmap toResult `fmap` T.evaluate (T.Apply p{selector=Just sel, greedy=NoGreedy}) prob
-    where
-      toResult pt = case T.open pt of
-        [nprob] -> CP.ComplexityPairProof
-          { CP.result = pt
-          , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
-          , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
-        _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
+  solveComplexityPair p sel prob = do
+  pt <- T.evaluate (T.Apply p{selector=Just sel, greedy=NoGreedy}) (T.Open prob)
+  return $ if T.isFailure pt
+    then Left $ "application of cp failed"
+    else case T.open pt of
+      [nprob] -> Right $ CP.ComplexityPairProof
+        { CP.result = pt
+        , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
+        , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
+      _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
 
 polyProcessorCP :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
 polyProcessorCP sh li ua ur = CP.toComplexityPair $ NaturalPI
