@@ -197,7 +197,6 @@ orient inter prob absi mselector useUP useUR = do
       , weakDPs_   = []
       , weakTrs_   = [] }
 
-toTree = undefined -- MS:TODO
 -- toTree :: (T.Processor p, T.In p ~ T.Out p) => p -> T.In p -> T.Result p -> T.ProofTree (T.Out p)
 -- toTree p prob (T.Fail po)                 = T.NoProgress (T.ProofNode p prob po) (T.Open prob)
 -- toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) certfn (T.Open `fmap` probs)

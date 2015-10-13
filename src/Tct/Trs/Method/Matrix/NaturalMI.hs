@@ -559,7 +559,7 @@ kindConstraints (MI.ConstructorEda cs mdeg) absmi = do
     filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
 
 
-entscheide :: NaturalMI -> Prob.TrsProblem -> CD.TctM (CD.Return (CD.ProofTree Prob.TrsProblem))
+entscheide :: NaturalMI -> Prob.TrsProblem -> CD.TctM (CD.Return NaturalMI)
 entscheide p prob = do
   let
     orientM = do
@@ -573,9 +573,8 @@ entscheide p prob = do
       , dim_  = miDimension p
       , mint_ = apint }
 
-  toResult `fmap` entscheide1 p aorder encoding decoding forceAny prob
+  entscheide1 p aorder encoding decoding forceAny prob
   where
-    toResult pt = undefined -- MS:TODO if CD.isProgressing pt then CD.Continue pt else CD.Abort pt
 
     absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (miDimension p)) (Sig.toMap sig)
 
@@ -593,25 +592,19 @@ entscheide1 ::
   -> (I.Interpretation F (SomeLInter (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
   -> I.ForceAny
   -> Prob.TrsProblem
-  -> CD.TctM (CD.ProofTree (Prob.TrsProblem))
+  -> CD.TctM (CD.Return NaturalMI)
 entscheide1 p aorder encoding decoding forceAny prob
-  | Prob.isTrivial prob = return . I.toTree p prob $ undefined -- MS:TODO CD.Fail (PC.Applicable PC.Incompatible)
+  | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
   | otherwise           = do
     res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
       <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
     case res of
-      SMT.Sat a
-        | Arg.useGreedy (greedy p) -> fmap CD.flatten $ again `DT.mapM` pt
-        | otherwise                -> return pt
-
-        where
-          pt    = undefined -- MS:TODO -- unI.toTree p prob $ CD.Success (I.newProblem prob (mint_ order)) (PC.Applicable $ PC.Order order) (certification p order)
-          order = mkOrder a
+      SMT.Sat a -> CD.succeedWith  (PC.Applicable $ PC.Order order) (certification p order) (I.newProblem prob (mint_ order))
+        where order = mkOrder a
 
       SMT.Error s -> throwError (userError s)
-      _           -> return $ I.toTree p prob $ undefined -- MS:TODO CD.Fail (PC.Applicable PC.Incompatible)
+      _           -> CD.abortWith (PC.Applicable PC.Incompatible :: PC.ApplicationProof NaturalMIProof)
       where
-        again = entscheide1 p aorder encoding decoding forceAny
 
         assertx st e = st {SMT.asserts = e: SMT.asserts st}
         srules = Trs.toList $ Prob.strictComponents prob
@@ -808,8 +801,8 @@ instance CD.Processor NaturalMI where
 
   {- | Decides whether applying the NaturalMI processor makes progress or not -}
   execute p prob
-    | Prob.isTrivial prob = undefined -- MS: TODOCD.resultToTree p prob $ un-- undCD.Fail PC.Closed
-    | otherwise           = undefined -- entscheide p prob
+    | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
+    | otherwise           = entscheide p prob
 
 
 
@@ -819,14 +812,16 @@ instance CD.Processor NaturalMI where
 
 
 instance CP.IsComplexityPair NaturalMI where
-  solveComplexityPair p sel prob = undefined -- fmap toResult `fmap` undefined -- MS:TODO undefined CD.evaluate (CD.Proc p{selector=Just sel, greedy=NoGreedy}) prob
-    where
-      toResult pt = case CD.open pt of
-        [nprob] -> CP.ComplexityPairProof
-          { CP.result = pt
-          , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
-          , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
-        _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
+  solveComplexityPair p sel prob = do
+  pt <- CD.evaluate (CD.Apply p{selector=Just sel, greedy=NoGreedy}) (CD.Open prob)
+  return $ if CD.isFailure pt
+    then Left $ "application of cp failed"
+    else case CD.open pt of
+      [nprob] -> Right $ CP.ComplexityPairProof
+        { CP.result = pt
+        , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
+        , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
+      _ -> error "Tct.Trs.Method.Poly.NaturalMI.solveComplexityPair: the impossible happened"
 
 matrixComplexityPair :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules -> CP.ComplexityPair
 matrixComplexityPair dim deg nmiKind ua ur = CP.toComplexityPair $
@@ -929,22 +924,20 @@ instance CD.Processor WeightGap where
   type Out WeightGap         = Prob.TrsProblem
 
   execute p prob
-    | Prob.isTrivial prob = undefined -- MS:TODO CD.resultToTree p prob $ CD.Fail PC.Closed
-    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictTrs prob) = undefined -- MS:TODO return . CD.resultToTree p prob $ incompatible
+    | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof WeightGapProof)
+    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictTrs prob) = incompatible
     | otherwise = do
       res <- wgEntscheide p prob
-      undefined -- MS:TODO
-      -- CD.resultToTree p prob `fmap` case res of
-      -- CD.resultToTree p prob `fmap` case res of
-      --   SMT.Sat order -> return $ CD.Success (CD.toId nprob) (PC.Applicable $ PC.Order order)  cert
-      --     where 
-      --       nprob = I.newProblem' prob (mint_ $ wgProof order)
-      --       bound = upperbound (wgDimension p) (wgKind p) (kind_ $ wgProof order) (I.inter_ $ mint_ (wgProof order))
-      --       cert  = (flip CD.updateTimeUBCert (`SR.add` bound) . CD.fromId)
+      case res of
+        SMT.Sat order -> CD.succeedWith (PC.Applicable $ PC.Order order) cert (CD.toId nprob)
+          where 
+            nprob = I.newProblem' prob (mint_ $ wgProof order)
+            bound = upperbound (wgDimension p) (wgKind p) (kind_ $ wgProof order) (I.inter_ $ mint_ (wgProof order))
+            cert  = (flip CD.updateTimeUBCert (`SR.add` bound) . CD.fromId)
 
-      --   SMT.Error s -> throwError (userError s)
-      --   _           -> return incompatible
-      -- where incompatible = undefined -- MS:TODO CD.Fail (PC.Applicable PC.Incompatible)
+        SMT.Error s -> throwError (userError s)
+        _           -> incompatible
+      where incompatible = CD.abortWith (PC.Applicable PC.Incompatible :: PC.ApplicationProof WeightGapProof)
 
 wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
 wgEntscheide p prob = do
