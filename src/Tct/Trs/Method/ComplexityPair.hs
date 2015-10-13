@@ -7,7 +7,7 @@ module Tct.Trs.Method.ComplexityPair
 
 import qualified Tct.Core.Common.Parser          as P
 import qualified Tct.Core.Data                   as T
-import qualified Tct.Core.Data                   as P (SParsable (..), SParser)
+import qualified Tct.Core.Data                   as P (SParser)
 import qualified Tct.Core.Parse                  as P
 
 import           Tct.Trs.Data                    (TrsProblem)

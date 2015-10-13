@@ -193,44 +193,39 @@ instance T.Processor DecomposeCP where
   type Out DecomposeCP         = TrsProblem
   type Forking DecomposeCP     = T.Pair
 
-  execute p@DecomposeCP{..} prob = undefined -- do
-    -- app <- runApplicationT $ do
-    --   test (isApplicableRandS prob withBoundCP_)
-    --   let
-    --     rs = RuleSelector
-    --       { rsName   = "first alternative for decompose on " ++ rsName (onSelectionCP_)
-    --       , rsSelect = \pr -> (BigAnd [rsSelect (selAnyOf selStricts) pr, rsSelect onSelectionCP_ pr, selectForcedRules pr withBoundCP_]) }
-    --   ComplexityPair cp <- return withCP_
+  execute p@DecomposeCP{..} prob = do
+    app <- runApplicationT $ do
+      test (isApplicableRandS prob withBoundCP_)
+      let
+        rs = RuleSelector
+          { rsName   = "first alternative for decompose on " ++ rsName (onSelectionCP_)
+          , rsSelect = \pr -> (BigAnd [rsSelect (selAnyOf selStricts) pr, rsSelect onSelectionCP_ pr, selectForcedRules pr withBoundCP_]) }
+      ComplexityPair cp <- return withCP_
 
-    --   cpproof <- undefined -- lift $ CP.solveComplexityPair cp rs prob
-      -- case cpproof of
-      --   T.Abort _      -> return . T.resultToTree p prob $ T.Fail (Applicable DecomposeFail)
-      --   T.Halt pt      -> return (T.Halt pt)
-      --   T.Continue cpp -> do
-      --     let
-      --       (rProb, sProb) = mkProbs prob withBoundCP_ (CP.removableDPs cpp) (CP.removableTrs cpp)
-      --       rProof = assumeWith (T.timeUBCert zero) (CP.result cpp)
-      --       proof = DecomposeCPProof
-      --         { bound_       = withBoundCP_
-      --         , sProb_       = sProb
-      --         , cp_          = withCP_
-      --         , cpproof_     = cpp
-      --         , cpcert_      = T.certificate rProof }
-      --     test (isApplicableRModuloS rProb sProb withBoundCP_)
-      --     if not (progress proof)
-      --       then return $ T.resultToTree p prob $ T.Fail (Applicable proof)
-      --       else return $ T.Continue $ T.Progress (pn $ Applicable proof) (certfn withBoundCP_) (T.Pair (rProof, T.Open sProb))
+      cpproof <- lift $ CP.solveComplexityPair cp rs prob
+      case cpproof of
+        Left s -> return $ T.NoProgress (T.SomeReason s)
+        Right cpp -> do
+          let
+            (rProb, sProb) = mkProbs prob withBoundCP_ (CP.removableDPs cpp) (CP.removableTrs cpp)
+            rProof = assumeWith (T.timeUBCert zero) (CP.result cpp)
+            proof = DecomposeCPProof
+              { bound_       = withBoundCP_
+              , sProb_       = sProb
+              , cp_          = withCP_
+              , cpproof_     = cpp
+              , cpcert_      = T.certificate rProof }
+          test (isApplicableRModuloS rProb sProb withBoundCP_)
+          if not (progress proof)
+            then return $ T.NoProgress (T.SomeReason $ Applicable proof)
+            else return $ T.Progress (Applicable proof) (certfn withBoundCP_) (T.Pair (rProof, T.Open sProb))
 
-    -- case app of
-      -- Applicable pt  -> return $ pt
-      -- Inapplicable s -> return $ T.resultToTree p prob $ T.Fail (Inapplicable s)
-      -- Closed         -> return $ T.resultToTree p prob $ T.Fail (Inapplicable "already closed")
-    -- where
-      -- test = maybe (return ()) (ApplicationT . return . Inapplicable)
-      -- pn proof = T.ProofNode
-      --   { T.processor = p
-      --   , T.problem   = prob
-      --   , T.proof     = proof }
+    case app of
+      Applicable ret -> return ret
+      Inapplicable s -> T.abortWith (Inapplicable s :: ApplicationProof DecomposeProof)
+      Closed         -> T.abortWith (Inapplicable "already closed" :: ApplicationProof DecomposeProof)
+    where
+      test = maybe (return ()) (ApplicationT . return . Inapplicable)
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
