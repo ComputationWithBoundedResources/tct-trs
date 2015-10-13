@@ -139,76 +139,70 @@ instance T.Processor PredecessorEstimationCP where
   type Forking PredecessorEstimationCP     = T.Pair
 
   execute p prob =
-    undefined
-    -- maybe (estimate $ withComplexityPair p) (return . T.resultToTree p prob . T.Fail . Inapplicable) (Prob.isDPProblem' prob)
-    -- where
-    --   wdg  = Prob.dependencyGraph prob
-    --   sdps = Prob.strictDPs prob
-    --   wdps = Prob.weakDPs prob
+    maybe (estimate $ withComplexityPair p) (\s -> T.abortWith (Inapplicable s :: ApplicationProof PredecessorEstimationProof)) (Prob.isDPProblem' prob)
+    where
+      wdg  = Prob.dependencyGraph prob
+      sdps = Prob.strictDPs prob
+      wdps = Prob.weakDPs prob
 
-    --   estimate (CP.ComplexityPair cp) = do
-    --     let
-    --       rs = RS.RuleSelector
-    --         { RS.rsName   = "first alternative for predecessorEstimation on " ++ RS.rsName (onSelectionCP p)
-    --         , RS.rsSelect = withPredecessors . RS.rsSelect (onSelectionCP p) }
+      estimate (CP.ComplexityPair cp) = do
+        let
+          rs = RS.RuleSelector
+            { RS.rsName   = "first alternative for predecessorEstimation on " ++ RS.rsName (onSelectionCP p)
+            , RS.rsSelect = withPredecessors . RS.rsSelect (onSelectionCP p) }
 
-    --     cpproof <- CP.solveComplexityPair cp rs prob
-    --     case cpproof of
-    --         T.Continue cpp -> mkProof cpp
-    --         T.Abort _      -> return . T.resultToTree p prob $ T.Fail (Applicable PredecessorEstimationFail)
-    --         T.Halt pt      -> return (T.Halt pt)
+        cpproof <- CP.solveComplexityPair cp rs prob
+        case cpproof of
+          Left msg  -> T.abortWith msg
+          Right cpp -> mkProof cpp
 
-        -- where
-        --   snub = S.toList . S.fromList
+        where
+          snub = S.toList . S.fromList
 
-        --   withPredecessors (RS.SelectDP d) = RS.BigOr $ RS.SelectDP d : predss
-        --     where
-        --       predss = case lookupNode wdg DGNode{theRule=d, isStrict=True} <|> lookupNode wdg DGNode{theRule=d,isStrict=False} of
-        --         Just n  -> [ withPreds n (S.singleton n) ]
-        --         Nothing -> []
-        --       withPreds n seen = bigAnd (k `fmap` snub [ (n', theRule cn') | (n',cn',_) <- lpredecessors wdg n])
-        --         where
-        --           k (n',r') = if n' `S.member` seen then RS.SelectDP r' else RS.BigOr [RS.SelectDP r', withPreds n' (n' `S.insert` seen) ]
-        --           bigAnd [a] = a
-        --           bigAnd as  = RS.BigAnd as
+          withPredecessors (RS.SelectDP d) = RS.BigOr $ RS.SelectDP d : predss
+            where
+              predss = case lookupNode wdg DGNode{theRule=d, isStrict=True} <|> lookupNode wdg DGNode{theRule=d,isStrict=False} of
+                Just n  -> [ withPreds n (S.singleton n) ]
+                Nothing -> []
+              withPreds n seen = bigAnd (k `fmap` snub [ (n', theRule cn') | (n',cn',_) <- lpredecessors wdg n])
+                where
+                  k (n',r') = if n' `S.member` seen then RS.SelectDP r' else RS.BigOr [RS.SelectDP r', withPreds n' (n' `S.insert` seen) ]
+                  bigAnd [a] = a
+                  bigAnd as  = RS.BigAnd as
 
-        --   withPredecessors (RS.SelectTrs ss) = RS.SelectTrs ss
-        --   withPredecessors (RS.BigOr ss)     = RS.BigOr (withPredecessors `fmap` ss)
-        --   withPredecessors (RS.BigAnd ss)    = RS.BigAnd (withPredecessors `fmap` ss)
+          withPredecessors (RS.SelectTrs ss) = RS.SelectTrs ss
+          withPredecessors (RS.BigOr ss)     = RS.BigOr (withPredecessors `fmap` ss)
+          withPredecessors (RS.BigAnd ss)    = RS.BigAnd (withPredecessors `fmap` ss)
 
-        --   mkProof cpproof
-        --     | Trs.null shiftWeak = return . T.resultToTree p prob $ T.Fail (Applicable PredecessorEstimationFail)
-        --     | otherwise          = return . T.Continue $ T.Progress pn bigAdd (T.Pair (subProof, T.Open nprob))
+          mkProof cpproof
+            | Trs.null shiftWeak = T.abortWith (Applicable PredecessorEstimationFail)
+            | otherwise          = return $ T.Progress (Applicable proof) bigAdd (T.Pair (subProof, T.Open nprob))
 
-        --     where
-        --       pn = T.ProofNode
-        --         { T.processor = p
-        --         , T.problem   = prob
-        --         , T.proof     = Applicable proof }
+            where
 
-        --       (known, propagated) = propagate (CP.removableDPs cpproof) []
-        --       propagate seen props
-        --           | null newp = (seen, props)
-        --           | otherwise = propagate (Trs.fromList (rule `fmap` newp) `Trs.union` seen) (newp ++ props)
-        --         where
-        --           newp = do
-        --             (n,cn) <- lnodes wdg
-        --             guard $ not (theRule cn `Trs.member` seen)
-        --             let predss = [ (n1,theRule cn1) | (n1,cn1,_) <- lpredecessors wdg n ]
-        --             guard $ all (\(_,r) -> r `Trs.member` seen) predss
-        --             return $ Selected { node=n, rule=theRule cn, preds=predss }
+              (known, propagated) = propagate (CP.removableDPs cpproof) []
+              propagate seen props
+                  | null newp = (seen, props)
+                  | otherwise = propagate (Trs.fromList (rule `fmap` newp) `Trs.union` seen) (newp ++ props)
+                where
+                  newp = do
+                    (n,cn) <- lnodes wdg
+                    guard $ not (theRule cn `Trs.member` seen)
+                    let predss = [ (n1,theRule cn1) | (n1,cn1,_) <- lpredecessors wdg n ]
+                    guard $ all (\(_,r) -> r `Trs.member` seen) predss
+                    return $ Selected { node=n, rule=theRule cn, preds=predss }
 
-        --       shiftWeak = sdps `Trs.intersect` known
-        --       nprob = Prob.sanitiseDPGraph $ prob
-        --         { Prob.strictDPs = (sdps `Trs.difference` shiftWeak)
-        --         , Prob.weakDPs   = (wdps `Trs.union` shiftWeak) }
-        --       subProof = assumeWith (T.timeUBCert zero) (CP.result cpproof)
-        --       proof = PredecessorEstimationCPProof
-        --         { wdg_      = wdg
-        --         , selected_ = propagated
-        --         , cp_       = withComplexityPair p
-        --         , cpproof_  = cpproof
-        --         , cpcert_   = T.certificate subProof }
+              shiftWeak = sdps `Trs.intersect` known
+              nprob = Prob.sanitiseDPGraph $ prob
+                { Prob.strictDPs = (sdps `Trs.difference` shiftWeak)
+                , Prob.weakDPs   = (wdps `Trs.union` shiftWeak) }
+              subProof = assumeWith (T.timeUBCert zero) (CP.result cpproof)
+              proof = PredecessorEstimationCPProof
+                { wdg_      = wdg
+                , selected_ = propagated
+                , cp_       = withComplexityPair p
+                , cpproof_  = cpproof
+                , cpcert_   = T.certificate subProof }
 
 
 --- * instances ------------------------------------------------------------------------------------------------------

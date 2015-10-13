@@ -29,9 +29,12 @@ data ComplexityPairProof = ComplexityPairProof
   , removableTrs :: Trs F V }
   deriving Show
 
+-- MS: TODO: a complexity pair should just return a proof tree
+-- then lift it here
+
 -- | A 'ComplexityPair' provides a special solve method returning a 'ComplexityProof'.
 class IsComplexityPair p where
-  solveComplexityPair :: p -> ExpressionSelector F V -> Problem F V -> T.TctM (T.Return ComplexityPairProof)
+  solveComplexityPair :: p -> ExpressionSelector F V -> Problem F V -> T.TctM (Either String ComplexityPairProof)
 
 -- | A 'ComplexityPair' is a processor that can returns 'ComplexityPairProof'.
 data ComplexityPair where
