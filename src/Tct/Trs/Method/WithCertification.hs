@@ -44,25 +44,16 @@ instance T.Processor WithCertification where
   type Out WithCertification         = TrsProblem
 
   execute p prob = do
-    undefined
-    -- ret <- T.evaluate (onStrategy p) prob
-    -- tmp <- T.tempDirectory `fmap` T.askState
-    -- undefined
-      rpt 
-    -- res <- undefined -- case ret of
-      -- T.Halt _ -> return (Left "Halting computation.")
-      -- rpt
-      --   | kind p == PartialProof -> CeTA.partialProofIO' tmp pt
-      --   | T.isOpen pt            -> return (Right pt)
-      --   | otherwise              -> CeTA.totalProofIO' tmp pt
-      --   where pt = T.fromReturn rpt
-    -- let
-      -- toRet = case ret of
-      --   T.Continue _ -> T.Continue
-      --   T.Abort _    -> T.Abort
-      --   T.Halt pt    -> const (T.Halt pt)
-
-    -- either (throwError . userError) (return . toRet) res
+    pt  <- T.evaluate (onStrategy p) (T.Open prob)
+    tmp <- T.tempDirectory `fmap` T.askState
+    res <- case pt of
+      T.Failure r -> return $ Left (show r)
+      rpt
+        | kind p == PartialProof -> CeTA.partialProofIO' tmp rpt
+        | T.isOpen rpt           -> return (Right pt)
+        | otherwise              -> CeTA.totalProofIO' tmp rpt
+    either T.abortWith k res
+    where k pt = return $ T.Progress () T.fromId (T.toId pt)
 
 withCertificationStrategy :: TotalProof -> TrsStrategy -> TrsStrategy
 withCertificationStrategy t st = T.Apply $ WithCertification { kind = t, onStrategy = st }
