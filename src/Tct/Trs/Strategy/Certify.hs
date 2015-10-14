@@ -60,7 +60,7 @@ intes 3 = mx 3 .<||> px 3
 intes n = mx n
 
 px,mx :: (?ua :: UsableArgs) => Degree -> TrsStrategy
-px d = poly' (Mixed d) NoRestrict ?ua URules (Just selAny) NoGreedy
+px d = poly' (Mixed d) Restrict ?ua URules (Just selAny) NoGreedy
 mx d = matrix' d d Triangular ?ua URules (Just selAny) NoGreedy
 
 top :: [TrsStrategy] -> TrsStrategy
