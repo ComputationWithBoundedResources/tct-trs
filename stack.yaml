@@ -10,7 +10,7 @@ packages:
     commit: 5ebefbadeefa99e35e97d558f93f2597c0c85b09
 - location:
     git: git@github.com:ComputationWithBoundedResources/tct-core
-    commit: 2d009482512b321cf511834bf9071f93d7465780
+    commit: 9d0a9d1afda4724bb167bf3ddc82b91d27ddfe7b
 - location:
     git: git@github.com:ComputationWithBoundedResources/tct-common
     commit: 27a23e33d00552821141cf2a46654df7ec4559b5
@@ -20,4 +20,4 @@ extra-deps:
 - multiset-0.2.2
 - term-rewriting-0.2
 - union-find-array-0.1.0.2
-resolver: lts-2.22
+resolver: lts-3.4
