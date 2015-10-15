@@ -89,5 +89,3 @@ competitionStrategy =
       then runtime' Best
       else derivational
 
-instance TP.SParsable i o TrsStrategy where
-  parseS = TP.withState trsDeclarations TP.strategy
