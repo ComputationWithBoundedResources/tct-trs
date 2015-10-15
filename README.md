@@ -49,7 +49,7 @@ cabal install **/*.cabal
 The installation provides an executable `tct-trs`.
 
 ```bash
-tct-trs --complexity rci examples/RaML/flatten.raml.trs
+tct-trs --complexity rci examples/RaML/minsort.raml.trs
 ```
 
 For full options, run `tct-trs --help`.
