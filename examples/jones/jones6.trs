@@ -1,0 +1,9 @@
+(VAR a d k x )
+
+(RULES 
+   f(a,empty) -> g(a,empty)
+   f(a,cons(x,k)) -> f(cons(x,a),k)
+   g(empty,d) -> d
+   g(cons(x,k),d) -> g(k,cons(x,d))
+)
+    

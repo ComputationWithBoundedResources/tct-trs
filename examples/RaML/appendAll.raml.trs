@@ -1,0 +1,22 @@
+(STARTTERM
+    CONSTRUCTOR-BASED)
+(STRATEGY
+    INNERMOST)
+
+(VAR
+    @l @l1 @l2 @ls @x @xs)
+(RULES
+    append(@l1,@l2) -> append#1(@l1,@l2)
+    append#1(::(@x,@xs),@l2) -> ::(@x,append(@xs,@l2))
+    append#1(nil(),@l2) -> @l2
+    appendAll(@l) -> appendAll#1(@l)
+    appendAll#1(::(@l1,@ls)) -> append(@l1,appendAll(@ls))
+    appendAll#1(nil()) -> nil()
+    appendAll2(@l) -> appendAll2#1(@l)
+    appendAll2#1(::(@l1,@ls)) -> append(appendAll(@l1),appendAll2(@ls))
+    appendAll2#1(nil()) -> nil()
+    appendAll3(@l) -> appendAll3#1(@l)
+    appendAll3#1(::(@l1,@ls)) -> append(appendAll2(@l1),appendAll3(@ls))
+    appendAll3#1(nil()) -> nil())
+(COMMENT
+    This TRS was automatically generated from the resource aware ML program 'appendAll.raml', c.f. http://raml.tcs.ifi.lmu.de/)

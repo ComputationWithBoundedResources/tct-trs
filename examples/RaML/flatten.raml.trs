@@ -1,0 +1,41 @@
+(STARTTERM
+    CONSTRUCTOR-BASED)
+(STRATEGY
+    INNERMOST)
+
+(VAR
+    @l @l1 @l2 @t @t1 @t2 @x @xs @y @ys)
+(RULES
+    #less(@x,@y) -> #cklt(#compare(@x,@y))
+    append(@l1,@l2) -> append#1(@l1,@l2)
+    append#1(::(@x,@xs),@l2) -> ::(@x,append(@xs,@l2))
+    append#1(nil(),@l2) -> @l2
+    flatten(@t) -> flatten#1(@t)
+    flatten#1(leaf()) -> nil()
+    flatten#1(node(@l,@t1,@t2)) -> append(@l,append(flatten(@t1),flatten(@t2)))
+    flattensort(@t) -> insertionsort(flatten(@t))
+    insert(@x,@l) -> insert#1(@l,@x)
+    insert#1(::(@y,@ys),@x) -> insert#2(#less(@y,@x),@x,@y,@ys)
+    insert#1(nil(),@x) -> ::(@x,nil())
+    insert#2(#false(),@x,@y,@ys) -> ::(@x,::(@y,@ys))
+    insert#2(#true(),@x,@y,@ys) -> ::(@y,insert(@x,@ys))
+    insertionsort(@l) -> insertionsort#1(@l)
+    insertionsort#1(::(@x,@xs)) -> insert(@x,insertionsort(@xs))
+    insertionsort#1(nil()) -> nil()
+    #cklt(#EQ()) ->= #false()
+    #cklt(#GT()) ->= #false()
+    #cklt(#LT()) ->= #true()
+    #compare(#0(),#0()) ->= #EQ()
+    #compare(#0(),#neg(@y)) ->= #GT()
+    #compare(#0(),#pos(@y)) ->= #LT()
+    #compare(#0(),#s(@y)) ->= #LT()
+    #compare(#neg(@x),#0()) ->= #LT()
+    #compare(#neg(@x),#neg(@y)) ->= #compare(@y,@x)
+    #compare(#neg(@x),#pos(@y)) ->= #LT()
+    #compare(#pos(@x),#0()) ->= #GT()
+    #compare(#pos(@x),#neg(@y)) ->= #GT()
+    #compare(#pos(@x),#pos(@y)) ->= #compare(@x,@y)
+    #compare(#s(@x),#0()) ->= #GT()
+    #compare(#s(@x),#s(@y)) ->= #compare(@x,@y))
+(COMMENT
+    This TRS was automatically generated from the resource aware ML program 'flatten.raml', c.f. http://raml.tcs.ifi.lmu.de/)

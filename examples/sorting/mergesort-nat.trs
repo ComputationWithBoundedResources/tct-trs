@@ -1,0 +1,24 @@
+(VAR
+    l x xs xs' y ys)
+(RULES
+    merge(nil,ys)            -> ys
+    merge(::(x,xs),nil)      -> ::(x,xs)
+    merge(::(x,xs),::(y,ys)) -> ifmerge(lt(x,y),x,xs,y,ys)
+    ifmerge(true,x,xs,y,ys)  -> ::(x,merge(xs,::(y,ys)))
+    ifmerge(false,x,xs,y,ys) -> ::(y,merge(::(x,xs),ys))
+
+    msplit(nil)             -> pair(nil,nil)
+    msplit(::(x,nil))       -> pair(::(x,nil),nil)
+    msplit(::(x,::(y,ys)))  -> msplit'(x,y,msplit(ys))
+    msplit'(x,y,pair(xs,ys)) -> pair(::(x,xs),::(y,ys))
+
+    mergesort(nil)            -> nil
+    mergesort(::(x,nil))      -> ::(x,nil)
+    mergesort(::(x,::(y,ys))) -> mergesort'(msplit(::(x,::(y,ys))))
+    mergesort'(pair(xs,ys))   -> merge(mergesort(xs),mergesort(ys))
+
+    lt(0,0)    -> false
+    lt(0,s(y)) -> true
+    lt(s(x),0) -> false
+    lt(s(x),s(y)) -> lt(x,y)
+)

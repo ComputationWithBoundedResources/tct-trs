@@ -1,0 +1,18 @@
+(VAR x y phi psi a l n)
+(RULES
+not(tt) -> ff
+not(ff) -> tt
+or(tt,x) -> tt
+or(ff,x) -> x
+eq(0,0) -> tt
+eq(s(x),0) -> ff
+eq(0,s(y)) -> ff
+eq(s(x),s(y)) -> eq(x,y)
+main(phi) -> ver(phi,nil)
+in(x,nil) -> ff
+in(x,cons(a,l)) -> or(eq(x,a),in(x,l))
+ver(Var(x),t) -> in(x,t)
+ver(Or(phi,psi),t) -> or(ver(phi,t),ver(psi,t))
+ver(Not(phi),t) -> not(ver(phi,t))
+ver(Exists(n,phi),t) -> or(ver(phi,cons(n,t)),ver(phi,t))
+)

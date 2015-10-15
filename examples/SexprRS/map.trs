@@ -1,0 +1,6 @@
+(VAR x xs f)
+
+(RULES
+ (map f nil) -> nil
+ (map f (cons x xs)) -> (cons (f x) (map f xs))
+)

@@ -1,0 +1,20 @@
+(VAR
+    ls pivot rs x xs y ys z zs)
+(RULES
+    >(s(x),0)    -> true
+    >(0,s(y))    -> false
+    >(0,0)       -> false
+    >(s(x),s(y)) -> >(x,y)
+
+    quicksort(nil)            -> nil
+    quicksort(::(z,zs))       -> quicksort'(z,split(z,zs))
+    quicksort'(z,pair(xs,ys)) -> append(quicksort(xs),::(z,quicksort(ys)))
+    
+    split(pivot,nil)              -> pair(nil,nil)
+    split(pivot,::(x,xs))         -> split'(>(x,pivot),x,split(pivot,xs))
+    split'(true, x, pair(ls,rs))  -> pair(ls,::(x,rs))
+    split'(false, x, pair(ls,rs)) -> pair(::(x,ls),rs)
+
+    append(nil,ys)      -> ys
+    append(::(x,xs),ys) -> ::(x,append(xs,ys))
+)

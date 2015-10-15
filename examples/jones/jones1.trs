@@ -1,0 +1,8 @@
+(VAR a k ls x)
+
+(RULES 
+   rev(ls) -> r1(ls,empty)
+   r1(empty,a) -> a
+   r1(cons(x,k),a) -> r1(k,cons(x,a))
+)
+    

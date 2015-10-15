@@ -1,0 +1,51 @@
+(STARTTERM
+    CONSTRUCTOR-BASED)
+(STRATEGY
+    INNERMOST)
+
+(VAR
+    @acc @l @l1 @l2 @line @ls @m @m1 @m2 @n @x @xs @y @ys)
+(RULES
+    *(@x,@y) -> #mult(@x,@y)
+    +(@x,@y) -> #add(@x,@y)
+    computeLine(@line,@m,@acc) -> computeLine#1(@line,@acc,@m)
+    computeLine#1(::(@x,@xs),@acc,@m) -> computeLine#2(@m,@acc,@x,@xs)
+    computeLine#1(nil(),@acc,@m) -> @acc
+    computeLine#2(::(@l,@ls),@acc,@x,@xs) -> computeLine(@xs,@ls,lineMult(@x,@l,@acc))
+    computeLine#2(nil(),@acc,@x,@xs) -> nil()
+    lineMult(@n,@l1,@l2) -> lineMult#1(@l1,@l2,@n)
+    lineMult#1(::(@x,@xs),@l2,@n) -> lineMult#2(@l2,@n,@x,@xs)
+    lineMult#1(nil(),@l2,@n) -> nil()
+    lineMult#2(::(@y,@ys),@n,@x,@xs) -> ::(+(*(@x,@n),@y),lineMult(@n,@xs,@ys))
+    lineMult#2(nil(),@n,@x,@xs) -> ::(*(@x,@n),lineMult(@n,@xs,nil()))
+    matrixMult(@m1,@m2) -> matrixMult#1(@m1,@m2)
+    matrixMult#1(::(@l,@ls),@m2) -> ::(computeLine(@l,@m2,nil()),matrixMult(@ls,@m2))
+    matrixMult#1(nil(),@m2) -> nil()
+    #add(#0(),@y) ->= @y
+    #add(#neg(#s(#0())),@y) ->= #pred(@y)
+    #add(#neg(#s(#s(@x))),@y) ->= #pred(#add(#pos(#s(@x)),@y))
+    #add(#pos(#s(#0())),@y) ->= #succ(@y)
+    #add(#pos(#s(#s(@x))),@y) ->= #succ(#add(#pos(#s(@x)),@y))
+    #mult(#0(),#0()) ->= #0()
+    #mult(#0(),#neg(@y)) ->= #0()
+    #mult(#0(),#pos(@y)) ->= #0()
+    #mult(#neg(@x),#0()) ->= #0()
+    #mult(#neg(@x),#neg(@y)) ->= #pos(#natmult(@x,@y))
+    #mult(#neg(@x),#pos(@y)) ->= #neg(#natmult(@x,@y))
+    #mult(#pos(@x),#0()) ->= #0()
+    #mult(#pos(@x),#neg(@y)) ->= #neg(#natmult(@x,@y))
+    #mult(#pos(@x),#pos(@y)) ->= #pos(#natmult(@x,@y))
+    #natadd(#0(),@y) ->= @y
+    #natadd(#s(@x),@y) ->= #s(#natadd(@x,@y))
+    #natmult(#0(),@y) ->= #0()
+    #natmult(#s(@x),@y) ->= #natadd(@y,#natmult(@x,@y))
+    #pred(#0()) ->= #neg(#s(#0()))
+    #pred(#neg(#s(@x))) ->= #neg(#s(#s(@x)))
+    #pred(#pos(#s(#0()))) ->= #0()
+    #pred(#pos(#s(#s(@x)))) ->= #pos(#s(@x))
+    #succ(#0()) ->= #pos(#s(#0()))
+    #succ(#neg(#s(#0()))) ->= #0()
+    #succ(#neg(#s(#s(@x)))) ->= #neg(#s(@x))
+    #succ(#pos(#s(@x))) ->= #pos(#s(#s(@x))))
+(COMMENT
+    This TRS was automatically generated from the resource aware ML program 'clevermmult.raml', c.f. http://raml.tcs.ifi.lmu.de/)

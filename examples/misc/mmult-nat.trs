@@ -1,0 +1,20 @@
+(VAR
+    acc l l1 l2 line ls m m1 m2 n x xs y ys)
+(RULES 
+
+    lineMult(n,nil,l2) -> nil
+    lineMult(n,::(x,xs), nil) -> ::(*(x,n),lineMult(n,xs,nil))
+    lineMult(n,::(x,xs), ::(y,ys)) -> ::(+(*(x,n),y),lineMult(n,xs,ys))
+
+    computeLine(nil,m,acc) -> acc
+    computeLine(::(x,xs),nil,acc) -> nil
+    computeLine(::(x,xs),::(l,ls),acc) -> computeLine(xs,ls,lineMult(x,l,acc))
+
+    matrixMult(nil,m2) -> nil
+    matrixMult(::(l,ls),m2) -> ::(computeLine(l,m2,nil), matrixMult(ls,m2))
+
+    *(0,y) -> 0
+    *(s(x),y) -> +(y,*(x,y))
+    +(0,y) -> y
+    +(s(x),y) -> s(+(x,y))
+)

@@ -1,0 +1,16 @@
+(VAR x xs y ys)
+
+(RULES
+  sort(nil)        -> nil
+  sort(cons(x,xs)) -> insert(x,sort(xs))
+
+  insert(x,nil)              -> cons(x,nil)
+  insert(x,cons(y,ys))       -> if_insert(leq(x,y), x, y, ys)
+  if_insert(true, x, y, ys)  -> cons(x,cons(y,ys))
+  if_insert(false, x, y, ys) -> cons(y,insert(x,ys))
+
+  leq(0,y)       -> true
+  leq(s(x), 0)   -> false
+  leq(s(x),s(y)) -> leq(x,y)
+)
+						

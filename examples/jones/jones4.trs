@@ -1,0 +1,8 @@
+(VAR m n r)
+
+(RULES 
+   p(m,n,s(r)) -> p(m,r,n)
+   p(m,s(n),0) -> p(0,n,m)
+   p(m,0,0) -> m
+)
+    

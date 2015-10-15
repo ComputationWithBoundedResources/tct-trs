@@ -1,0 +1,14 @@
+(VAR x y z u v)
+
+(RULES 
+  div(x, y) -> h(x, y, y)
+
+  egypt(/(0, y))    -> nil
+  egypt(/(s(x), y)) -> app(div(y, s(x)),  egypt(i(/(s(x), y), /(s(0), div(y, s(x))))))
+
+  h(s(0), y, z)	         -> s(0)
+  h(s(s(x)), s(0), z)	 -> s(h(s(x), z, z))
+  h(s(s(x)), s(s(y)), z) -> h(s(x), s(y), z)
+
+  i(/(x, y),  /(u, v)) -> /(-(*(x, v), *(y, u)), *(y, v))
+)

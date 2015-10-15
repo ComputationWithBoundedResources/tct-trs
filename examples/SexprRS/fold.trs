@@ -1,0 +1,8 @@
+(VAR x xs y f)
+
+(RULES
+ (fold f y nil) -> y
+ (fold f y (cons x xs)) -> (f y (fold f x xs))
+ (add 0 y) -> y
+ (add (s x) y) -> (s (add x y))
+)

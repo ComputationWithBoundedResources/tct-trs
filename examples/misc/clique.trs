@@ -1,0 +1,16 @@
+(VAR E K S u u2 v v2 )
+
+(RULES 
+  ite(tt, u, v) -> u
+  ite(ff, u, v) -> v
+  find(u, v, []) -> ff
+  find(u, v, ::(::(u, v), E)) -> tt
+  find(u, v, ::(::(u2, v2), E)) -> find(u, v, E)
+  complete(u, [], E) -> tt
+  complete(u, ::(v, S), E) -> ite(find(u, v, E), complete(u, S, E), ff)
+  clique([], E) -> tt
+  clique(::(u, K), E) -> ite(complete(u, K, E), clique(K, E), ff)
+  choice([], K, E) -> ite(clique(K, E), K, [])
+  choice(::(u, S), K, E) -> choice(S, ::(u, K), E)
+  choice(::(u, S), K, E) -> choice(S, K, E)
+)

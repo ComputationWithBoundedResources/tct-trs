@@ -1,0 +1,24 @@
+(STARTTERM
+    CONSTRUCTOR-BASED)
+(STRATEGY
+    INNERMOST)
+
+(VAR
+    @l @l1 @l2 @l3 @x @xs @y @ys @z @zs)
+(RULES
+    group3(@l) -> group3#1(@l)
+    group3#1(::(@x,@xs)) -> group3#2(@xs,@x)
+    group3#1(nil()) -> nil()
+    group3#2(::(@y,@ys),@x) -> group3#3(@ys,@x,@y)
+    group3#2(nil(),@x) -> nil()
+    group3#3(::(@z,@zs),@x,@y) -> ::(tuple#3(@x,@y,@z),group3(@zs))
+    group3#3(nil(),@x,@y) -> nil()
+    zip3(@l1,@l2,@l3) -> zip3#1(@l1,@l2,@l3)
+    zip3#1(::(@x,@xs),@l2,@l3) -> zip3#2(@l2,@l3,@x,@xs)
+    zip3#1(nil(),@l2,@l3) -> nil()
+    zip3#2(::(@y,@ys),@l3,@x,@xs) -> zip3#3(@l3,@x,@xs,@y,@ys)
+    zip3#2(nil(),@l3,@x,@xs) -> nil()
+    zip3#3(::(@z,@zs),@x,@xs,@y,@ys) -> ::(tuple#3(@x,@y,@z),zip3(@xs,@ys,@zs))
+    zip3#3(nil(),@x,@xs,@y,@ys) -> nil())
+(COMMENT
+    This TRS was automatically generated from the resource aware ML program 'rationalPotential.raml', c.f. http://raml.tcs.ifi.lmu.de/)

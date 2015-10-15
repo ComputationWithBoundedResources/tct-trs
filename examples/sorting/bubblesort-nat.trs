@@ -1,0 +1,22 @@
+(VAR
+    x y x' xs ys)
+(RULES
+
+    append(nil,ys)      -> ys
+    append(::(x,xs),ys) -> ::(x,append(xs,ys))
+
+    lt(0,0)    -> false
+    lt(0,s(y)) -> true
+    lt(s(x),0) -> false
+    lt(s(x),s(y)) -> lt(x,y)
+
+    bubblesort(nil) -> nil
+    bubblesort(::(x,xs)) -> bubblesort'(bubble(::(x,xs)))
+    bubblesort'(pair(xs,x)) -> append(bubblesort(xs),::(x,nil))
+
+    bubble(::(x,nil)) -> pair(nil,x)
+    bubble(::(x,::(x',xs))) -> bubble'(lt(x,x'), x, x', xs)
+    bubble'(true, x, x', xs) -> bubble''(x,bubble(::(x',xs)))
+    bubble'(false, x, x', xs) -> bubble''(x',bubble(::(x,xs)))
+    bubble''(x,pair(xs,x')) -> pair(::(x,xs), x')
+)

@@ -1,0 +1,13 @@
+(VAR x y)
+(RULES
+  lcs(e,y) -> 0
+  lcs(x,e) -> 0
+  lcs(a(x),a(y)) -> s(lcs(x,y))
+  lcs(b(x),b(y)) -> s(lcs(x,y))
+  lcs(a(x),b(y)) -> max(lcs(x,b(y)),lcs(a(x),y))
+  lcs(b(x),a(y)) -> max(lcs(x,a(y)),lcs(b(x),y))
+  
+  max(x,0) -> 0
+  max(0,y) -> 0
+  max(s(x),s(y)) -> max(x,y)
+)

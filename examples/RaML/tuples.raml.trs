@@ -1,0 +1,43 @@
+(STARTTERM
+    CONSTRUCTOR-BASED)
+(STRATEGY
+    INNERMOST)
+
+(VAR
+    @acc @l @l1 @l2 @n @x @xs)
+(RULES
+    append(@l1,@l2) -> append#1(@l1,@l2)
+    append#1(::(@x,@xs),@l2) -> ::(@x,append(@xs,@l2))
+    append#1(nil(),@l2) -> @l2
+    append3(@l1,@l2) -> append3#1(@l1,@l2)
+    append3#1(::(@x,@xs),@l2) -> ::(@x,append3(@xs,@l2))
+    append3#1(nil(),@l2) -> @l2
+    append4(@l1,@l2) -> append4#1(@l1,@l2)
+    append4#1(::(@x,@xs),@l2) -> ::(@x,append4(@xs,@l2))
+    append4#1(nil(),@l2) -> @l2
+    attach(@n,@l) -> attach#1(@l,@n)
+    attach#1(::(@x,@xs),@n) -> ::(tuple#2(@n,@x),attach(@n,@xs))
+    attach#1(nil(),@n) -> nil()
+    attach3(@n,@l) -> attach3#1(@l,@n)
+    attach3#1(::(@x,@xs),@n) -> ::(tuple#2(@n,@x),attach3(@n,@xs))
+    attach3#1(nil(),@n) -> nil()
+    attach4(@n,@l) -> attach4#1(@l,@n)
+    attach4#1(::(@x,@xs),@n) -> ::(tuple#2(@n,@x),attach4(@n,@xs))
+    attach4#1(nil(),@n) -> nil()
+    pairs(@l) -> pairs#1(@l)
+    pairs#1(::(@x,@xs)) -> append(attach(@x,@xs),pairs(@xs))
+    pairs#1(nil()) -> nil()
+    pairs'(@l) -> pairs'#1(@l)
+    pairs'#1(::(@x,@xs)) -> append(pairs'(@xs),attach(@x,@xs))
+    pairs'#1(nil()) -> nil()
+    pairs_aux(@l,@acc) -> pairs_aux#1(@l,@acc)
+    pairs_aux#1(::(@x,@xs),@acc) -> pairs_aux(@xs,append(attach(@x,@xs),@acc))
+    pairs_aux#1(nil(),@acc) -> @acc
+    quadruples(@l) -> quadruples#1(@l)
+    quadruples#1(::(@x,@xs)) -> append4(attach4(@x,triples(@xs)),quadruples(@xs))
+    quadruples#1(nil()) -> nil()
+    triples(@l) -> triples#1(@l)
+    triples#1(::(@x,@xs)) -> append3(attach3(@x,pairs(@xs)),triples(@xs))
+    triples#1(nil()) -> nil())
+(COMMENT
+    This TRS was automatically generated from the resource aware ML program 'tuples.raml', c.f. http://raml.tcs.ifi.lmu.de/)

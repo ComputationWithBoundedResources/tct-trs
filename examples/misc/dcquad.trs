@@ -1,0 +1,8 @@
+(VAR x y z u)
+(RULES
+ q(s(x),y) -> p(s(x),0,s(0),y)
+ p(s(x),y,z,u) -> p(x,s(y),s(s(z)),u)
+ p(0,s(x),y,z) -> q(x,add(x,z))
+ add(0,x) -> x
+ add(s(x),y) -> s(add(x,y))
+)

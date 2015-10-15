@@ -1,0 +1,43 @@
+(STARTTERM
+    CONSTRUCTOR-BASED)
+(STRATEGY
+    INNERMOST)
+
+(VAR
+    @l @l1 @l2 @n @x @xs @y)
+(RULES
+    *(@x,@y) -> #mult(@x,@y)
+    dyade(@l1,@l2) -> dyade#1(@l1,@l2)
+    dyade#1(::(@x,@xs),@l2) -> ::(mult(@x,@l2),dyade(@xs,@l2))
+    dyade#1(nil(),@l2) -> nil()
+    mult(@n,@l) -> mult#1(@l,@n)
+    mult#1(::(@x,@xs),@n) -> ::(*(@n,@x),mult(@n,@xs))
+    mult#1(nil(),@n) -> nil()
+    #add(#0(),@y) ->= @y
+    #add(#neg(#s(#0())),@y) ->= #pred(@y)
+    #add(#neg(#s(#s(@x))),@y) ->= #pred(#add(#pos(#s(@x)),@y))
+    #add(#pos(#s(#0())),@y) ->= #succ(@y)
+    #add(#pos(#s(#s(@x))),@y) ->= #succ(#add(#pos(#s(@x)),@y))
+    #mult(#0(),#0()) ->= #0()
+    #mult(#0(),#neg(@y)) ->= #0()
+    #mult(#0(),#pos(@y)) ->= #0()
+    #mult(#neg(@x),#0()) ->= #0()
+    #mult(#neg(@x),#neg(@y)) ->= #pos(#natmult(@x,@y))
+    #mult(#neg(@x),#pos(@y)) ->= #neg(#natmult(@x,@y))
+    #mult(#pos(@x),#0()) ->= #0()
+    #mult(#pos(@x),#neg(@y)) ->= #neg(#natmult(@x,@y))
+    #mult(#pos(@x),#pos(@y)) ->= #pos(#natmult(@x,@y))
+    #natadd(#0(),@y) ->= @y
+    #natadd(#s(@x),@y) ->= #s(#natadd(@x,@y))
+    #natmult(#0(),@y) ->= #0()
+    #natmult(#s(@x),@y) ->= #natadd(@y,#natmult(@x,@y))
+    #pred(#0()) ->= #neg(#s(#0()))
+    #pred(#neg(#s(@x))) ->= #neg(#s(#s(@x)))
+    #pred(#pos(#s(#0()))) ->= #0()
+    #pred(#pos(#s(#s(@x)))) ->= #pos(#s(@x))
+    #succ(#0()) ->= #pos(#s(#0()))
+    #succ(#neg(#s(#0()))) ->= #0()
+    #succ(#neg(#s(#s(@x)))) ->= #neg(#s(@x))
+    #succ(#pos(#s(@x))) ->= #pos(#s(#s(@x))))
+(COMMENT
+    This TRS was automatically generated from the resource aware ML program 'dyade.raml', c.f. http://raml.tcs.ifi.lmu.de/)

@@ -1,0 +1,8 @@
+(VAR a k x y)
+
+(RULES 
+   f(x,empty) -> x
+   f(empty,cons(a,k)) -> f(cons(a,k),k)
+   f(cons(a,k),y) -> f(y,k)    
+)
+    

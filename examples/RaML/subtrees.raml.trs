@@ -1,0 +1,18 @@
+(STARTTERM
+    CONSTRUCTOR-BASED)
+(STRATEGY
+    INNERMOST)
+
+(VAR
+    @l1 @l2 @t @t1 @t2 @x @xs)
+(RULES
+    append(@l1,@l2) -> append#1(@l1,@l2)
+    append#1(::(@x,@xs),@l2) -> ::(@x,append(@xs,@l2))
+    append#1(nil(),@l2) -> @l2
+    subtrees(@t) -> subtrees#1(@t)
+    subtrees#1(leaf()) -> nil()
+    subtrees#1(node(@x,@t1,@t2)) -> subtrees#2(subtrees(@t1),@t1,@t2,@x)
+    subtrees#2(@l1,@t1,@t2,@x) -> subtrees#3(subtrees(@t2),@l1,@t1,@t2,@x)
+    subtrees#3(@l2,@l1,@t1,@t2,@x) -> ::(node(@x,@t1,@t2),append(@l1,@l2)))
+(COMMENT
+    This TRS was automatically generated from the resource aware ML program 'subtrees.raml', c.f. http://raml.tcs.ifi.lmu.de/)

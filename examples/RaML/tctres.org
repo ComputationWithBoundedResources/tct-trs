@@ -1,0 +1,53 @@
+* RAML files
+
+zini@X220~/.tct/examples/raml$ for i in `ls *.raml`; do ~/.tct/RamlToTrs $i > $i.trs; echo "$i `tct +RTS -N -RTS -v a -t 60 -s strat $i.trs`"  ; done 2>/dev/zero
+appendAll.raml YES(?,O(n^1))
+bfs.raml YES(?,O(n^2))
+bft_mmult.raml TIMEOUT
+bitvectors.raml TIMEOUT
+clevermmult.raml YES(?,O(n^2))
+duplicates.raml YES(?,O(n^2))
+dyade.raml YES(?,O(n^2))
+eratosthenes.raml YES(?,O(n^2))
+flatten.raml YES(?,O(n^2))
+insertionsort.raml TIMEOUT
+listsort.raml YES(?,O(n^2))
+longestCommonSubsequence.raml TIMEOUT
+matrix.raml TIMEOUT
+mergesort.raml TIMEOUT
+minsort.raml YES(?,O(n^2))
+queue.raml YES(?,O(n^1))
+quicksort.raml TIMEOUT
+rationalPotential.raml YES(?,O(n^1))
+splitandsort.raml TIMEOUT
+subtrees.raml YES(?,O(n^2))
+ticks.raml YES(?,O(n^1))
+tuples.raml MAYBE
+
+| Input              | Prototype | TcT | Method                                                |
+|--------------------+-----------+-----+-------------------------------------------------------|
+| [[file:appendAll.trs]] | n^1       | n^1 | dt >>> exhaustively (compose Add (mx 1 1))            |
+| [[file:bfs.trs]]       | n^2       | n^2 | dt >>> exhaustively (compose Add (mx 1 1)) >>> mx 2 2 |
+| [[file:bft_mmult.trs]] | n^5       | ?   | interpretations modulo af?                            |
+|                    |           |     |                                                       |
+
+
+* examples GM
+  ~/.tct$ for i in `ls examples/gm/*.trs`; do echo "$i - `./tct +RTS -N4 -RTS -v a -a irc -s strat $i`"; done
+
+  examples/gm/div.trs - YES(?,O(n^1))
+  examples/gm/jones1.trs - YES(O(1),O(n^1))
+  examples/gm/jones2.trs - YES(O(1),O(n^1))
+  examples/gm/jones4.trs - YES(?,O(n^1))
+  examples/gm/jones5.trs - MAYBE
+  examples/gm/jones6.trs - YES(?,O(n^1))
+  examples/gm/list2.trs - YES(?,O(n^1))
+  examples/gm/list3.trs - YES(?,O(n^2))
+  examples/gm/list.trs - YES(?,O(n^2))
+  examples/gm/matrix2.trs - YES(O(1),O(1))
+  examples/gm/matrix.trs - YES(?,O(n^1))
+  examples/gm/wst0.trs - MAYBE
+  examples/gm/wst1.trs - YES(?,O(n^1))
+  examples/gm/wst2.trs - YES(?,O(n^2))
+  examples/gm/wst3.trs - YES(O(1),O(n^1))
+
