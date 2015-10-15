@@ -41,7 +41,7 @@ import qualified Data.Rewriting.Problem.Xml as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Declarations        (trsDeclarations)
+import           Tct.Trs.Declarations        (trsDeclarations,competition)
 
 
 trs :: TrsConfig -> IO ()
@@ -68,6 +68,7 @@ type TrsConfig = TctConfig TrsProblem
 trsConfig :: TrsConfig
 trsConfig = defaultTctConfig parserIO
   `addStrategies` trsDeclarations
+  `withDefaultStrategy` competition
   `appendGHCiScript`
     [ ":module +Tct.Trs.Processors"
     , ":module +Tct.Trs.Interactive"]
