@@ -20,13 +20,6 @@ Other packages:
 The tool is only tested under GNU/Linux.
 
 
-  * [minismt, version 0.6](http://cl-informatik.uibk.ac.at/software/minismt/)
-      * requires ttt2, version >= 1.15 (we recommend the latest version
-        available at the
-        [repository](http://cl2-informatik.uibk.ac.at/mercurial.cgi/ttt2/), as
-        there were some compilation problems with the latest available spin-of
-        version 1.15)
-
 ###Installation
 
 ####Using Stack
@@ -35,7 +28,6 @@ To build and install the package run following command:
 
 ```bash
 stack install tct-trs
-```
 
 ####Using Cabal
 For building via `cabal/cabal-install`, make sure that you have [ghc](http://www.haskell.org/ghc/) and [cabal](http://www.haskell.org/cabal/).
