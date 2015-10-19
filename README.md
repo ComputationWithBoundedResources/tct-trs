@@ -7,7 +7,7 @@ This repository provides the `tct-trs` library as well as the `tct-trs` executab
 ###Requirements
 
 Executables:
-  * [Glasgow Haskell Compiler, version 7.10](http://www.haskell.org/ghc/) 
+  * [Glasgow Haskell Compiler, version 7.10](http://www.haskell.org/ghc/)
   * [minismt, version 0.6](http://cl-informatik.uibk.ac.at/software/minismt/) or [z3, version 4.3](https://github.com/Z3Prover/z3)
     * We recommend using `minismt`. If you want to use `z3`, see [how to set up z3](#how-to-set-up-z3?).
 
@@ -21,13 +21,12 @@ The tool is only tested under GNU/Linux.
 
 ###Installation
 
-
 ####Using Stack
 We recommend using [stack](https://github.com/commercialhaskell/stack) with the accompanied `stack.yaml` file.
 To build and install the package run following command:
 
 ```bash
-stack install
+stack install tct-trs
 ```
 
 ####Using Cabal
@@ -42,7 +41,7 @@ git clone https://github.com/ComputationWithBoundedResources/tct-core
 git clone https://github.com/ComputationWithBoundedResources/tct-common
 git clone https://github.com/ComputationWithBoundedResources/tct-trs
 git clone https://github.com/ComputationWithBoundedResources/term-rewriting-xml
-cabal install **/*.cabal
+cabal install **/*.cabal tct-trs
 ```
 
 ###Example Usage
