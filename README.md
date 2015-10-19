@@ -19,6 +19,14 @@ Other packages:
 
 The tool is only tested under GNU/Linux.
 
+
+  * [minismt, version 0.6](http://cl-informatik.uibk.ac.at/software/minismt/)
+      * requires ttt2, version >= 1.15 (we recommend the latest version
+        available at the
+        [repository](http://cl2-informatik.uibk.ac.at/mercurial.cgi/ttt2/), as
+        there were some compilation problems with the latest available spin-of
+        version 1.15)
+
 ###Installation
 
 ####Using Stack
@@ -55,7 +63,7 @@ For full options, run `tct-trs --help`.
 
 ###FAQ
 
-#####How to set up z3?
+#####Q:How to set up z3?
 
 To use `z3`, you have to update the default configuration and re-install the executable.
 

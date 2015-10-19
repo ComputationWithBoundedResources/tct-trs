@@ -5,5 +5,5 @@ import Tct.Trs.Config
 import Tct.Trs.Interactive
 
 main :: IO ()
-main = trs $ trsConfig
+main = trs trsConfig
   -- `setSolver` ("z3",[])
