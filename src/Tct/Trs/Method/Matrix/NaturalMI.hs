@@ -71,7 +71,6 @@ import qualified Tct.Common.SMT                             as SMT
 
 
 -- imports tct-core
-import qualified Tct.Core.Common.Parser                     as P
 import qualified Tct.Core.Common.Pretty                     as PP
 import qualified Tct.Core.Common.SemiRing                   as SR
 import qualified Tct.Core.Common.Xml                        as Xml
@@ -660,20 +659,17 @@ description =  [ "description of the matrix interpretation processor: TODO"     
 
 {- | argument for the NaturalMIKind -}
 nmiKindArg :: CD.Argument 'CD.Required NaturalMIKind
-nmiKindArg = CD.arg
-  `CD.withName` "miKind"
+nmiKindArg = CD.flag "kind"
+  ["Specifies the kind of the matrix interpretation."]
   `CD.withDomain` fmap show [(minBound :: NaturalMIKind)..]
-  `CD.withHelp`  ["Specifies the kind of the matrix interpretation."]
 
 {- | dimension argument -}
 dimArg :: CD.Argument 'CD.Required Int
-dimArg = CD.nat { CD.argName = "dimension" }
-         `CD.withHelp` ["Specifies the dimension of the matrices used in the interpretation."]
+dimArg = CD.nat "dimension" ["Specifies the dimension of the matrices used in the interpretation."]
 
 {- | degree argument -}
 degArg :: CD.Argument 'CD.Required Int
-degArg = CD.nat { CD.argName = "degree" }
-         `CD.withHelp` ["Specifies the maximal degree of the matrices used in the interpretation."]
+degArg = CD.nat "degree" ["Specifies the maximal degree of the matrices used in the interpretation."]
 
 {- | rule selctor argument -}
 slArg :: (Ord f, Ord v) => CD.Argument 'CD.Required (Maybe (TD.ExpressionSelector f v))
@@ -877,10 +873,6 @@ instance Xml.Xml (MatrixOrder Int) where
     | True      = Xml.toXml order -- FIXME: MS: add sanity check; ceta supports definitely triangular; does it support algebraic ?
     | otherwise = Xml.unsupported
 
-instance CD.SParsable i i NaturalMIKind where
-  parseS = P.enum
-
-
 
 ----------------------------------------------------------------------
 -- #WG weightgap
@@ -895,9 +887,6 @@ data WgOn
   = WgOnTrs -- ^ Orient at least all non-DP rules.
   | WgOnAny -- ^ Orient some rule.
   deriving (Eq, Show, DT.Typeable, Bounded, Enum)
-
-instance CD.SParsable i i WgOn where
-  parseS = P.enum
 
 data WeightGap = WeightGap
   { wgDimension :: Int
@@ -1072,13 +1061,12 @@ weightGapDeclaration = CD.declare  "weightgap" wgDescription (argDim,argDeg, arg
    argDeg = degArg `CD.optional` 1
    argNMIKind = nmiKindArg `CD.optional` Algebraic
    argUA = Arg.usableArgs  `CD.optional` Arg.UArgs
-   argWgOn = CD.arg
-     `CD.withName` "on"
+   argWgOn = CD.flag "on"
+      [ "This flag determines which rule have to be strictly oriented by the the matrix interpretation for the weight gap principle. "
+      , "Here 'trs' refers to all strict non-dependency-pair rules of the considered problem, "
+      , "while 'any' only demands any rule at all to be strictly oriented. "
+      , "The default value is 'trs'."]
      `CD.withDomain` fmap show [(minBound :: WgOn)..]
-     `CD.withHelp`  [ "This flag determines which rule have to be strictly oriented by the the matrix interpretation for the weight gap principle. "
-                    , "Here 'trs' refers to all strict non-dependency-pair rules of the considered problem, "
-                    , "while 'any' only demands any rule at all to be strictly oriented. "
-                    , "The default value is 'trs'."]
      `CD.optional` WgOnAny
 
 weightgap :: TrsStrategy

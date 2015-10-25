@@ -15,13 +15,18 @@ import           Tct.Trs.Processors
 import           Tct.Trs.Strategy.Certify
 import           Tct.Trs.Strategy.Derivational
 import           Tct.Trs.Strategy.Runtime
+import           Tct.Trs.Strategy.Web
 import qualified Tct.Core.Parse as TP
 import qualified Tct.Core.Common.Parser as TP
+
+
+instance T.DefaultDeclared TrsProblem TrsProblem where
+  defaultDecls = trsDeclarations
 
 trsDeclarations :: [TrsDeclaration]
 trsDeclarations =
   [ T.SD emptyDeclaration
-  , T.SD withCertificationDeclaration
+  -- , T.SD withCertificationDeclaration
 
   , T.SD decomposeDeclaration
   , T.SD decomposeCPDeclaration
@@ -44,7 +49,7 @@ trsDeclarations =
   , T.SD usableRulesDeclaration
 
   -- DP graph
-  , T.SD decomposeDGDeclaration
+  -- , T.SD decomposeDGDeclaration
   , T.SD pathAnalysisDeclaration
   , T.SD predecessorEstimationDeclaration
   , T.SD removeHeadsDeclaration
@@ -71,6 +76,7 @@ trsDeclarations =
   , T.SD derivationalDeclaration
   , T.SD runtimeDeclaration
   , T.SD competitionDeclaration
+  , T.SD webDeclaration
   ]
 
 
@@ -88,4 +94,41 @@ competitionStrategy =
     if isRCProblem p
       then runtime' Best
       else derivational
+
+
+-- selArg :: T.Argument 'T.Optional (ExpressionSelector F V)
+-- selArg = RS.selectorArg
+--   `T.withName` "onSelection"
+--   `T.withHelp`
+--     [ "Determines the strict rules of the selected upper conguence rules." ]
+--   `T.optional` decomposeDGselect
+
+-- upperArg :: T.Argument 'T.Optional (Maybe TrsStrategy)
+-- upperArg = T.some (T.strat "onUpper" ["Use this processor to solve the upper component."])
+--   `T.optional` Nothing
+
+-- lowerArg :: T.Argument 'T.Optional (Maybe TrsStrategy)
+-- lowerArg = T.some (T.strat "onLower" ["Use this processor to solve the lower component."])
+--   `T.optional` Nothing
+
+
+-- | This processor implements processor \'dependency graph decomposition\'.
+-- It tries to estimate the
+-- complexity of the input problem based on the complexity of
+-- dependency pairs of upper congruence classes (with respect to the
+-- congruence graph) relative to the dependency pairs in the remaining
+-- lower congruence classes. The overall upper bound for the
+-- complexity of the input problem is estimated by multiplication of
+-- upper bounds of the sub problems.
+-- Note that the processor allows the optional specification of
+-- processors that are applied on the two individual subproblems. The
+-- transformation results into the systems which could not be oriented
+-- by those processors.
+-- decomposeDGDeclaration :: T.Declaration (
+--   '[ T.Argument 'T.Optional (ExpressionSelector F V)
+--    , T.Argument 'T.Optional (Maybe TrsStrategy)
+--    , T.Argument 'T.Optional (Maybe TrsStrategy) ]
+--   T.:-> TrsStrategy)
+-- decomposeDGDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) (\x y z -> T.Apply (decomposeDGProcessor x y z))
+
 

@@ -13,7 +13,6 @@ module Tct.Trs.Method.DP.DPGraph.RemoveHeads
   ) where
 
 
-import           Control.Applicative          ((<$>))
 import qualified Data.Rewriting.Rule          as R (Rule, rhs)
 import qualified Data.Rewriting.Term          as R
 
@@ -46,7 +45,7 @@ instance T.Processor RemoveHeads where
   type In RemoveHeads          = TrsProblem
   type Out RemoveHeads         = TrsProblem
 
-  execute p prob =
+  execute RemoveHeads prob =
     maybe remhead (\s -> T.abortWith (Inapplicable s :: ApplicationProof RemoveHeadsProof)) (Prob.isDTProblem' prob)
     where
       remhead

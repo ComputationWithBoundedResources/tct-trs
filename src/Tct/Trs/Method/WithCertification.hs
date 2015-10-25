@@ -1,15 +1,14 @@
 -- | This module provides the /With Certification/ processor.
 -- Is used to certify the proof output of a (sub) strategy.
 module Tct.Trs.Method.WithCertification 
-  ( withCertificationDeclaration
-  , withCertification
+  ( --withCertificationDeclaration
+  withCertification
   , withCertification'
   -- * arguments
   , TotalProof (..)
   ) where
 
 
-import           Control.Monad.Error    (throwError)
 import           Data.Typeable
 
 import qualified Tct.Core.Common.Parser as P
@@ -29,8 +28,6 @@ import qualified Tct.Trs.Data.CeTA      as CeTA
 --  * silent return if certification is successful.
 data TotalProof = TotalProof | PartialProof
   deriving (Show, Eq, Enum, Bounded, Typeable)
-
-instance T.SParsable i i TotalProof where parseS = P.enum 
 
 data WithCertification = WithCertification
   { kind       :: TotalProof
@@ -58,26 +55,25 @@ instance T.Processor WithCertification where
 withCertificationStrategy :: TotalProof -> TrsStrategy -> TrsStrategy
 withCertificationStrategy t st = T.Apply $ WithCertification { kind = t, onStrategy = st }
 
-withCertificationDeclaration :: T.Declaration(
-  '[ T.Argument 'T.Optional TotalProof
-   , T.Argument 'T.Required TrsStrategy]
-   T.:-> TrsStrategy)
-withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, T.strat) withCertificationStrategy
-  where
-    desc = "This processor invokes CeTA on the result of the provided strategy."
-    totalArg = T.arg
-      `T.withName` "kind"
-      `T.withHelp` [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ]
-      `T.optional` TotalProof
-      `T.withDomain` fmap show [(minBound :: TotalProof)..]
+-- withCertificationDeclaration :: T.Declaration(
+--   '[ T.Argument 'T.Optional TotalProof
+--    , T.Argument 'T.Required TrsStrategy]
+--    T.:-> TrsStrategy)
+-- withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, T.strat) withCertificationStrategy
+--   where
+--     desc = "This processor invokes CeTA on the result of the provided strategy."
+--     totalArg = (T.flag "kind"
+--       [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ]
+--       `T.withDomain` fmap show [(minBound :: TotalProof)..])
+--       `T.optional` TotalProof
 
 -- | 
 -- > withCertification (dependencyTuples .>>> matrix .>>> empty)
 -- > dependencyPairs' WIDP .>>> withCertification (matrix .>>> empty)
 withCertification :: TrsStrategy -> TrsStrategy
-withCertification = T.deflFun withCertificationDeclaration
+withCertification = undefined --T.deflFun withCertificationDeclaration
 
 -- | > (withCertification' PartialProof dependencyTuples) .>>> matrix >>> empty
 withCertification' :: TotalProof -> TrsStrategy -> TrsStrategy
-withCertification' = T.declFun withCertificationDeclaration
+withCertification' = undefined --T.declFun withCertificationDeclaration
 

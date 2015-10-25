@@ -22,7 +22,6 @@ import           Data.Monoid                  ((<>))
 import qualified Data.Set                     as S
 import           Data.Typeable
 
-import qualified Tct.Core.Common.Parser       as P
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
 import qualified Tct.Core.Data                as T
@@ -441,15 +440,11 @@ orient allowEcomp sig prec safe mu a =
 --- * instances ------------------------------------------------------------------------------------------------------
 
 extCompArg :: T.Argument 'T.Required ExtComp
-extCompArg = T.arg
-  `T.withName` "extended"
-  `T.withHelp`
-    [ "Extended Composition: If this flag is enabled, then the slightly more ."
-    , "liberal composition scheme 'f(x;y) = h(g(;x);k(x;y))' is permitted."
-    , "Currently it is not known whether this extension is sound." ]
+extCompArg = T.flag "extend"
+  [ "Extended Composition: If this flag is enabled, then the slightly more ."
+  , "liberal composition scheme 'f(x;y) = h(g(;x);k(x;y))' is permitted."
+  , "Currently it is not known whether this extension is sound." ]
   `T.withDomain` fmap show [(minBound :: ExtComp)..]
-
-instance T.SParsable i i ExtComp where parseS = P.enum
 
 description :: [String]
 description = [ unwords

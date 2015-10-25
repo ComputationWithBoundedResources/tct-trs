@@ -20,13 +20,9 @@ import           System.Exit
 import           System.IO            (hClose)
 import           System.IO.Temp       (openTempFile)
 import           System.Process       (readProcessWithExitCode)
-
-import           Tct.Core.Common.Xml  as Xml
-
-
-import           Control.Applicative
 import qualified Data.Foldable        as F
 
+import           Tct.Core.Common.Xml  as Xml
 import qualified Tct.Core.Data        as T
 
 import qualified Tct.Common.CeTA      as C

@@ -143,9 +143,7 @@ pathAnalysisDeclaration :: T.Declaration ('[T.Argument 'T.Optional Bool] T.:-> T
 pathAnalysisDeclaration = T.declare "pathAnalysis" desc (T.OneTuple linArg) pathAnalysisStrategy
   where
     desc = ["This processor implements path-analysis as described in the dependency pair paper."]
-    linArg = T.bool
-      `T.withName` "linear"
-      `T.withHelp` ["If this flag is set, linear path analysis is employed."]
+    linArg = T.bool "linear" ["If this flag is set, linear path analysis is employed."]
       `T.optional` True
 
 pathAnalysis' :: Bool -> TrsStrategy

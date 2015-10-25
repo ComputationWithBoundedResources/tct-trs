@@ -27,7 +27,7 @@ module Tct.Trs.Method.DP.DPGraph.PredecessorEstimation
   ) where
 
 
-import           Control.Applicative           ((<$>), (<|>))
+import           Control.Applicative           ((<|>))
 import           Control.Monad                 (guard)
 import           Data.List                     (find)
 import           Data.Maybe                    (catMaybes)

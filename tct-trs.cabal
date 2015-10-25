@@ -123,6 +123,7 @@ library
     Tct.Trs.Strategy.Certify
     Tct.Trs.Strategy.Runtime
     Tct.Trs.Strategy.Derivational
+    Tct.Trs.Strategy.Web
   build-depends:
     array              == 0.5.*,
     base               == 4.*,

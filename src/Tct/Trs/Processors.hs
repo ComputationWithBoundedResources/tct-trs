@@ -71,29 +71,26 @@ type Degree = Int
 
 -- | Argument for degree. @:degree nat@
 degreeArg :: Argument 'Required T.Nat
-degreeArg = nat `withName` "degree" `withHelp` ["set max degree"]
+degreeArg = nat "degree" ["set max degree"]
 
 -- | Arguments for bounded degrees. @:form nat :to nat@
 boundedArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat)
 boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
   where
-    lArg = nat `withName` "from" `withHelp` ["from degree"]
-    uArg = nat `withName` "to"   `withHelp` ["to degree"]
+    lArg = nat "from" ["from degree"]
+    uArg = nat "to"   ["to degree"]
 
 -- | Argument for timeout. @:timeout nat@
 timeoutArg :: Argument 'Required T.Nat
-timeoutArg = nat `withName` "timeout" `withHelp` ["set a timeout"]
+timeoutArg = nat "timeout" ["set a timeout"]
 
 -- | Parsable Flag. Usually used to dynamically select 'fastest' or 'best' combinator.
 data CombineWith = Best | Fastest    deriving (Show, Enum, Bounded, Typeable)
-instance T.SParsable i i CombineWith where parseS = P.enum
 
--- | Argument for combine. @comine <Best|Fastest>@
-combineWithArg :: Argument 'Required a
-combineWithArg = T.arg
-  `withName` "combineWith"
+-- | Argument for combine. @combine <Best|Fastest>@
+combineWithArg :: Argument 'Required CombineWith
+combineWithArg = T.flag "combineWith" ["Set race conditions."]
   `T.withDomain` fmap show [(minBound :: CombineWith) ..]
-  `withHelp` ["combine with"]
 
 
 (.>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy

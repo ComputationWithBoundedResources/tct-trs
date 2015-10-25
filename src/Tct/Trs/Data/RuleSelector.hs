@@ -46,7 +46,6 @@ import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.RuleSet         as Rs
 import           Tct.Trs.Data.Trs             (SelectorExpression (..), Trs)
 import qualified Tct.Trs.Data.Trs             as Trs
-import           Tct.Trs.Data.Symbol          (F, V)
 
 
 -- | This datatype is used to select a subset of rules recorded in a problem.
@@ -61,11 +60,9 @@ instance Show (RuleSelector f v a) where show = rsName
 type RuleSetSelector f v    = RuleSelector f v (Rs.RuleSet f v)
 type ExpressionSelector f v = RuleSelector f v (SelectorExpression f v)
 
-selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
-selectorArg = T.arg { T.argName  = "selector" }
-
-instance T.SParsable i i (ExpressionSelector F V) where
-  parseS = P.choice
+selectorArg :: (Ord f, Ord v) => T.Argument 'T.Required (ExpressionSelector f v)
+selectorArg = T.arg "selector" "<selector>" ["Selector Expression."] parser where
+  parser = P.choice
     [ P.try $ P.symbol (sym1 ++ sym2) >> return (comb prim) | (sym1,comb) <- combs, (sym2,prim) <- prims ]
     where
       combs =

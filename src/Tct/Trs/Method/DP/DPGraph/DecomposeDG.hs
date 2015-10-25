@@ -13,8 +13,8 @@
 Here @sep(R#) = {l->ri | l -> Com(r1,...,rk) in R#}@.
 -}
 module Tct.Trs.Method.DP.DPGraph.DecomposeDG
-  ( decomposeDGDeclaration
-  , decomposeDG
+  (
+  decomposeDG
   , decomposeDG'
 
   -- * ruleselector instances
@@ -190,24 +190,6 @@ help =
   , "The transformation results into the systems which could not be oriented"
   , "by those processors." ]
 
-selArg :: T.Argument 'T.Optional (ExpressionSelector F V)
-selArg = RS.selectorArg
-  `T.withName` "onSelection"
-  `T.withHelp`
-    [ "Determines the strict rules of the selected upper conguence rules." ]
-  `T.optional` decomposeDGselect
-
-upperArg :: T.Argument 'T.Optional (Maybe TrsStrategy)
-upperArg = T.some T.strat
-  `T.withName` "onUpper"
-  `T.withHelp` ["Use this processor to solve the upper component."]
-  `T.optional` Nothing
-
-lowerArg :: T.Argument 'T.Optional (Maybe TrsStrategy)
-lowerArg = T.some T.strat
-  `T.withName` "onLower"
-  `T.withHelp` ["Use this processor to solve the lower component."]
-  `T.optional` Nothing
 
 -- decomposeDGProcDeclaration :: T.Declaration (
   -- '[ T.Argument 'T.Optional (ExpressionSelector F V)
@@ -234,30 +216,12 @@ lowerArg = T.some T.strat
 -- selectLowerBy :: ExpressionSelector F V -> DecomposeDG -> DecomposeDG
 -- selectLowerBy sel p = p{ onSelection=sel }
 
--- | This processor implements processor \'dependency graph decomposition\'.
--- It tries to estimate the
--- complexity of the input problem based on the complexity of
--- dependency pairs of upper congruence classes (with respect to the
--- congruence graph) relative to the dependency pairs in the remaining
--- lower congruence classes. The overall upper bound for the
--- complexity of the input problem is estimated by multiplication of
--- upper bounds of the sub problems.
--- Note that the processor allows the optional specification of
--- processors that are applied on the two individual subproblems. The
--- transformation results into the systems which could not be oriented
--- by those processors.
-decomposeDGDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional (Maybe TrsStrategy)
-   , T.Argument 'T.Optional (Maybe TrsStrategy) ]
-  T.:-> TrsStrategy)
-decomposeDGDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) (\x y z -> T.Apply (decomposeDGProcessor x y z))
 
 decomposeDG :: ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy -> TrsStrategy
-decomposeDG = T.declFun decomposeDGDeclaration
+decomposeDG = undefined -- T.declFun decomposeDGDeclaration
 
 decomposeDG' :: TrsStrategy
-decomposeDG' = T.deflFun decomposeDGDeclaration
+decomposeDG' = undefined --T.deflFun decomposeDGDeclaration
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

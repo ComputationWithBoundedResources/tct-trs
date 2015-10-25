@@ -12,7 +12,6 @@ module Tct.Trs.Method.DP.UsableRules
   ) where
 
 
-import           Control.Applicative         ((<$>))
 import           Control.Monad.State.Strict
 import           Data.List                   (partition)
 import qualified Data.Rewriting.Rule         as R

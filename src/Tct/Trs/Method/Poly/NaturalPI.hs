@@ -194,7 +194,7 @@ entscheide1 _ aorder encoding decoding forceAny prob
 description :: [String]
 description =  [ "This processor tries to find a polynomial interpretation and shifts strict oriented rules to the weak components." ]
 
-selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
+selectorArg :: (Ord f, Ord v) => T.Argument 'T.Required (ExpressionSelector f v)
 selectorArg = RS.selectorArg
   `T.withName` "shift"
   `T.withHelp` [ "This argument specifies which rules to orient strictly and shift to the weak components." ]

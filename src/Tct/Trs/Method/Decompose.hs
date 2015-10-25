@@ -23,7 +23,6 @@ import           Data.Typeable
 import qualified Data.Rewriting.Rule           as R (Rule)
 import qualified Data.Rewriting.Term           as R (isVariantOf)
 
-import qualified Tct.Core.Common.Parser        as P
 import qualified Tct.Core.Common.Pretty        as PP
 import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Common.Xml           as Xml
@@ -161,7 +160,7 @@ instance T.Processor Decompose where
   type Out Decompose         = TrsProblem
   type Forking Decompose     = T.Pair
 
-  execute p@Decompose{..} prob =
+  execute Decompose{..} prob =
     maybe decomposition (\s -> T.abortWith (Inapplicable s :: ApplicationProof DecomposeProof)) maybeApplicable
     where
       decomposition
@@ -193,7 +192,7 @@ instance T.Processor DecomposeCP where
   type Out DecomposeCP         = TrsProblem
   type Forking DecomposeCP     = T.Pair
 
-  execute p@DecomposeCP{..} prob = do
+  execute DecomposeCP{..} prob = do
     app <- runApplicationT $ do
       test (isApplicableRandS prob withBoundCP_)
       let
@@ -275,12 +274,11 @@ instance Xml.Xml DecomposeProof where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 boundArg :: T.Argument 'T.Required DecomposeBound
-boundArg = T.arg { T.argName = "allow", T.argDomain = "<bound>"} `T.withHelp` help where
-  help =
-    [ "This argument type determines"
-    , "how the complexity certificate should be obtained from subproblems (R) and (S)."
-    , "Consequently, this argument also determines the shape of (S)."
-    , "<bound> is one of " ++ show [Add, RelativeAdd, RelativeMul, RelativeComp] ]
+boundArg = T.flag "allow"
+  [ "This argument type determines"
+  , "how the complexity certificate should be obtained from subproblems (R) and (S)."
+  , "Consequently, this argument also determines the shape of (S)." ]
+  `T.withDomain` fmap show [(minBound :: DecomposeBound)..]
 
 desc :: [String]
 desc =
@@ -290,9 +288,6 @@ desc =
   , "The processor closely follows the ideas presented in"
   , "/Complexity Bounds From Relative Termination Proofs/"
   , "(<http://www.imn.htwk-leipzig.de/~waldmann/talk/06/rpt/rel/main.pdf>)" ]
-
-instance T.SParsable i i DecomposeBound where
-  parseS = P.enum
 
 bndArg :: T.Argument 'T.Optional DecomposeBound
 bndArg = boundArg `T.optional` RelativeAdd

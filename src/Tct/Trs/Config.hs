@@ -44,7 +44,7 @@ import           Tct.Trs.Data.Problem
 import           Tct.Trs.Declarations        (trsDeclarations,competition)
 
 
-trs :: TrsConfig -> IO ()
+trs :: T.Declared TrsProblem TrsProblem => TrsConfig -> IO ()
 trs = tct3WithOptions trsUpdate trsOptions
 
 -- | Parses a TrsProblem. Uses the @xml@ format if the file extension is @xml@, otherwise the @WST@ format.

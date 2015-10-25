@@ -29,7 +29,6 @@ import           Data.Typeable                      (Typeable)
 
 import qualified Data.Rewriting.Term                as R
 
-import qualified Tct.Core.Common.Parser             as P
 import qualified Tct.Core.Common.Pretty             as PP
 import           Tct.Core.Common.SemiRing           as PP (add)
 import qualified Tct.Core.Common.Xml                as Xml
@@ -115,7 +114,7 @@ instance T.Processor Bounds where
   type In  Bounds         = TrsProblem
   type Out Bounds         = TrsProblem
 
-  execute p prob = 
+  execute p prob =
     maybe apply (\s -> T.abortWith (Inapplicable s :: ApplicationProof BoundsProof)) maybeApplicable
     where
       apply = boundHeight_ automaton `seq`
@@ -172,10 +171,8 @@ computeAutomaton sig st strict weak enrich initial = toGautomaton $ compatibleAu
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-initialAutomatonArg :: T.Argument T.Required InitialAutomaton
-initialAutomatonArg = T.arg
-  `T.withName` "initial"
-  `T.withHelp`
+initialAutomatonArg :: T.Argument 'T.Required InitialAutomaton
+initialAutomatonArg = T.flag "initial"
     [ "The employed initial automaton."
     , "If 'perSymbol' is set then the initial automaton admits one dedicated"
     , "state per function symbols."
@@ -184,18 +181,10 @@ initialAutomatonArg = T.arg
     , "two states are used in order to distinguish defined symbols from constructors." ]
   `T.withDomain` fmap show [(minBound :: InitialAutomaton)..]
 
-enrichmentArg :: T.Argument T.Required Enrichment
-enrichmentArg = T.arg
-  `T.withName` "enrichment"
-  `T.withHelp`
+enrichmentArg :: T.Argument 'T.Required Enrichment
+enrichmentArg = T.flag "enrichment"
     [ "The employed enrichment." ]
   `T.withDomain` fmap show [(minBound :: Enrichment)..]
-
-instance T.SParsable i i InitialAutomaton where
-  parseS = P.enum
-
-instance T.SParsable i i Enrichment where
-  parseS = P.enum
 
 description :: [String]
 description =
