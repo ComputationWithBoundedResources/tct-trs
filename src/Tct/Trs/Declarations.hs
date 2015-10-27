@@ -15,6 +15,7 @@ import           Tct.Trs.Processors
 import           Tct.Trs.Strategy.Certify
 import           Tct.Trs.Strategy.Derivational
 import           Tct.Trs.Strategy.Runtime
+import           Tct.Trs.Strategy.Web
 import qualified Tct.Core.Parse as TP
 import qualified Tct.Core.Common.Parser as TP
 
@@ -71,6 +72,9 @@ trsDeclarations =
   , T.SD derivationalDeclaration
   , T.SD runtimeDeclaration
   , T.SD competitionDeclaration
+
+  -- Web
+  , T.SD webDeclaration
   ]
 
 
