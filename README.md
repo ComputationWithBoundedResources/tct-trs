@@ -28,6 +28,7 @@ To build and install the package run following command:
 
 ```bash
 stack install tct-trs
+```
 
 ####Using Cabal
 For building via `cabal/cabal-install`, make sure that you have [ghc](http://www.haskell.org/ghc/) and [cabal](http://www.haskell.org/cabal/).
