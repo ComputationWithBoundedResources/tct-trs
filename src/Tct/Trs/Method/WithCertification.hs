@@ -1,8 +1,8 @@
 -- | This module provides the /With Certification/ processor.
 -- Is used to certify the proof output of a (sub) strategy.
 module Tct.Trs.Method.WithCertification 
-  ( --withCertificationDeclaration
-  withCertification
+  ( withCertificationDeclaration
+  , withCertification
   , withCertification'
   -- * arguments
   , TotalProof (..)
@@ -11,7 +11,6 @@ module Tct.Trs.Method.WithCertification
 
 import           Data.Typeable
 
-import qualified Tct.Core.Common.Parser as P
 import qualified Tct.Core.Data          as T
 
 import           Tct.Trs.Data
@@ -55,17 +54,17 @@ instance T.Processor WithCertification where
 withCertificationStrategy :: TotalProof -> TrsStrategy -> TrsStrategy
 withCertificationStrategy t st = T.Apply $ WithCertification { kind = t, onStrategy = st }
 
--- withCertificationDeclaration :: T.Declaration(
---   '[ T.Argument 'T.Optional TotalProof
---    , T.Argument 'T.Required TrsStrategy]
---    T.:-> TrsStrategy)
--- withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, T.strat) withCertificationStrategy
---   where
---     desc = "This processor invokes CeTA on the result of the provided strategy."
---     totalArg = (T.flag "kind"
---       [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ]
---       `T.withDomain` fmap show [(minBound :: TotalProof)..])
---       `T.optional` TotalProof
+withCertificationDeclaration :: T.Declared TrsProblem TrsProblem => T.Declaration(
+  '[ T.Argument 'T.Optional TotalProof
+   , T.Argument 'T.Required TrsStrategy]
+   T.:-> TrsStrategy)
+withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, stratArg) withCertificationStrategy
+  where
+    stratArg = T.strat "toCertify" ["The strategy to certify."]
+    desc = "This processor invokes CeTA on the result of the provided strategy."
+    totalArg = (T.flag "kind"
+      [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ])
+      `T.optional` TotalProof
 
 -- | 
 -- > withCertification (dependencyTuples .>>> matrix .>>> empty)

@@ -16,14 +16,9 @@ import           Tct.Trs.Strategy.Certify
 import           Tct.Trs.Strategy.Derivational
 import           Tct.Trs.Strategy.Runtime
 import           Tct.Trs.Strategy.Web
-import qualified Tct.Core.Parse as TP
-import qualified Tct.Core.Common.Parser as TP
 
 
-instance T.DefaultDeclared TrsProblem TrsProblem where
-  defaultDecls = trsDeclarations
-
-trsDeclarations :: [TrsDeclaration]
+trsDeclarations :: T.Declared TrsProblem TrsProblem => [TrsDeclaration]
 trsDeclarations =
   [ T.SD emptyDeclaration
   -- , T.SD withCertificationDeclaration

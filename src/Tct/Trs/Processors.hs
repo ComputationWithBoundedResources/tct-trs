@@ -36,7 +36,6 @@ import           Data.Typeable
 
 import           Tct.Core
 import qualified Tct.Core.Data                                   as T
-import qualified Tct.Core.Common.Parser       as P
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.DependencyGraph                    as DG

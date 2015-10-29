@@ -27,9 +27,9 @@ module Tct.Trs.Config
   ) where
 
 
-import           Control.Applicative
 import           System.FilePath            (takeExtension)
 
+import           Tct.Core.Common.Options
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml (putXml)
 import qualified Tct.Core.Data              as T
@@ -41,7 +41,7 @@ import qualified Data.Rewriting.Problem.Xml as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Declarations        (trsDeclarations,competition)
+import           Tct.Trs.Declarations        (competition)
 
 
 trs :: T.Declared TrsProblem TrsProblem => TrsConfig -> IO ()
@@ -65,9 +65,8 @@ type TrsConfig = TctConfig TrsProblem
 
 -- | Default Tct configuration for Trs.
 -- Sets the @xml@ / @wst@ parser. Sets a list of default strategies.
-trsConfig :: TrsConfig
+trsConfig :: T.Declared TrsProblem TrsProblem => TrsConfig
 trsConfig = defaultTctConfig parserIO
-  `addStrategies` trsDeclarations
   `withDefaultStrategy` competition
   `appendGHCiScript`
     [ ":module +Tct.Trs.Processors"

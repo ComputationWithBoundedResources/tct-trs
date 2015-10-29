@@ -46,7 +46,6 @@ module Tct.Trs.Method.Matrix.NaturalMI
   ) where
 
 -- general imports
-import           Control.Monad.Error                        (throwError)
 import           Data.Monoid                                ((<>))
 import qualified Control.Monad                              as CM
 import qualified Data.Foldable                              as DF
@@ -71,6 +70,7 @@ import qualified Tct.Common.SMT                             as SMT
 
 
 -- imports tct-core
+import           Tct.Core.Common.Error                      (throwError)
 import qualified Tct.Core.Common.Pretty                     as PP
 import qualified Tct.Core.Common.SemiRing                   as SR
 import qualified Tct.Core.Common.Xml                        as Xml

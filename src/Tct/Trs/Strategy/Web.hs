@@ -6,8 +6,8 @@ import           Tct.Core
 import           Tct.Trs.Processors
 
 webDeclaration = strategy "web"
-  ( degreeArg
-  , ba "matchbounds"
+  ( --degreeArg
+  ba "matchbounds"
   , ba "matrices"
   , ba "matricesusableargs"
   , ba "matricesusablerules"
@@ -24,7 +24,7 @@ webDeclaration = strategy "web"
 ba s = bool s ["Wether to use " ++ s ++ "."]
 
 web
-  deg
+  -- deg
   -- base
   useMatchbounds
   useMatrices
@@ -42,6 +42,8 @@ web
   useDPSimps
 
   =
+
+  let deg = 3 in 
 
   when useToi (try toInnermost)
   .>>>

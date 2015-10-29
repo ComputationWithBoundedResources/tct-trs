@@ -19,7 +19,6 @@ module Tct.Trs.Method.Poly.NaturalPI
   ) where
 
 
-import           Control.Monad.Error                 (throwError)
 import qualified Data.List                           as L
 import qualified Data.Map.Strict                     as M
 import           Data.Maybe                          (fromMaybe)
@@ -29,6 +28,7 @@ import qualified Data.Set                            as S
 import qualified Data.Rewriting.Rule                 as R (Rule (..))
 import qualified Data.Rewriting.Term                 as R
 
+import           Tct.Core.Common.Error               (throwError)
 import qualified Tct.Core.Common.Pretty              as PP
 import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Data                       as T
