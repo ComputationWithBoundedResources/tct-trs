@@ -41,7 +41,7 @@ import qualified Data.Rewriting.Problem.Xml as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Declarations        (competition)
+import           Tct.Trs.Strategy.Competition (competition)
 
 
 trs :: T.Declared Trs Trs => TrsConfig -> IO ()
