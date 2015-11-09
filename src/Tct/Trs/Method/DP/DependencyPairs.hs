@@ -28,7 +28,7 @@ import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Signature      as Sig
-import qualified Tct.Trs.Data.Trs            as Trs
+import qualified Tct.Trs.Data.Rules          as RS
 import qualified Tct.Trs.Data.Symbol         as Symb
 
 
@@ -78,13 +78,13 @@ markRule subtermsOf (R.Rule lhs rhs) =
 -- | (Original Rule, DP Rule)
 type Transformation f v = (R.Rule f v, R.Rule f v)
 
-fromTransformation :: (Ord f, Ord v) => [Transformation f v] -> Trs f v
-fromTransformation = Trs.fromList . snd . unzip
+fromTransformation :: (Ord f, Ord v) => [Transformation f v] -> Rules f v
+fromTransformation = RS.fromList . snd . unzip
 
-markRules :: (R.Term F V -> [R.Term F V]) -> Trs F V -> State Int [Transformation F V]
-markRules subtermsOf trs = F.mapM (\r -> markRule subtermsOf r >>= \r' -> return (r,r')) (Trs.toList trs)
+markRules :: (R.Term F V -> [R.Term F V]) -> Rules F V -> State Int [Transformation F V]
+markRules subtermsOf trs = F.mapM (\r -> markRule subtermsOf r >>= \r' -> return (r,r')) (RS.toList trs)
 
-dependencyPairsOf :: DPKind -> Symbols F -> Trs F V -> State Int [Transformation F V]
+dependencyPairsOf :: DPKind -> Symbols F -> Rules F V -> State Int [Transformation F V]
 dependencyPairsOf dpKind defineds = markRules $ case dpKind of
   WDP  -> subtermsWDP defineds
   WIDP -> subtermsWIDP defineds
@@ -104,8 +104,8 @@ data DependencyPairsProof = DependencyPairsProof
 
 instance T.Processor DependencyPairs where
   type ProofObject DependencyPairs = ApplicationProof DependencyPairsProof
-  type In  DependencyPairs         = TrsProblem
-  type Out DependencyPairs         = TrsProblem
+  type In  DependencyPairs         = Trs
+  type Out DependencyPairs         = Trs
 
   execute p prob                 =
     maybe dp (\s -> T.abortWith (Inapplicable s :: ApplicationProof DependencyPairsProof)) maybeApplicable
@@ -113,7 +113,7 @@ instance T.Processor DependencyPairs where
       dp = T.succeedWith1 (Applicable nproof) T.fromId nprob
       maybeApplicable =
         Prob.isRCProblem' prob
-        <|> Prob.note (not . Trs.null $ Prob.dpComponents prob) " already contains dependency paris"
+        <|> Prob.note (not . RS.null $ Prob.dpComponents prob) " already contains dependency paris"
         -- .<|> if useTuples then Prob.isInnermostProblem' prob else Nothing
 
       dpKind
@@ -123,7 +123,7 @@ instance T.Processor DependencyPairs where
 
       sig      = Prob.signature prob
       defineds = Sig.defineds sig
-      -- defineds = S.fromList . map (either (const undefined) id . R.root . R.lhs) . Trs.toList $ Prob.allComponents prob
+      -- defineds = S.fromList . map (either (const undefined) id . R.root . R.lhs) . RS.toList $ Prob.allComponents prob
 
       (stricts, weaks) = flip evalState 0 $ do
         let
@@ -133,7 +133,7 @@ instance T.Processor DependencyPairs where
         return (ss,ws)
       sDPs = fromTransformation stricts
       wDPs = fromTransformation weaks
-      nsig = unions [sig, Sig.map Symb.markFun (Sig.restrictSignature sig defineds), Trs.signature sDPs, Trs.signature wDPs]
+      nsig = unions [sig, Sig.map Symb.markFun (Sig.restrictSignature sig defineds), RS.signature sDPs, RS.signature wDPs]
         where unions = foldr1 Sig.union
       nprob = Prob.sanitiseDPGraph $ prob
         { Prob.startTerms = Prob.BasicTerms (Symb.markFun `S.map` Prob.defineds starts) (Prob.constructors starts)
@@ -141,7 +141,7 @@ instance T.Processor DependencyPairs where
 
         , Prob.strictDPs = sDPs
         , Prob.weakDPs   = wDPs
-        , Prob.strictTrs = if useTuples then Trs.empty else Prob.strictTrs prob
+        , Prob.strictTrs = if useTuples then RS.empty else Prob.strictTrs prob
         , Prob.weakTrs   = if useTuples then Prob.trsComponents prob else Prob.weakTrs prob }
         where starts = Prob.startTerms prob
       nproof = DependencyPairsProof

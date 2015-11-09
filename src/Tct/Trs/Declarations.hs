@@ -18,7 +18,7 @@ import           Tct.Trs.Strategy.Runtime
 import           Tct.Trs.Strategy.Web
 
 
-trsDeclarations :: T.Declared TrsProblem TrsProblem => [TrsDeclaration]
+trsDeclarations :: T.Declared Trs Trs => [TrsDeclaration]
 trsDeclarations =
   [ T.SD emptyDeclaration
   -- , T.SD withCertificationDeclaration

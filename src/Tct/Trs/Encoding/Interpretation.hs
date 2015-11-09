@@ -29,7 +29,7 @@ import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem               as Prob
 import qualified Tct.Trs.Data.RuleSelector          as RS
 import qualified Tct.Trs.Data.Signature             as Sig
-import qualified Tct.Trs.Data.Trs                   as Trs
+import qualified Tct.Trs.Data.Rules                 as RS
 import qualified Tct.Trs.Encoding.ArgumentFiltering as AFEnc
 import qualified Tct.Trs.Encoding.UsablePositions   as UPEnc
 import qualified Tct.Trs.Encoding.UsableRules       as UREnc
@@ -77,7 +77,7 @@ data InterpretationProof a b = InterpretationProof
 
 -- MS: formally this is not so nice as in tct2; some extra work would be necessary
 -- on the other hand we now have an abstract orient function for interpretations
--- see Tct.Trs.Method.Poly.NaturalPI for an example
+-- see Tct.RS.Method.Poly.NaturalPI for an example
 class AbstractInterpretation i where
   type (A i) :: *
   type (B i) :: *
@@ -85,19 +85,19 @@ class AbstractInterpretation i where
 
   encode      :: i -> A i -> SMT.SmtSolverSt Int (B i)
 
-  setMonotone :: i -> B i -> [Int] -> (SMT.Formula Int) 
-  setInFilter :: i -> B i -> (Int -> SMT.Formula Int) -> (SMT.Formula Int)
+  setMonotone :: i -> B i -> [Int] -> SMT.Formula Int
+  setInFilter :: i -> B i -> (Int -> SMT.Formula Int) -> SMT.Formula Int
 
   interpret   :: i -> Interpretation F (B i) -> R.Term F V -> C i
 
-  addConstant :: i -> C i -> (SMT.IExpr Int) -> C i
-  gte         :: i -> C i -> C i -> (SMT.Formula Int)
+  addConstant :: i -> C i -> SMT.IExpr Int -> C i
+  gte         :: i -> C i -> C i -> SMT.Formula Int
 
-type ForceAny = [R.Rule F V] -> (SMT.Formula Int) 
+type ForceAny = [R.Rule F V] -> SMT.Formula Int
 
 
 orient :: AbstractInterpretation i => i
-  -> TrsProblem
+  -> Trs
   -> Interpretation F (A i)
   -> Shift
   -> Bool -- TODO: MS: Use Types
@@ -162,10 +162,10 @@ orient inter prob absi mselector useUP useUR = do
           All       -> SMT.bigAnd [ usable r .=> strict r .> zero | r <- srules ]
           Shift sel -> orientSelected (RS.rsSelect sel prob)
 
-    orientSelected (Trs.SelectDP r)  = strict r .> zero
-    orientSelected (Trs.SelectTrs r) = strict r .> zero
-    orientSelected (Trs.BigAnd es)   = SMT.bigAnd (orientSelected `fmap` es)
-    orientSelected (Trs.BigOr es)    = SMT.bigOr (orientSelected `fmap` es)
+    orientSelected (RS.SelectDP r)  = strict r .> zero
+    orientSelected (RS.SelectTrs r) = strict r .> zero
+    orientSelected (RS.BigAnd es)   = SMT.bigAnd (orientSelected `fmap` es)
+    orientSelected (RS.BigOr es)    = SMT.bigOr (orientSelected `fmap` es)
 
   SMT.assert wOrderConstraints
   SMT.assert sOrderConstraints
@@ -178,9 +178,9 @@ orient inter prob absi mselector useUP useUR = do
 
   where
     trs    = Prob.allComponents prob
-    rules  = Trs.toList trs
-    srules = Trs.toList (Prob.strictComponents prob)
-    wrules = Trs.toList (Prob.weakComponents prob)
+    rules  = RS.toList trs
+    srules = RS.toList (Prob.strictComponents prob)
+    wrules = RS.toList (Prob.weakComponents prob)
 
     allowUR = useUR && Prob.isRCProblem prob && Prob.isInnermostProblem prob
     allowAF = allowUR
@@ -201,19 +201,19 @@ orient inter prob absi mselector useUP useUR = do
 -- toTree p prob (T.Fail po)                 = T.NoProgress (T.ProofNode p prob po) (T.Open prob)
 -- toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) certfn (T.Open `fmap` probs)
 
-newProblem :: TrsProblem -> InterpretationProof a b -> T.Optional T.Id TrsProblem
+newProblem :: Trs -> InterpretationProof a b -> T.Optional T.Id Trs
 newProblem prob proof = case shift_ proof of
   All     -> T.Null
   Shift _ -> T.Opt . T.Id $ newProblem' prob proof
 
 newProblem' :: Problem F V -> InterpretationProof a b -> Problem F V
 newProblem' prob proof = Prob.sanitiseDPGraph $  prob
-    { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
-    , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
-    , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs
-    , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs }
+    { Prob.strictDPs = Prob.strictDPs prob `RS.difference` sDPs
+    , Prob.strictTrs = Prob.strictTrs prob `RS.difference` sTrs
+    , Prob.weakDPs   = Prob.weakDPs prob `RS.union` sDPs
+    , Prob.weakTrs   = Prob.weakTrs prob `RS.union` sTrs }
   where
-    rules = Trs.fromList . fst . unzip
+    rules = RS.fromList . fst . unzip
     sDPs = rules (strictDPs_ proof)
     sTrs = rules (strictTrs_ proof)
 
@@ -251,10 +251,10 @@ xmlProof :: Xml.Xml a => InterpretationProof a b -> Xml.XmlContent -> Xml.XmlCon
 xmlProof proof itype =
   Xml.elt "ruleShifting"
     [ orderingConstraintProof
-    , Xml.elt "trs" [Xml.toXml $ Trs.fromList trs]          -- strict part
+    , Xml.elt "trs" [Xml.toXml $ RS.fromList trs]          -- strict part
     -- ceta complains if usableRules are set for non-innermost; even if all rules are given
     , if useURules_ proof 
-        then Xml.elt "usableRules" [Xml.toXml $ Trs.fromList usr] -- usable part
+        then Xml.elt "usableRules" [Xml.toXml $ RS.fromList usr] -- usable part
         else Xml.empty
     ]
     where

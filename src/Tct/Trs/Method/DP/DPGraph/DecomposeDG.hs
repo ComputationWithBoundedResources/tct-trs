@@ -50,7 +50,7 @@ import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.RuleSelector    as RS
 import qualified Tct.Trs.Data.RuleSet         as Prob
 import qualified Tct.Trs.Data.Symbol          as Symb
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules           as RS
 
 
 data DecomposeDG = DecomposeDG
@@ -62,9 +62,9 @@ data DecomposeDG = DecomposeDG
 data DecomposeDGProof
   = DecomposeDGProof
     { wdg_         :: DG F V
-    , unselected_  :: Trs F V
-    , selected_    :: Trs F V
-    , extension_   :: Trs F V }
+    , unselected_  :: Rules F V
+    , selected_    :: Rules F V
+    , extension_   :: Rules F V }
   | DecomposeDGFail String
   deriving Show
 
@@ -73,15 +73,15 @@ certfn (T.Pair (c1,c2)) = zero { T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.tim
 
 instance T.Processor DecomposeDG where
   type ProofObject DecomposeDG = ApplicationProof DecomposeDGProof
-  type In DecomposeDG          = TrsProblem
-  type Out DecomposeDG         = TrsProblem
+  type In DecomposeDG          = Trs
+  type Out DecomposeDG         = Trs
   type Forking DecomposeDG     = T.Pair
 
   execute p prob = do
     maybe decomposition (\s -> T.abortWith (Inapplicable s :: ApplicationProof DecomposeDGProof)) (Prob.isDPProblem' prob)
     where
       decomposition
-        | Trs.null initialDPs             = abortx (DecomposeDGFail "no rules were selected")
+        | RS.null initialDPs             = abortx (DecomposeDGFail "no rules were selected")
         | not (any isCut unselectedNodes) = abortx (DecomposeDGFail "no rule was cut")
         | prob `isSubsetDP` lowerProb     = abortx (DecomposeDGFail "lower component not simpler")
         | otherwise                       = do
@@ -93,15 +93,15 @@ instance T.Processor DecomposeDG where
         where
           abortx              = T.abortWith  . Applicable
           mapply stM pr      = maybe (return $ T.Open pr) (\st -> T.evaluate st (T.Open pr)) stM
-          p1 `isSubsetDP` p2 = Prob.strictDPs p1 `Trs.isSubset` Prob.strictDPs p2 && Prob.weakDPs p1 `Trs.isSubset` Prob.weakDPs p2
+          p1 `isSubsetDP` p2 = Prob.strictDPs p1 `RS.isSubset` Prob.strictDPs p2 && Prob.weakDPs p1 `RS.isSubset` Prob.weakDPs p2
 
           wdg = Prob.dependencyGraph prob
 
           -- compute forward closed lower component from the selector (1)
           initialDPs = fst . RS.rules $ RS.rsSelect (RS.selFirstAlternative $ onSelection p) prob
           selected = withNodeLabels' wdg $ reachablesDfs wdg initialNodes
-            where initialNodes = [ n | (n,nl) <- (lnodes wdg), theRule nl `Trs.member` initialDPs]
-          (selectedNodes, selectedStrictDPs, selectedWeakDPs) = (S.fromList ns, Trs.fromList srs, Trs.fromList wrs)
+            where initialNodes = [ n | (n,nl) <- (lnodes wdg), theRule nl `RS.member` initialDPs]
+          (selectedNodes, selectedStrictDPs, selectedWeakDPs) = (S.fromList ns, RS.fromList srs, RS.fromList wrs)
             where (ns,srs,wrs) = withRulesPair' selected
 
           unselectedNodes  = filter (`S.notMember` selectedNodes) (nodes wdg)
@@ -110,12 +110,12 @@ instance T.Processor DecomposeDG where
           -- to fulfill (2) we move weak predecessors in the upper component (cut nodes) to the strict component
           isCut n = any (`S.member` selectedNodes) (successors wdg n)
           (cutWeakDPs, uncutWeakDPs) = L.partition (isCut . fst) (filterWeak unselectedLNodes)
-          unselectedStrictDPs = Trs.fromList $ asRules cutWeakDPs ++ asRules (filterStrict unselectedLNodes)
-          unselectedWeakDPs   = Trs.fromList $ asRules uncutWeakDPs
+          unselectedStrictDPs = RS.fromList $ asRules cutWeakDPs ++ asRules (filterStrict unselectedLNodes)
+          unselectedWeakDPs   = RS.fromList $ asRules uncutWeakDPs
 
           -- compute extension rules sep
-          extension = sep unselectedStrictDPs `Trs.union` sep unselectedWeakDPs where
-            sep = Trs.fromList . concatMap sepRule . Trs.toList
+          extension = sep unselectedStrictDPs `RS.union` sep unselectedWeakDPs where
+            sep = RS.fromList . concatMap sepRule . RS.toList
             sepRule (R.Rule l (R.Fun f ts)) | Symb.isCompoundFun f = [ R.Rule l ti | ti <- ts ]
             sepRule (R.Rule l r) = [ R.Rule l r ]
 
@@ -125,12 +125,12 @@ instance T.Processor DecomposeDG where
 
           lowerProb = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = selectedStrictDPs
-            , Prob.weakDPs   = extension `Trs.union` selectedWeakDPs }
+            , Prob.weakDPs   = extension `RS.union` selectedWeakDPs }
 
           proof = DecomposeDGProof
             { wdg_         = wdg
-            , selected_    = selectedStrictDPs `Trs.union` selectedWeakDPs
-            , unselected_  = Trs.fromList $ asRules unselectedLNodes
+            , selected_    = selectedStrictDPs `RS.union` selectedWeakDPs
+            , unselected_  = RS.fromList $ asRules unselectedLNodes
             , extension_   = extension }
 
 
@@ -141,8 +141,8 @@ decomposeDGselect :: ExpressionSelector F V
 decomposeDGselect = RS.selAllOf (RS.selFromDG f) { RS.rsName = "below first cut in WDG" }
   where
     f dg = Prob.emptyRuleSet
-      { Prob.sdps = Trs.fromList selectedStrict
-      , Prob.wdps = Trs.fromList selectedWeak }
+      { Prob.sdps = RS.fromList selectedStrict
+      , Prob.wdps = RS.fromList selectedWeak }
       where
         wdg = dependencyGraph dg
         cdg = congruenceGraph dg
@@ -197,12 +197,12 @@ selArg = RS.selectorArg
     [ "Determines the strict rules of the selected upper conguence rules." ]
   `T.optional` decomposeDGselect
 
-upperArg :: T.Declared TrsProblem TrsProblem => T.Argument 'T.Optional (Maybe TrsStrategy)
+upperArg :: T.Declared Trs Trs => T.Argument 'T.Optional (Maybe TrsStrategy)
 upperArg = T.some (T.strat "onUpper"
   ["Use this processor to solve the upper component."])
   `T.optional` Nothing
 
-lowerArg :: T.Declared TrsProblem TrsProblem => T.Argument 'T.Optional (Maybe TrsStrategy)
+lowerArg :: T.Declared Trs Trs => T.Argument 'T.Optional (Maybe TrsStrategy)
 lowerArg = T.some (T.strat "onLower"
   ["Use this processor to solve the lower component."])
   `T.optional` Nothing
@@ -244,17 +244,17 @@ lowerArg = T.some (T.strat "onLower"
 -- processors that are applied on the two individual subproblems. The
 -- transformation results into the systems which could not be oriented
 -- by those processors.
-decomposeDGDeclaration :: T.Declared TrsProblem TrsProblem => T.Declaration (
+decomposeDGDeclaration :: T.Declared Trs Trs => T.Declaration (
   '[ T.Argument 'T.Optional (ExpressionSelector F V)
    , T.Argument 'T.Optional (Maybe TrsStrategy)
    , T.Argument 'T.Optional (Maybe TrsStrategy) ]
   T.:-> TrsStrategy)
 decomposeDGDeclaration = T.declare "decomposeDG" help (selArg,upperArg,lowerArg) (\x y z -> T.Apply (decomposeDGProcessor x y z))
 
--- decomposeDG :: T.Declared TrsProblem TrsProblem => ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy -> TrsStrategy
+-- decomposeDG :: T.Declared Trs Trs => ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy -> TrsStrategy
 -- decomposeDG = T.declFun decomposeDGDeclaration
 
--- decomposeDG' :: T.Declared TrsProblem TrsProblem => TrsStrategy
+-- decomposeDG' :: T.Declared Trs Trs => TrsStrategy
 -- decomposeDG' = T.deflFun decomposeDGDeclaration
 
 decomposeDG :: ExpressionSelector F V -> Maybe TrsStrategy -> Maybe TrsStrategy -> TrsStrategy

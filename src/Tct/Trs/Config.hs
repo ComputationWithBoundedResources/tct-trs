@@ -44,28 +44,28 @@ import           Tct.Trs.Data.Problem
 import           Tct.Trs.Declarations        (competition)
 
 
-trs :: T.Declared TrsProblem TrsProblem => TrsConfig -> IO ()
+trs :: T.Declared Trs Trs => TrsConfig -> IO ()
 trs = tct3WithOptions trsUpdate trsOptions
 
--- | Parses a TrsProblem. Uses the @xml@ format if the file extension is @xml@, otherwise the @WST@ format.
-parserIO :: FilePath -> IO (Either String TrsProblem)
+-- | Parses a Trs. Uses the @xml@ format if the file extension is @xml@, otherwise the @WST@ format.
+parserIO :: FilePath -> IO (Either String Trs)
 parserIO fn
   | takeExtension fn == ".xml" = fromRewriting <$> R.xmlFileToProblem fn
   | otherwise                  = parser <$> readFile fn
 
 -- | @WST@ format parser from 'Data.Rewriting'.
-parser :: String -> Either String TrsProblem
+parser :: String -> Either String Trs
 parser s = case R.fromString s of
   Left e  -> Left (show e)
   Right p -> fromRewriting p
 
 
 -- | The Tct configuration type for Trs.
-type TrsConfig = TctConfig TrsProblem
+type TrsConfig = TctConfig Trs
 
 -- | Default Tct configuration for Trs.
 -- Sets the @xml@ / @wst@ parser. Sets a list of default strategies.
-trsConfig :: T.Declared TrsProblem TrsProblem => TrsConfig
+trsConfig :: T.Declared Trs Trs => TrsConfig
 trsConfig = defaultTctConfig parserIO
   `withDefaultStrategy` competition
   `appendGHCiScript`

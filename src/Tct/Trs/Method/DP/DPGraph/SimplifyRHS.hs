@@ -31,7 +31,7 @@ import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Signature       as Sig
 import qualified Tct.Trs.Data.Symbol          as Symb
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules as RS
 
 
 data SimplifyRHS = SimplifyRHS deriving Show
@@ -45,8 +45,8 @@ data SimplifyRHSProof
 
 instance T.Processor SimplifyRHS where
   type ProofObject SimplifyRHS = ApplicationProof SimplifyRHSProof
-  type In  SimplifyRHS         = TrsProblem
-  type Out SimplifyRHS         = TrsProblem
+  type In  SimplifyRHS         = Trs
+  type Out SimplifyRHS         = Trs
 
   execute SimplifyRHS prob =
     maybe simpRHS (\s -> T.abortWith (Inapplicable s :: ApplicationProof SimplifyRHSProof)) (Prob.isDTProblem' prob)
@@ -74,7 +74,7 @@ instance T.Processor SimplifyRHS where
 
 
           (stricts,weaks) = L.partition fst elims
-          toTrs rs        = Trs.fromList [ r | (_,(r1, mr2)) <- rs, let r = r1 `fromMaybe` mr2]
+          toTrs rs        = RS.fromList [ r | (_,(r1, mr2)) <- rs, let r = r1 `fromMaybe` mr2]
           simplified      = [ r | (_,(_, Just r)) <- elims ]
           nprob = Prob.sanitiseDPGraph $ prob
             { Prob.strictDPs = toTrs stricts
@@ -103,7 +103,7 @@ simplifyRHSDeclaration = T.declare "simplifyRHS" desc () (T.Apply SimplifyRHS) w
 -- r_i can be rewritten.
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
--- not applicable when @strictTrs prob \= Trs.empty@.
+-- not applicable when @strictTrs prob \= RS.empty@.
 simplifyRHS :: TrsStrategy
 simplifyRHS = T.declFun simplifyRHSDeclaration
 
@@ -116,7 +116,7 @@ instance PP.Pretty SimplifyRHSProof where
     [ PP.text "Consider the dependency graph"
     , PP.indent 2 $ PP.pretty (wdg_ p)
     , PP.text "Due to missing edges in the depndency graph, the right-hand sides of following rules could be simplified:"
-    , PP.indent 2 $ PP.pretty (Trs.fromList $ simplified_ p) ]
+    , PP.indent 2 $ PP.pretty (RS.fromList $ simplified_ p) ]
 
 instance Xml.Xml SimplifyRHSProof where
   toXml SimplifyRHSFail      = Xml.elt "simpRHS" []

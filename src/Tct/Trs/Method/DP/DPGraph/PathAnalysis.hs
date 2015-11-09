@@ -42,7 +42,7 @@ import           Tct.Trs.Data
 import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.RuleSet         as Prob
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules           as RS
 
 
 type Path         = [NodeId]
@@ -64,8 +64,8 @@ data PathAnalysisProof
 
 instance T.Processor PathAnalysis where
   type ProofObject PathAnalysis = ApplicationProof PathAnalysisProof
-  type In PathAnalysis          = TrsProblem
-  type Out PathAnalysis         = TrsProblem
+  type In PathAnalysis          = Trs
+  type Out PathAnalysis         = Trs
   type Forking PathAnalysis     = []
 
   execute p prob = 
@@ -92,8 +92,8 @@ instance T.Processor PathAnalysis where
 
           paths = [pth | (pth, _) <- subsumedBy] ++ [pth | (pth,_) <- probPaths]
 
-nodesFrom :: (Ord v, Ord f) => CDG f v -> NodeId -> (Trs f v, Trs f v)
-nodesFrom cdg n = (Trs.fromList srs, Trs.fromList wrs)
+nodesFrom :: (Ord v, Ord f) => CDG f v -> NodeId -> (Rules f v, Rules f v)
+nodesFrom cdg n = (RS.fromList srs, RS.fromList wrs)
   where (srs,wrs) = allRulesPairFromNodes cdg [n]
 
 walkFromL :: (Ord v, Ord f) => CDG f v -> NodeId -> [Subsumed f v]
@@ -115,8 +115,8 @@ walkFromL cdg root = map toSubsumed walked where
       | null sucs = [(path',visited',rs')]
       | otherwise = []
     rs' = rs
-      { Prob.sdps = Prob.sdps rs `Trs.union` stricts
-      , Prob.wdps = Prob.wdps rs `Trs.union` weaks }
+      { Prob.sdps = Prob.sdps rs `RS.union` stricts
+      , Prob.wdps = Prob.wdps rs `RS.union` weaks }
 
 walkFromQ :: (Ord v, Ord f) => CDG f v -> NodeId -> [Subsumed f v]
 walkFromQ cdg root = walkFromQ' [] Prob.emptyRuleSet root where
@@ -128,10 +128,10 @@ walkFromQ cdg root = walkFromQ' [] Prob.emptyRuleSet root where
     new
       | subsumed  = [Left  (path, [path ++ [n'] | n' <- sucs])]
       | otherwise = [Right (path, rs')]
-      where subsumed = not (null sucs) && Trs.null stricts
+      where subsumed = not (null sucs) && RS.null stricts
     rs' = rs
       { Prob.sdps = stricts
-      , Prob.wdps = (Prob.sdps rs `Trs.union` Prob.wdps rs) `Trs.union` weaks }
+      , Prob.wdps = (Prob.sdps rs `RS.union` Prob.wdps rs) `RS.union` weaks }
 
 
 --- * instances ------------------------------------------------------------------------------------------------------

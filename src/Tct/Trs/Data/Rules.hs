@@ -1,9 +1,9 @@
 -- | This module provides a set like interface to TRSs.
 -- 
 -- Should be imported qualified.
-module Tct.Trs.Data.Trs
+module Tct.Trs.Data.Rules
   (
-  Trs
+  Rules
   , SelectorExpression (..)
 
   , map
@@ -54,10 +54,10 @@ import qualified Tct.Trs.Data.Signature as Sig
 
 type RuleSet f v = S.Set (Rule f v)
 
-newtype TrsT a = TrsT (S.Set a)
+newtype RulesT a = RulesT (S.Set a)
   deriving (Eq, Ord, Show, F.Foldable)
 
-type Trs f v = TrsT (R.Rule f v)
+type Rules f v = RulesT (R.Rule f v)
 
 data SelectorExpression f v
   = SelectDP (Rule f v)
@@ -67,33 +67,33 @@ data SelectorExpression f v
   deriving (Show, Typeable)
 
 
-funs :: Ord f => Trs f v -> S.Set f
-funs (TrsT rs) = S.foldl k S.empty rs
+funs :: Ord f => Rules f v -> S.Set f
+funs (RulesT rs) = S.foldl k S.empty rs
   where k acc = S.union acc . S.fromList . R.funs
 
-map :: (Ord f2, Ord v2) => (Rule f1 v1 -> Rule f2 v2) -> Trs f1 v1 -> Trs f2 v2
+map :: (Ord f2, Ord v2) => (Rule f1 v1 -> Rule f2 v2) -> Rules f1 v1 -> Rules f2 v2
 map k = fromList . fmap k . toList
 
-toList :: Trs f v -> [Rule f v]
-toList (TrsT rs) = S.toList rs
+toList :: Rules f v -> [Rule f v]
+toList (RulesT rs) = S.toList rs
 
-toAscList :: Trs f v -> [Rule f v]
-toAscList (TrsT rs) = S.toAscList rs
+toAscList :: Rules f v -> [Rule f v]
+toAscList (RulesT rs) = S.toAscList rs
 
-fromList :: (Ord f, Ord v) => [Rule f v] -> Trs f v
-fromList = TrsT . S.fromList
+fromList :: (Ord f, Ord v) => [Rule f v] -> Rules f v
+fromList = RulesT . S.fromList
 
-definedSymbols :: Ord f => Trs f v -> S.Set f
-definedSymbols (TrsT rs) = S.foldr ofRule S.empty rs
+definedSymbols :: Ord f => Rules f v -> S.Set f
+definedSymbols (RulesT rs) = S.foldr ofRule S.empty rs
   where
     ofRule (R.Rule l _) = ofTerm l
     ofTerm (T.Fun f _)  = (f `S.insert`)
     ofTerm _            = id
 
--- constructorSymbols :: Ord f => Trs f v -> S.Set f 
+-- constructorSymbols :: Ord f => Rules f v -> S.Set f 
 -- constructorSymbols trs = funs trs `S.difference` definedSymbols trs
 
-symbols :: (Ord f, Ord v) => Trs f v -> (M.Map f Int, M.Map f Int)
+symbols :: (Ord f, Ord v) => Rules f v -> (M.Map f Int, M.Map f Int)
 symbols trs = (toMap ds, toMap $ funs trs' `S.difference` ds)
   where 
     trs' = map (\(R.Rule l r) -> R.Rule (T.withArity l) (T.withArity r)) trs
@@ -101,84 +101,84 @@ symbols trs = (toMap ds, toMap $ funs trs' `S.difference` ds)
 
     toMap        = foldr insert M.empty . S.toAscList
     insert (k,a) = M.insertWith err k a
-    err          = error "Tct.Trs.Data.Trs: Symbol already defined with different arity."
+    err          = error "Tct.Trs.Data.Rules: already defined"
 
-signature :: (Ord f, Ord v) => Trs f v -> Sig.Signature f
+signature :: (Ord f, Ord v) => Rules f v -> Sig.Signature f
 signature = Sig.mkSignature . symbols
 
 
-lift1 :: (RuleSet f v -> a) -> Trs f v -> a
-lift1 f (TrsT rs) = f rs
+lift1 :: (RuleSet f v -> a) -> Rules f v -> a
+lift1 f (RulesT rs) = f rs
 
-lift2 :: (RuleSet f v -> RuleSet f v -> a) -> Trs f v -> Trs f v -> a
-lift2 f (TrsT rs1)  (TrsT rs2) = f rs1 rs2
+lift2 :: (RuleSet f v -> RuleSet f v -> a) -> Rules f v -> Rules f v -> a
+lift2 f (RulesT rs1)  (RulesT rs2) = f rs1 rs2
 
-member :: (Ord f, Ord v) => Rule f v -> Trs f v -> Bool
+member :: (Ord f, Ord v) => Rule f v -> Rules f v -> Bool
 member = lift1 . S.member
 
-empty :: Trs f v
-empty = TrsT S.empty
+empty :: Rules f v
+empty = RulesT S.empty
 
-singleton :: Rule f v -> Trs f v
-singleton = TrsT . S.singleton
+singleton :: Rule f v -> Rules f v
+singleton = RulesT . S.singleton
 
-concat :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
-concat trs1 trs2 = TrsT $ lift2 S.union trs1 trs2
+concat :: (Ord f, Ord v) => Rules f v -> Rules f v -> Rules f v
+concat trs1 trs2 = RulesT $ lift2 S.union trs1 trs2
 
-union :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
-union trs1 trs2 = TrsT $ lift2 S.union trs1 trs2
+union :: (Ord f, Ord v) => Rules f v -> Rules f v -> Rules f v
+union trs1 trs2 = RulesT $ lift2 S.union trs1 trs2
 
-unions :: (Ord f, Ord v) => [Trs f v] -> Trs f v
+unions :: (Ord f, Ord v) => [Rules f v] -> Rules f v
 unions []   = empty
 unions trss = foldl1 union trss
 
-intersect :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
-intersect trs1 trs2 = TrsT $ lift2 S.intersection trs1 trs2
+intersect :: (Ord f, Ord v) => Rules f v -> Rules f v -> Rules f v
+intersect trs1 trs2 = RulesT $ lift2 S.intersection trs1 trs2
 
-difference :: (Ord f, Ord v) => Trs f v -> Trs f v -> Trs f v
-difference trs1 trs2 = TrsT $ lift2 S.difference trs1 trs2
+difference :: (Ord f, Ord v) => Rules f v -> Rules f v -> Rules f v
+difference trs1 trs2 = RulesT $ lift2 S.difference trs1 trs2
 
-filter :: (Rule f v -> Bool) -> Trs f v -> Trs f v
-filter k (TrsT rs) = TrsT (S.filter k rs)
+filter :: (Rule f v -> Bool) -> Rules f v -> Rules f v
+filter k (RulesT rs) = RulesT (S.filter k rs)
 
 -- * properties
-any' :: (Rule f v -> Bool) -> Trs f v -> Bool
-any' f (TrsT rs) = S.foldr ((||) . f) False rs
+any' :: (Rule f v -> Bool) -> Rules f v -> Bool
+any' f (RulesT rs) = S.foldr ((||) . f) False rs
 
-all' :: (Rule f v -> Bool) -> Trs f v -> Bool
-all' f (TrsT rs) = S.foldr ((&&) . f) True rs
+all' :: (Rule f v -> Bool) -> Rules f v -> Bool
+all' f (RulesT rs) = S.foldr ((&&) . f) True rs
 
-size :: Trs f v -> Int
+size :: Rules f v -> Int
 size = lift1 S.size
 
-null :: Trs f v -> Bool
+null :: Rules f v -> Bool
 null = lift1 S.null
 
-isSubset :: (Ord f, Ord v) => Trs f v -> Trs f v -> Bool
+isSubset :: (Ord f, Ord v) => Rules f v -> Rules f v -> Bool
 isSubset = lift2 S.isSubsetOf
 
-isWellformed :: Ord v => Trs f v -> Bool
+isWellformed :: Ord v => Rules f v -> Bool
 isWellformed trs = all T.isFun (R.lhss rules) && all (\r -> vars (R.rhs r) `S.isSubsetOf` vars (R.lhs r)) rules
   where 
     rules = toList trs
     vars = S.fromList . T.vars
 
-isLinear, isLeftLinear, isRightLinear, isDuplicating, isCollapsing :: (Ord f, Ord v) => Trs f v -> Bool
+isLinear, isLeftLinear, isRightLinear, isDuplicating, isCollapsing :: (Ord f, Ord v) => Rules f v -> Bool
 isLinear      = all' R.isLinear
 isLeftLinear  = all' R.isLeftLinear
 isRightLinear = all' R.isRightLinear
 isDuplicating = any' R.isDuplicating
 isCollapsing  = any' R.isCollapsing
 
-isNonErasing, isNonSizeIncreasing, isNonDuplicating :: (Ord f, Ord v) => Trs f v -> Bool
+isNonErasing, isNonSizeIncreasing, isNonDuplicating :: (Ord f, Ord v) => Rules f v -> Bool
 isNonErasing        = all' R.isNonErasing
 isNonSizeIncreasing = all' R.isNonSizeIncreasing
 isNonDuplicating    = not . isDuplicating
 
-isOverlay :: (Ord f, Ord v) => Trs f v -> Bool
+isOverlay :: (Ord f, Ord v) => Rules f v -> Bool
 isOverlay = L.null . CP.cpsIn' . toList 
 
-isConstructorTrs :: Ord f => Sig.Signature f -> Trs f v -> Bool
+isConstructorTrs :: Ord f => Sig.Signature f -> Rules f v -> Bool
 isConstructorTrs sig = all' (all (S.null . (`S.intersection` ds) . funsS) . R.directSubterms . R.lhs)
   where 
     ds    = Sig.defineds sig
@@ -192,28 +192,28 @@ isConstructorTrs sig = all' (all (S.null . (`S.intersection` ds) . funsS) . R.di
 note :: Bool -> String -> Maybe String
 note b st = if b then Just st else Nothing
 
-isLinear', isRightLinear'  :: (Ord f, Ord v) => Trs f v -> Maybe String
+isLinear', isRightLinear'  :: (Ord f, Ord v) => Rules f v -> Maybe String
 isLinear' trs      = note (not $ isLinear trs) " some rule is non-linear"
 isRightLinear' trs = note (not $ isRightLinear trs) " some rule is not right linear"
 
-isNonErasing', isNonSizeIncreasing', isNonDuplicating' :: (Ord f, Ord v) => Trs f v -> Maybe String
+isNonErasing', isNonSizeIncreasing', isNonDuplicating' :: (Ord f, Ord v) => Rules f v -> Maybe String
 isNonErasing' trs        = note (not $ isNonErasing trs) " some rule is erasing"
 isNonSizeIncreasing' trs = note (not $ isNonSizeIncreasing trs) " some rule is size-increasing"
 isNonDuplicating' trs    = note (not $ isNonDuplicating trs) " some rule is duplicating"
 
-isOverlay' :: (Ord f, Ord v) => Trs f v -> Maybe String
+isOverlay' :: (Ord f, Ord v) => Rules f v -> Maybe String
 isOverlay' trs = note (not $ isOverlay trs) " system is not overlay"
 
-isConstructorTrs' :: (Ord f, Ord v) => Sig.Signature f -> Trs f v -> Maybe String
+isConstructorTrs' :: (Ord f, Ord v) => Sig.Signature f -> Rules f v -> Maybe String
 isConstructorTrs' sig trs = note (not $ isConstructorTrs sig trs) " system is not constructor system"
 
 
 --- * proofdata  -----------------------------------------------------------------------------------------------------
 
-ppTrs :: (PP.Pretty f, PP.Pretty v) => Trs f v -> PP.Doc
+ppTrs :: (PP.Pretty f, PP.Pretty v) => Rules f v -> PP.Doc
 ppTrs = PP.vcat . fmap PP.pretty . toList
 
-instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Trs f v) where
+instance (PP.Pretty f, PP.Pretty v) => PP.Pretty (Rules f v) where
   pretty = ppTrs
 
 instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Term f v) where
@@ -230,7 +230,7 @@ instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (R.Rule f v) where
 instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Int, R.Rule f v) where
   toXml (i,r) = Xml.toXml r `Xml.setAtts` [Xml.att "rid" (show i)]
 
-instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Trs f v) where
+instance (Xml.Xml f, Xml.Xml v) => Xml.Xml (Rules f v) where
   toXml rs = Xml.elt "rules" [ Xml.toXml r | r <- toList rs ]
   toCeTA   = Xml.toXml
 

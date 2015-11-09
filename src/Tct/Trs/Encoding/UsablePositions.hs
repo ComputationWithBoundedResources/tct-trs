@@ -29,7 +29,7 @@ import qualified Tct.Trs.Data.ProblemKind as Prob
 import qualified Tct.Trs.Data.Rewriting   as R (isUnifiable)
 import qualified Tct.Trs.Data.Signature   as Sig
 import qualified Tct.Trs.Data.Symbol      as Symb
-import qualified Tct.Trs.Data.Trs         as Trs
+import qualified Tct.Trs.Data.Rules       as RS
 
 
 -- | Maps function symbols to a set of (usable) argument positions.
@@ -79,10 +79,10 @@ isUsable sym i (UP m) = maybe False (IS.member i) (M.lookup sym m)
 
 -- | Constructs the usable argument positions of a given TRS,
 -- with respect to a given strategy.
-usableArgs :: (Ord f, Ord v) => Prob.Strategy -> Trs f v -> UsablePositions f
+usableArgs :: (Ord f, Ord v) => Prob.Strategy -> Rules f v -> UsablePositions f
 usableArgs = usableArgsCap
 
-usableArgsCap :: (Ord f, Ord v) => Prob.Strategy -> Trs f v -> UsablePositions f
+usableArgsCap :: (Ord f, Ord v) => Prob.Strategy -> Rules f v -> UsablePositions f
 usableArgsCap Prob.Innermost trs = usableReplacementMap trs empty
 usableArgsCap _ trs              = fix (usableReplacementMap trs) empty
   where
@@ -91,10 +91,10 @@ usableArgsCap _ trs              = fix (usableReplacementMap trs) empty
       | otherwise = fix f res
       where res = f up
 
-usableReplacementMap :: (Ord f, Ord v) => Trs f v -> UsablePositions f -> UsablePositions f
+usableReplacementMap :: (Ord f, Ord v) => Rules f v -> UsablePositions f -> UsablePositions f
 usableReplacementMap trs up = unions [ snd $ uArgs l r | R.Rule l r <- rules]
   where
-    rules = Trs.toList trs
+    rules = RS.toList trs
     uArgs l t@(R.Var _)    = (not (isBlockedProperSubtermOf t l), empty)
     uArgs l t@(R.Fun f ts) = (not (isBlockedProperSubtermOf t l) && (subtermUsable || hasRedex)
                              , unions $ new : [ uargs | (_,_,uargs) <- uArgs'] )

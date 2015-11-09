@@ -13,7 +13,7 @@ import           Tct.Trs.Data.Problem   (signature, trsComponents)
 -- import           Tct.Trs.Data.RuleSelector (selAllOf, selStricts)
 import           Tct.Trs.Data
 import           Tct.Trs.Data.Signature (arity, symbols)
-import           Tct.Trs.Data.Trs       (isNonSizeIncreasing)
+import qualified Tct.Trs.Data.Rules as RS
 import           Tct.Trs.Processors
 
 -- MS:
@@ -52,9 +52,9 @@ dcfast =
 
 iteNonSizeIncreasing :: TrsStrategy -> TrsStrategy -> TrsStrategy
 iteNonSizeIncreasing st1 st2 = withProblem $ \prob ->
-  if isNonSizeIncreasing (trsComponents prob) then st1 else st2
+  if RS.isNonSizeIncreasing (trsComponents prob) then st1 else st2
 
-isSRS :: TrsProblem -> Bool
+isSRS :: Trs -> Bool
 isSRS prob = S.fold (\sym -> (arity sig sym == 1 &&)) True (symbols sig)
   where sig = signature prob
 

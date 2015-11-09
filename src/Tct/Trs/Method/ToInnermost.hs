@@ -17,10 +17,10 @@ import qualified Tct.Core.Common.Xml          as Xml
 import qualified Tct.Core.Data                as T
 
 import           Tct.Common.ProofCombinators (ApplicationProof(..))
-import           Tct.Trs.Data                (TrsProblem, TrsStrategy)
+import           Tct.Trs.Data                (Trs, TrsStrategy)
 
 import qualified Tct.Trs.Data.Problem         as Prob
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules as RS
 
 
 data ToInnermost = ToInnermost deriving Show
@@ -35,8 +35,8 @@ data ToInnermostProof
 -- trs is not rightlinear, not overlay or contains weak components
 instance T.Processor ToInnermost where
   type ProofObject ToInnermost = ApplicationProof ToInnermostProof
-  type In  ToInnermost         = TrsProblem
-  type Out ToInnermost         = TrsProblem
+  type In  ToInnermost         = Trs
+  type Out ToInnermost         = Trs
 
   execute ToInnermost prob =
     maybe ti (\s -> T.abortWith (Inapplicable s :: ApplicationProof ToInnermostProof)) maybeApplicable
@@ -46,9 +46,9 @@ instance T.Processor ToInnermost where
           | Prob.isInnermostProblem prob = T.abortWith (Applicable IsAlreadyInnermost)
           | otherwise                    = T.succeedWith1 (Applicable ToInnermostSuccess) T.fromId (Prob.toInnermost prob)
        maybeApplicable =
-         Trs.isRightLinear' (Prob.allComponents prob)
+         RS.isRightLinear' (Prob.allComponents prob)
          <|>
-         Trs.isOverlay' (Prob.allComponents prob)
+         RS.isOverlay' (Prob.allComponents prob)
          <|>
          Prob.noWeakComponents' prob
 

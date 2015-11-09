@@ -23,7 +23,7 @@ import           Tct.Common.ProofCombinators
 import           Tct.Trs.Data
 import           Tct.Trs.Data.DependencyGraph as DG (isCyclicNode, nodes, empty)
 import qualified Tct.Trs.Data.Problem         as Prob
-import qualified Tct.Trs.Data.Trs             as Trs (empty)
+import qualified Tct.Trs.Data.Rules as RS
 import qualified Tct.Trs.Method.Empty         as E (empty)
 
 
@@ -36,8 +36,8 @@ data TrivialProof
 
 instance T.Processor Trivial where
   type ProofObject Trivial = ApplicationProof TrivialProof
-  type In  Trivial         = TrsProblem
-  type Out Trivial         = TrsProblem
+  type In  Trivial         = Trs
+  type Out Trivial         = Trs
 
   execute Trivial prob =
     maybe cyclic (\s -> T.abortWith (Inapplicable s :: ApplicationProof TrivialProof)) (Prob.isDTProblem' prob)
@@ -49,8 +49,8 @@ instance T.Processor Trivial where
           cdg = Prob.congruenceGraph prob
 
           nprob = prob
-            { Prob.strictDPs = Trs.empty
-            , Prob.weakDPs   = Trs.empty
+            { Prob.strictDPs = RS.empty
+            , Prob.weakDPs   = RS.empty
             , Prob.dpGraph   = DG.empty }
           proof = TrivialProof { wdg_ = Prob.dependencyGraph prob }
 
@@ -63,7 +63,7 @@ trivialStrategy = T.Apply Trivial .>>> E.empty
 -- | Checks whether the DP problem is trivial, i.e., does not contain any cycles.
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
--- not applicable when @strictTrs prob \= Trs.empty@.
+-- not applicable when @strictTrs prob \= RS.empty@.
 trivialDeclaration :: T.Declaration ('[] T.:-> TrsStrategy)
 trivialDeclaration = T.declare "trivial" desc () trivialStrategy where
   desc =

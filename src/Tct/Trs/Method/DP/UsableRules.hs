@@ -27,7 +27,7 @@ import           Tct.Common.ProofCombinators
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem        as Prob
 import qualified Tct.Trs.Data.Rewriting      as R
-import qualified Tct.Trs.Data.Trs            as Trs
+import qualified Tct.Trs.Data.Rules          as RS
 
 
 -- MS: stolen from mzini/hoca
@@ -50,9 +50,9 @@ usableRulesOf rhss rules = walk (caps rhss) [] rules
       where (ur',rs') = partition (\ rl -> s `R.isUnifiable` R.lhs rl) rs
     caps ss = [ cap rules s | si <- ss, s@T.Fun{} <- T.subterms si ]
 
-usableRulesOf' :: (Show f, Show v, Ord v, Ord f) => Trs.Trs f v -> Trs.Trs f v -> Trs.Trs f v
-usableRulesOf' start trs = start `Trs.union` steps
-  where steps = Trs.fromList $ usableRulesOf (RS.rhss $ Trs.toList start) (Trs.toList trs)
+usableRulesOf' :: (Show f, Show v, Ord v, Ord f) => RS.Rules f v -> RS.Rules f v -> RS.Rules f v
+usableRulesOf' start trs = start `RS.union` steps
+  where steps = RS.fromList $ usableRulesOf (RS.rhss $ RS.toList start) (RS.toList trs)
 
 
 --- * processor ------------------------------------------------------------------------------------------------------
@@ -61,16 +61,16 @@ data UsableRules = UsableRules deriving Show
 
 data UsableRulesProof
   = UsableRulesProof
-  { usable_    :: Trs F V
-  , notUsable_ :: Trs F V }
+  { usable_    :: Rules F V
+  , notUsable_ :: Rules F V }
   | UsableRulesFail
   deriving Show
 
 
 instance T.Processor UsableRules where
   type ProofObject UsableRules = ApplicationProof UsableRulesProof
-  type In  UsableRules         = TrsProblem
-  type Out UsableRules         = TrsProblem
+  type In  UsableRules         = Trs
+  type Out UsableRules         = Trs
 
   execute UsableRules prob =
     maybe usables (\s -> T.abortWith (Inapplicable s :: ApplicationProof UsableRulesProof)) (Prob.isDPProblem' prob)
@@ -81,24 +81,24 @@ instance T.Processor UsableRules where
 
       rules    = Prob.allComponents prob
       usable   = usableRulesOf' (Prob.startComponents prob) rules
-      progress = Trs.size usable < Trs.size rules
+      progress = RS.size usable < RS.size rules
 
       proof = UsableRulesProof
         { usable_    = usable
-        , notUsable_ = rules `Trs.difference` usable }
+        , notUsable_ = rules `RS.difference` usable }
 
       nprob = Prob.sanitiseDPGraph $ prob
-        { Prob.strictDPs = Prob.strictDPs prob `Trs.intersect` usable
-        , Prob.weakDPs   = Prob.weakDPs   prob `Trs.intersect` usable
-        , Prob.strictTrs = Prob.strictTrs prob `Trs.intersect` usable
-        , Prob.weakTrs   = Prob.weakTrs   prob `Trs.intersect` usable }
+        { Prob.strictDPs = Prob.strictDPs prob `RS.intersect` usable
+        , Prob.weakDPs   = Prob.weakDPs   prob `RS.intersect` usable
+        , Prob.strictTrs = Prob.strictTrs prob `RS.intersect` usable
+        , Prob.weakTrs   = Prob.weakTrs   prob `RS.intersect` usable }
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
 
 instance PP.Pretty UsableRulesProof where
   pretty p@UsableRulesProof{}
-    | Trs.null (usable_ p) = PP.text "No rule is usable, rules are removed from the input problem."
+    | RS.null (usable_ p) = PP.text "No rule is usable, rules are removed from the input problem."
     | otherwise = PP.vcat
       [ PP.text "We replace rewrite rules by usable rules:"
       , PP.indent 2 $ PP.pretty (usable_ p) ]

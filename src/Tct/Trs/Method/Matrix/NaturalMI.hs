@@ -87,7 +87,7 @@ import qualified Tct.Trs.Data.Problem                       as Prob
 import qualified Tct.Trs.Data.ProblemKind                   as ProbK
 import qualified Tct.Trs.Data.RuleSelector                  as RS
 import qualified Tct.Trs.Data.Signature                     as Sig
-import qualified Tct.Trs.Data.Trs                           as Trs
+import qualified Tct.Trs.Data.Rules as RS
 import qualified Tct.Trs.Encoding.Interpretation            as I
 import qualified Tct.Trs.Encoding.UsableRules               as UREnc
 import qualified Tct.Trs.Encoding.UsablePositions           as UPEnc
@@ -230,7 +230,7 @@ interpretf dim ebsi = I.interpretTerm interpretFun interpretVar
       where
         find e a m =
           DM.fromMaybe
-            (error $ "Tct.Trs.Method.Matrix.NatrualMI.interpretf: Matrix " ++ e ++ " not found")
+            (error $ "Tct.RS.Method.Matrix.NatrualMI.interpretf: Matrix " ++ e ++ " not found")
             (Map.lookup a m)
         finter = find ("interpretation " ++ show f) f (I.interpretations ebsi)
         coeffs = MI.coefficients finter
@@ -558,7 +558,7 @@ kindConstraints (MI.ConstructorEda cs mdeg) absmi = do
     filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
 
 
-entscheide :: NaturalMI -> Prob.TrsProblem -> CD.TctM (CD.Return NaturalMI)
+entscheide :: NaturalMI -> Prob.Trs -> CD.TctM (CD.Return NaturalMI)
 entscheide p prob = do
   let
     orientM = do
@@ -590,7 +590,7 @@ entscheide1 ::
   -> SMT.SmtState Int
   -> (I.Interpretation F (SomeLInter (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
   -> I.ForceAny
-  -> Prob.TrsProblem
+  -> Prob.Trs
   -> CD.TctM (CD.Return NaturalMI)
 entscheide1 p aorder encoding decoding forceAny prob
   | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
@@ -606,7 +606,7 @@ entscheide1 p aorder encoding decoding forceAny prob
       where
 
         assertx st e = st {SMT.asserts = e: SMT.asserts st}
-        srules = Trs.toList $ Prob.strictComponents prob
+        srules = RS.toList $ Prob.strictComponents prob
 
         mkOrder (inter, ufuns) = aorder { mint_ = mkInter (mint_ aorder) inter ufuns }
         mkInter aproof inter ufuns = aproof
@@ -619,13 +619,13 @@ entscheide1 p aorder encoding decoding forceAny prob
           where
 
 
-          (sDPs,wDPs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
-          (sTrs,wTrs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
+          (sDPs,wDPs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
+          (sTrs,wTrs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
           wDPs' = filter (uncurry isWeak . snd) wDPs
           wTrs' = filter (uncurry isWeak . snd) wTrs
           rs trs =
             [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
-            | r@(RR.Rule lhs rhs) <- Trs.toList trs
+            | r@(RR.Rule lhs rhs) <- RS.toList trs
             , isUsable ufuns r]
 
           isUsable Nothing _ = True
@@ -641,7 +641,7 @@ entscheide1 p aorder encoding decoding forceAny prob
 matrixStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector F V)
                -> Arg.Greedy
-               -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
+               -> CD.Strategy Prob.Trs Prob.Trs
 matrixStrategy dim deg nmiKind ua ur sl gr = CD.Apply $
   NaturalMI { miDimension = dim
             , miDegree = deg
@@ -704,16 +704,16 @@ matrixDeclaration :: CD.Declaration (
    , CD.Argument 'CD.Optional Arg.UsableRules
    , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V))
    , CD.Argument 'CD.Optional Arg.Greedy
-  ] CD.:-> CD.Strategy Prob.TrsProblem Prob.TrsProblem)
+  ] CD.:-> CD.Strategy Prob.Trs Prob.Trs)
 matrixDeclaration = CD.declare "matrix" description args matrixStrategy
 
-matrix :: CD.Strategy Prob.TrsProblem Prob.TrsProblem
+matrix :: CD.Strategy Prob.Trs Prob.Trs
 matrix = CD.deflFun matrixDeclaration
 
 matrix' :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector F V)
                -> Arg.Greedy
-               -> CD.Strategy Prob.TrsProblem Prob.TrsProblem
+               -> CD.Strategy Prob.Trs Prob.Trs
 matrix' = CD.declFun matrixDeclaration
 
 
@@ -781,7 +781,7 @@ setMonotone (MI.LInter vmmap _) poss =
     setMonotonePos pos =
       case Map.lookup (toSI pos) vmmap of
       Just m -> EncM.mEntry 1 1 m SMT..> SMT.zero
-      Nothing -> error "Tct.Trs.Method.Matrix.NatrualMI.setMonotone: Argument Position not found"
+      Nothing -> error "Tct.RS.Method.Matrix.NatrualMI.setMonotone: Argument Position not found"
 
 setStronglyLinear :: SR.SemiRing c => Int -> MI.SomeLinearInterpretation c -> [Int] -> MI.SomeLinearInterpretation c
 setStronglyLinear dim (MI.LInter vmmap cs) poss = MI.LInter (foldr k vmmap poss) cs
@@ -791,8 +791,8 @@ setStronglyLinear dim (MI.LInter vmmap cs) poss = MI.LInter (foldr k vmmap poss)
 
 instance CD.Processor NaturalMI where
   type ProofObject NaturalMI = PC.ApplicationProof NaturalMIProof
-  type In  NaturalMI         = Prob.TrsProblem
-  type Out NaturalMI         = Prob.TrsProblem
+  type In  NaturalMI         = Prob.Trs
+  type Out NaturalMI         = Prob.Trs
   type Forking NaturalMI     = CD.Optional CD.Id
 
   {- | Decides whether applying the NaturalMI processor makes progress or not -}
@@ -815,9 +815,9 @@ instance CP.IsComplexityPair NaturalMI where
     else case CD.open pt of
       [nprob] -> Right $ CP.ComplexityPairProof
         { CP.result = pt
-        , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
-        , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
-      _ -> error "Tct.Trs.Method.Poly.NaturalMI.solveComplexityPair: the impossible happened"
+        , CP.removableDPs = Prob.strictDPs prob `RS.difference` Prob.strictDPs nprob
+        , CP.removableTrs = Prob.strictTrs prob `RS.difference` Prob.strictTrs nprob }
+      _ -> error "Tct.RS.Method.Poly.NaturalMI.solveComplexityPair: the impossible happened"
 
 matrixComplexityPair :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules -> CP.ComplexityPair
 matrixComplexityPair dim deg nmiKind ua ur = CP.toComplexityPair $
@@ -909,12 +909,12 @@ type WeightGapProof = PC.OrientationProof WeightGapOrder
 
 instance CD.Processor WeightGap where
   type ProofObject WeightGap = PC.ApplicationProof WeightGapProof
-  type In  WeightGap         = Prob.TrsProblem
-  type Out WeightGap         = Prob.TrsProblem
+  type In  WeightGap         = Prob.Trs
+  type Out WeightGap         = Prob.Trs
 
   execute p prob
     | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof WeightGapProof)
-    | (wgOn p == WgOnTrs) && Trs.null (Prob.strictTrs prob) = incompatible
+    | (wgOn p == WgOnTrs) && RS.null (Prob.strictTrs prob) = incompatible
     | otherwise = do
       res <- wgEntscheide p prob
       case res of
@@ -928,7 +928,7 @@ instance CD.Processor WeightGap where
         _           -> incompatible
       where incompatible = CD.abortWith (PC.Applicable PC.Incompatible :: PC.ApplicationProof WeightGapProof)
 
-wgEntscheide :: WeightGap -> TrsProblem -> CD.TctM (SMT.Result WeightGapOrder)
+wgEntscheide :: WeightGap -> Trs -> CD.TctM (SMT.Result WeightGapOrder)
 wgEntscheide p prob = do
   res :: SMT.Result (I.Interpretation F (SomeLInter Int))
     <- SMT.smtSolveSt (SMT.smtSolveTctM prob) $ do
@@ -985,10 +985,10 @@ wgEntscheide p prob = do
     usablePositions = UPEnc.usableArgsWhereApplicable prob False (wgUArgs p == Arg.UArgs)
 
     trs    = Prob.allComponents prob
-    rules  = Trs.toList trs
-    strs   = Trs.toList (Prob.strictTrs prob)
-    srules = Trs.toList (Prob.strictComponents prob)
-    wrules = Trs.toList (Prob.weakComponents prob)
+    rules  = RS.toList trs
+    strs   = RS.toList (Prob.strictTrs prob)
+    srules = RS.toList (Prob.strictComponents prob)
+    wrules = RS.toList (Prob.weakComponents prob)
 
 
     absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (wgDimension p)) (Sig.toMap sig)
@@ -1030,9 +1030,9 @@ wgEntscheide p prob = do
         , I.weakTrs_   = wTrs }
       }
       where
-      (sDPs,wDPs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
-      (sTrs,wTrs) = List.partition (\(r,i) -> r `Trs.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
-      rs x = [ (r, (interpretf dim mint  lhs, interpretf dim mint rhs)) | r@(RR.Rule lhs rhs) <- Trs.toList x ]
+      (sDPs,wDPs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
+      (sTrs,wTrs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
+      rs x = [ (r, (interpretf dim mint  lhs, interpretf dim mint rhs)) | r@(RR.Rule lhs rhs) <- RS.toList x ]
 
 
 ----------------------------------------------------------------------
@@ -1053,7 +1053,7 @@ weightGapDeclaration :: CD.Declaration (
    , CD.Argument 'CD.Optional NaturalMIKind
    , CD.Argument 'CD.Optional Arg.UsableArgs
    , CD.Argument 'CD.Optional WgOn
-  ] CD.:-> CD.Strategy Prob.TrsProblem Prob.TrsProblem)
+  ] CD.:-> CD.Strategy Prob.Trs Prob.Trs)
 weightGapDeclaration = CD.declare  "weightgap" wgDescription (argDim,argDeg, argNMIKind, argUA, argWgOn) weightGapStrategy
   where
    wgDescription = [ "Uses the weight gap principle to shift some strict rules to the weak part of the problem"]

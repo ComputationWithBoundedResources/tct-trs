@@ -49,7 +49,7 @@ import qualified Tct.Trs.Data.ComplexityPair   as CP
 import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem          as Prob
 import qualified Tct.Trs.Data.RuleSelector     as RS
-import qualified Tct.Trs.Data.Trs              as Trs
+import qualified Tct.Trs.Data.Rules            as RS
 
 import qualified Tct.Trs.Method.ComplexityPair as CP
 
@@ -81,8 +81,8 @@ data PredecessorEstimationProof
 
 instance T.Processor (PredecessorEstimation) where
   type ProofObject PredecessorEstimation = ApplicationProof PredecessorEstimationProof
-  type In  PredecessorEstimation         = TrsProblem
-  type Out PredecessorEstimation         = TrsProblem
+  type In  PredecessorEstimation         = Trs
+  type Out PredecessorEstimation         = Trs
 
   execute p prob = 
     maybe estimate  (\s -> T.abortWith (Inapplicable s :: ApplicationProof PredecessorEstimationProof)) (Prob.isDPProblem' prob)
@@ -100,7 +100,7 @@ instance T.Processor (PredecessorEstimation) where
           candidates = do
             (n,cn) <- lnodes wdg
             let predss = [ (n1,cn1) | (n1,cn1,_) <- lpredecessors wdg n ]
-            guard $ isStrict cn && Trs.member (theRule cn) initialDPs
+            guard $ isStrict cn && RS.member (theRule cn) initialDPs
             guard $ all (\(n1,cn1) -> n1 /= n && isStrict cn1) predss
             return $ Selected { node=n, rule=theRule cn, preds=fmap theRule `map` predss }
 
@@ -116,12 +116,12 @@ instance T.Processor (PredecessorEstimation) where
 
           selected = select (sort candidates) []
 
-          shiftStrict = Trs.fromList [ r | s <- selected , (_,r) <- preds s ]
-          shiftWeak   = Trs.fromList [ rule s | s <- selected ]
+          shiftStrict = RS.fromList [ r | s <- selected , (_,r) <- preds s ]
+          shiftWeak   = RS.fromList [ rule s | s <- selected ]
           -- MS: TODO: dpgraph modify isStrict for selected ones
           nprob = Prob.sanitiseDPGraph $ prob
-            { Prob.strictDPs = (sdps `Trs.difference` shiftWeak) `Trs.union` shiftStrict
-            , Prob.weakDPs   = (wdps `Trs.union` shiftWeak) `Trs.difference` shiftStrict }
+            { Prob.strictDPs = (sdps `RS.difference` shiftWeak) `RS.union` shiftStrict
+            , Prob.weakDPs   = (wdps `RS.union` shiftWeak) `RS.difference` shiftStrict }
           proof = PredecessorEstimationProof
             { wdg_      = wdg
             , selected_ = selected }
@@ -134,8 +134,8 @@ data PredecessorEstimationCP = PredecessorEstimationCP
 
 instance T.Processor PredecessorEstimationCP where
   type ProofObject PredecessorEstimationCP = ApplicationProof PredecessorEstimationProof
-  type In  PredecessorEstimationCP         = TrsProblem
-  type Out PredecessorEstimationCP         = TrsProblem
+  type In  PredecessorEstimationCP         = Trs
+  type Out PredecessorEstimationCP         = Trs
   type Forking PredecessorEstimationCP     = T.Pair
 
   execute p prob =
@@ -175,7 +175,7 @@ instance T.Processor PredecessorEstimationCP where
           withPredecessors (RS.BigAnd ss)    = RS.BigAnd (withPredecessors `fmap` ss)
 
           mkProof cpproof
-            | Trs.null shiftWeak = T.abortWith (Applicable PredecessorEstimationFail)
+            | RS.null shiftWeak = T.abortWith (Applicable PredecessorEstimationFail)
             | otherwise          = return $ T.Progress (Applicable proof) bigAdd (T.Pair (subProof, T.Open nprob))
 
             where
@@ -183,19 +183,19 @@ instance T.Processor PredecessorEstimationCP where
               (known, propagated) = propagate (CP.removableDPs cpproof) []
               propagate seen props
                   | null newp = (seen, props)
-                  | otherwise = propagate (Trs.fromList (rule `fmap` newp) `Trs.union` seen) (newp ++ props)
+                  | otherwise = propagate (RS.fromList (rule `fmap` newp) `RS.union` seen) (newp ++ props)
                 where
                   newp = do
                     (n,cn) <- lnodes wdg
-                    guard $ not (theRule cn `Trs.member` seen)
+                    guard $ not (theRule cn `RS.member` seen)
                     let predss = [ (n1,theRule cn1) | (n1,cn1,_) <- lpredecessors wdg n ]
-                    guard $ all (\(_,r) -> r `Trs.member` seen) predss
+                    guard $ all (\(_,r) -> r `RS.member` seen) predss
                     return $ Selected { node=n, rule=theRule cn, preds=predss }
 
-              shiftWeak = sdps `Trs.intersect` known
+              shiftWeak = sdps `RS.intersect` known
               nprob = Prob.sanitiseDPGraph $ prob
-                { Prob.strictDPs = (sdps `Trs.difference` shiftWeak)
-                , Prob.weakDPs   = (wdps `Trs.union` shiftWeak) }
+                { Prob.strictDPs = (sdps `RS.difference` shiftWeak)
+                , Prob.weakDPs   = (wdps `RS.union` shiftWeak) }
               subProof = assumeWith (T.timeUBCert zero) (CP.result cpproof)
               proof = PredecessorEstimationCPProof
                 { wdg_      = wdg
@@ -293,7 +293,7 @@ instance PP.Pretty PredecessorEstimationProof where
     where
       remdps = CP.removableDPs (cpproof_ p)
       ndps   = asNodedRules $ lnodes (wdg_ p)
-      rdps   = filter ((`Trs.member` remdps) . snd) ndps
+      rdps   = filter ((`RS.member` remdps) . snd) ndps
 
       orientedNodes = S.fromList $ fst (unzip rdps)
       knownNodes    = orientedNodes `S.union` S.fromList (node `fmap` (selected_ p))

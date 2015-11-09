@@ -41,7 +41,7 @@ import qualified Tct.Trs.Data.Precedence      as Prec
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Rewriting       as R (directSubterms)
 import qualified Tct.Trs.Data.Signature       as Sig
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules as RS
 import qualified Tct.Trs.Encoding.SafeMapping as SM
 
 
@@ -53,7 +53,7 @@ useExtComp :: ExtComp -> Bool
 useExtComp = (ExtComp==)
 
 data EpoStarProof f v = EpoStarProof
-  { stricts_             :: Trs f v          -- ^ The oriented input TRS.
+  { stricts_             :: Rules f v          -- ^ The oriented input TRS.
   , safeMapping_         :: SM.SafeMapping f -- ^ The safe mapping.
   , precedence_          :: Precedence f     -- ^ The precedence.
   , argumentPermutation_ :: MuMapping f      -- ^ Employed argument permutation.
@@ -62,15 +62,15 @@ data EpoStarProof f v = EpoStarProof
 
 instance T.Processor EpoStar where
   type ProofObject EpoStar = ApplicationProof (OrientationProof (EpoStarProof F V))
-  type In  EpoStar         = TrsProblem
-  type Out EpoStar         = TrsProblem
+  type In  EpoStar         = Trs
+  type Out EpoStar         = Trs
   type Forking EpoStar     = T.Judgement
 
   execute p prob =
     maybe epo (\s -> T.abortWith (Inapplicable s :: ApplicationProof (OrientationProof (EpoStarProof F V)))) maybeApplicable
     where
 
-      maybeApplicable = Prob.isRCProblem' prob <|> Prob.isInnermostProblem' prob <|> Trs.isConstructorTrs' sig trs
+      maybeApplicable = Prob.isRCProblem' prob <|> Prob.isInnermostProblem' prob <|> RS.isConstructorTrs' sig trs
 
       trs    = Prob.allComponents prob
       sig    = Prob.signature prob
@@ -219,7 +219,7 @@ unorientable sig u v =
 
 entscheide :: (Functor m, Monad m, Ord f, Ord v, Show f, Show v) =>
   SMT.SmtSolver m Int
-  -> Trs f v
+  -> Rules f v
   -> Signature f
   -> ExtComp
   -> m (SMT.Result (Precedence f, SM.SafeMapping f, MuMapping f))
@@ -253,7 +253,7 @@ entscheide solver trs sig ecomp = do
     return $ SMT.decode (prenc, sfenc, muenc)
   return $ res
     where
-      rs = Trs.toList trs
+      rs = RS.toList trs
 
 orient :: (Show v, Show f, Ord v, Ord f) =>
   Bool

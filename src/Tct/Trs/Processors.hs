@@ -42,7 +42,7 @@ import qualified Tct.Trs.Data.DependencyGraph                    as DG
 import qualified Tct.Trs.Data.Problem                            as Prob
 import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.RuleSet                            as Prob
-import qualified Tct.Trs.Data.Trs                                as Trs
+import qualified Tct.Trs.Data.Rules as RS
 
 import           Tct.Trs.Method.Bounds                           as M
 import           Tct.Trs.Method.Decompose                        as M
@@ -201,7 +201,7 @@ cleanSuffix = force $
   .>>> try (removeWeakSuffixes .>>> try (simplifyRHS .>>> try usableRules))
   where
     sel = RS.selAllOf (RS.selFromWDG f) { RS.rsName = "simple predecessor estimation selector" }
-    f wdg = Prob.emptyRuleSet { Prob.sdps = Trs.fromList rs }
+    f wdg = Prob.emptyRuleSet { Prob.sdps = RS.fromList rs }
       where rs = [ DG.theRule nl | (n,nl) <- DG.lnodes wdg, all (not . DG.isStrict . (\(_,l,_) -> l)) (DG.lsuccessors wdg n) ]
 
 -- | Using the decomposition processor (c.f. 'Compose.decomposeBy') this transformation
@@ -253,7 +253,7 @@ toDP =
 -- by (i) orienting using predecessor extimation and the given processor,
 -- and (ii) using 'DPSimp.removeWeakSuffix' and various sensible further simplifications.
 -- Fails only if (i) fails.
-removeLeaf :: ComplexityPair -> T.Strategy TrsProblem TrsProblem
+removeLeaf :: ComplexityPair -> T.Strategy Trs Trs
 removeLeaf cp =
   predecessorEstimationCP anyStrictLeaf cp
   .>>> try (removeWeakSuffixes .>>> try simplifyRHS)

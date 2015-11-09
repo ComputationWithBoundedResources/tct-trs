@@ -81,11 +81,11 @@ library
     Tct.Trs.Data.Problem
     Tct.Trs.Data.ProblemKind
     Tct.Trs.Data.Rewriting
+    Tct.Trs.Data.Rules
     Tct.Trs.Data.RuleSelector
     Tct.Trs.Data.RuleSet
     Tct.Trs.Data.Signature
     Tct.Trs.Data.Symbol
-    Tct.Trs.Data.Trs
     Tct.Trs.Declarations
     Tct.Trs.Encoding.ArgumentFiltering
     Tct.Trs.Encoding.Bounds.Automata

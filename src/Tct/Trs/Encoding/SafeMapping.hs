@@ -13,7 +13,7 @@ import qualified Data.Rewriting.Rule    as R
 import qualified Tct.Core.Common.Pretty as PP
 
 import           Tct.Trs.Data
-import           Tct.Trs.Data.Trs as Trs (toList)
+import           Tct.Trs.Data.Rules as RS (toList)
 import qualified Tct.Trs.Data.Signature as Sig
 
 
@@ -62,10 +62,10 @@ instance (Ord f, PP.Pretty f) => PP.Pretty (SafeMapping f) where
   pretty sm@(SafeMapping (sig, _)) = PP.hsep $ PP.punctuate (PP.text ",") [ pp sym | sym <- S.toList $ Sig.symbols sig]
     where pp sym = PP.text "safe" PP.<> PP.parens (PP.pretty sym) PP.<+> PP.text "=" PP.<+> PP.set' (safeArgumentPositions sym sm)
 
-type SafeTrs f v = (Trs f v, SafeMapping f)
+type SafeRules f v = (Rules f v, SafeMapping f)
 
-prettySafeTrs :: (Ord f, PP.Pretty f, PP.Pretty v) => SafeMapping f -> Trs f v -> PP.Doc
-prettySafeTrs sm = PP.vcat . fmap ppr . Trs.toList
+prettySafeTrs :: (Ord f, PP.Pretty f, PP.Pretty v) => SafeMapping f -> Rules f v -> PP.Doc
+prettySafeTrs sm = PP.vcat . fmap ppr . RS.toList
   where
     ppr (R.Rule l r)   = PP.hsep [ppt l, PP.text "->", ppt r]
 

@@ -36,8 +36,8 @@ data WithCertification = WithCertification
 
 instance T.Processor WithCertification where
   type ProofObject WithCertification = ()
-  type In  WithCertification         = TrsProblem
-  type Out WithCertification         = TrsProblem
+  type In  WithCertification         = Trs
+  type Out WithCertification         = Trs
 
   execute p prob = do
     pt  <- T.evaluate (onStrategy p) (T.Open prob)
@@ -54,7 +54,7 @@ instance T.Processor WithCertification where
 withCertificationStrategy :: TotalProof -> TrsStrategy -> TrsStrategy
 withCertificationStrategy t st = T.Apply $ WithCertification { kind = t, onStrategy = st }
 
-withCertificationDeclaration :: T.Declared TrsProblem TrsProblem => T.Declaration(
+withCertificationDeclaration :: T.Declared Trs Trs => T.Declaration(
   '[ T.Argument 'T.Optional TotalProof
    , T.Argument 'T.Required TrsStrategy]
    T.:-> TrsStrategy)
