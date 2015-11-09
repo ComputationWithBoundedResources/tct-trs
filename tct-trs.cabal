@@ -121,8 +121,9 @@ library
     Tct.Trs.Method.WithCertification
     Tct.Trs.Processors
     Tct.Trs.Strategy.Certify
-    Tct.Trs.Strategy.Runtime
+    Tct.Trs.Strategy.Competition
     Tct.Trs.Strategy.Derivational
+    Tct.Trs.Strategy.Runtime
     Tct.Trs.Strategy.Web
   build-depends:
     array              == 0.5.*,
