@@ -4,7 +4,7 @@ packages:
 
 - location:
     git: git@github.com:ComputationWithBoundedResources/slogic
-    commit: 1f9c923a4d55ea700aa98a83d99836a3c419385b
+    commit: 54beea4baf8f2ad1f02d86b4319512b6e70ab4a2
 - location:
     git: git@github.com:ComputationWithBoundedResources/term-rewriting-xml
     commit: d535bce1db3ea4c76df3aa202bcac441365ece2b
