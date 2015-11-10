@@ -7,13 +7,13 @@ packages:
     commit: 1f9c923a4d55ea700aa98a83d99836a3c419385b
 - location:
     git: git@github.com:ComputationWithBoundedResources/term-rewriting-xml
-    commit: 5ebefbadeefa99e35e97d558f93f2597c0c85b09
+    commit: d535bce1db3ea4c76df3aa202bcac441365ece2b
 - location:
     git: git@github.com:ComputationWithBoundedResources/tct-core
-    commit: 9d0a9d1afda4724bb167bf3ddc82b91d27ddfe7b
+    commit: cfe3ad6b9062c2fdf397734d69c263920f99165e
 - location:
     git: git@github.com:ComputationWithBoundedResources/tct-common
-    commit: 27a23e33d00552821141cf2a46654df7ec4559b5
+    commit: b88ce5394cb9a7dde6d3a08a0a15391991e36ed5
 extra-deps:
 - dotgen-0.4.2
 - fgl-visualize-0.1.0.1
