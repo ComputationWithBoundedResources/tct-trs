@@ -16,7 +16,7 @@ in the strict components.
 -- the subproof for predecessor estimation cp is currently stored as closed left branch (using assumption)
 -- good: normally printed; (partially) certificable
 -- bad: the (generic) proof output is a bit awkward
-module Tct.Trs.Method.DP.DPGraph.PredecessorEstimation
+module Tct.Trs.Processor.DP.DPGraph.PredecessorEstimation
   ( predecessorEstimationDeclaration
   , predecessorEstimation
   , predecessorEstimation'
@@ -51,7 +51,7 @@ import qualified Tct.Trs.Data.Problem          as Prob
 import qualified Tct.Trs.Data.RuleSelector     as RS
 import qualified Tct.Trs.Data.Rules            as RS
 
-import qualified Tct.Trs.Method.ComplexityPair as CP
+import qualified Tct.Trs.Processor.ComplexityPair as CP
 
 
 data Selected = Selected

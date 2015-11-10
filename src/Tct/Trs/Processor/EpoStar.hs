@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -- Implementation details can be found in the technical report 'http://arxiv.org/pdf/1010.1128v3.pdf'.
 -- | This module provides the \EpoStar\ processor.
-module Tct.Trs.Method.EpoStar
+module Tct.Trs.Processor.EpoStar
   ( epoStarDeclaration
   , epoStar
   , epoStar'

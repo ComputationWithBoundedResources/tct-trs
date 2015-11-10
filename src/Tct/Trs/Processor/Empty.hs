@@ -1,6 +1,6 @@
 -- | This module provides the /Empty/ processor.
 -- Checks wether the strict components of a problem are empty.
-module Tct.Trs.Method.Empty
+module Tct.Trs.Processor.Empty
   ( emptyDeclaration
   , empty
   ) where

@@ -6,7 +6,7 @@
 @
 , where @U(R)@ denotes an approximation of the usable rules wrt. to the starting terms.
 -}
-module Tct.Trs.Method.DP.UsableRules
+module Tct.Trs.Processor.DP.UsableRules
   ( usableRulesDeclaration
   , usableRules
   ) where

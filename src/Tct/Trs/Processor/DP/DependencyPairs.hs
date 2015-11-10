@@ -1,5 +1,5 @@
 -- | This module implements the /Weak Dependency Pairs/ and the /Dependency Tuples/ processor.
-module Tct.Trs.Method.DP.DependencyPairs
+module Tct.Trs.Processor.DP.DependencyPairs
   ( DPKind (..)
   , dependencyPairsDeclaration
   , dependencyPairs

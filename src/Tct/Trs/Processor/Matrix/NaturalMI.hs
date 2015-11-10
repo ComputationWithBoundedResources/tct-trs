@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
-Module      : Tct.Trs.Method.Matrix.MatrixInterpretation
+Module      : Tct.Trs.Processor.Matrix.MatrixInterpretation
 Description : Matrix interpretation over naturals
 Copyright   : (c) since tct-trs
                   Martin Avanzini <martin.avanzini@uibk.ac.at>,
@@ -20,7 +20,7 @@ Portability : unportable
 
 -}
 
-module Tct.Trs.Method.Matrix.NaturalMI
+module Tct.Trs.Processor.Matrix.NaturalMI
   (
   -- * Matrix interpretation
     matrixDeclaration

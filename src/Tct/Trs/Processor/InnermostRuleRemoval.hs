@@ -8,7 +8,7 @@
 , where @irr(R)@ removes rules @f(l_1,...,l_n) -> r@ for wich @l_i (1 <= i <= n)@ is not in normal form.
 The processor applies only to innermost problems.
 -}
-module Tct.Trs.Method.InnermostRuleRemoval
+module Tct.Trs.Processor.InnermostRuleRemoval
   ( innermostRuleRemovalDeclaration
   , innermostRuleRemoval
   ) where

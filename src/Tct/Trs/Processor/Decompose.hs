@@ -3,7 +3,7 @@
 -- [1] http://www.imn.htwk-leipzig.de/~waldmann/talk/06/rpt/rel/main.pdf>
 -- [2] A.~Stump, N.~Hirokawa, A Rewriting Approach to Automata-Based Parsing
 {-# LANGUAGE RecordWildCards #-}
-module Tct.Trs.Method.Decompose
+module Tct.Trs.Processor.Decompose
   ( DecomposeBound(..)
 
   , decomposeDeclaration
@@ -39,7 +39,7 @@ import qualified Tct.Trs.Data.Rewriting        as R
 import           Tct.Trs.Data.RuleSelector
 import qualified Tct.Trs.Data.Rules            as RS
 
-import qualified Tct.Trs.Method.ComplexityPair as CP
+import qualified Tct.Trs.Processor.ComplexityPair as CP
 
 
 data DecomposeBound

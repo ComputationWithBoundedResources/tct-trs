@@ -7,7 +7,7 @@
 @
 , where @rem(R#)@ removes DPs that can not occur in any derivation wrt to the starting terms.
 -}
-module Tct.Trs.Method.DP.DPGraph.RemoveInapplicable
+module Tct.Trs.Processor.DP.DPGraph.RemoveInapplicable
   ( removeInapplicableDeclaration
   , removeInapplicable
   ) where

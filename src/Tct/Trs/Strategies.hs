@@ -1,5 +1,5 @@
--- | This module collects declarations from 'Tct.Trs.Method.* and  'Tct.Trs.Strategy.*'.
-module Tct.Trs.Declarations (trsDeclarations) where
+-- | This module collects declarations from 'Tct.Trs.Processor.* and  'Tct.Trs.Strategy.*'.
+module Tct.Trs.Strategies (trsDeclarations) where
 
 
 import Tct.Core

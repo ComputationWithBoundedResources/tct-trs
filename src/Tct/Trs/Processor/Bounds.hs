@@ -1,5 +1,5 @@
 {- |
-Module      :  Tct.Method.Bounds
+Module      :  Tct.Processor.Bounds
 Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>,
                Georg Moser <georg.moser@uibk.ac.at>,
                Andreas Schnabl <andreas.schnabl@uibk.ac.at>
@@ -13,7 +13,7 @@ Portability :  unportable
 This module implements the (relative-) bounds processor.
 -}
 
-module Tct.Trs.Method.Bounds
+module Tct.Trs.Processor.Bounds
   ( boundsDeclaration
   , bounds
   , bounds'
@@ -43,7 +43,7 @@ import qualified Tct.Trs.Data.ProblemKind           as Prob
 import qualified Tct.Trs.Data.Rewriting             as R
 import qualified Tct.Trs.Data.Signature             as Sig
 import qualified Tct.Trs.Data.Rules                 as RS
-import qualified Tct.Trs.Method.Empty               as E (empty)
+import qualified Tct.Trs.Processor.Empty               as E (empty)
 
 import           Tct.Trs.Encoding.Bounds.Automata
 import           Tct.Trs.Encoding.Bounds.Violations

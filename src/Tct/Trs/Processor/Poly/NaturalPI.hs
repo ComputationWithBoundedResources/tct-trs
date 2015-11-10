@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Tct.Trs.Method.Poly.NaturalPI
+module Tct.Trs.Processor.Poly.NaturalPI
   (
   -- * Declaration
     polyDeclaration

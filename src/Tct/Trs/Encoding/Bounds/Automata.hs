@@ -2,7 +2,7 @@
 
 ----------------------------------------------------------------------------------
 -- |
--- Module      :  Tct.Method.Bounds.Automata
+-- Module      :  Tct.Processor.Bounds.Automata
 -- Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>,
 --                Georg Moser <georg.moser@uibk.ac.at>,
 --                Andreas Schnabl <andreas.schnabl@uibk.ac.at>

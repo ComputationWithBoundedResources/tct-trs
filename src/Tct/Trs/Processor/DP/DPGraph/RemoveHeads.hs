@@ -7,7 +7,7 @@
 @
 , where @rem(R#)@ removes DP rules @l#->com(r1#,...,rn#)@ that occur at root positions of the DP graph and all @ri#@ are starting terms.
 -}
-module Tct.Trs.Method.DP.DPGraph.RemoveHeads
+module Tct.Trs.Processor.DP.DPGraph.RemoveHeads
   ( removeHeadsDeclaration
   , removeHeads
   ) where

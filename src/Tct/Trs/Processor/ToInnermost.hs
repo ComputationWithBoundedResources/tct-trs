@@ -5,7 +5,7 @@ Masahiko Sakai , Kouji Okamoto , Toshiki Sakabe, 2003: "Innermost reductions fin
 
 -}
 
-module Tct.Trs.Method.ToInnermost
+module Tct.Trs.Processor.ToInnermost
   ( toInnermost
   , toInnermostDeclaration
 ) where

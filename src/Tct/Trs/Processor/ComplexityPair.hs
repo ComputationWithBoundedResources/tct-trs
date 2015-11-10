@@ -1,5 +1,5 @@
 -- | This module collects declarations for /Complexity Pairs/.
-module Tct.Trs.Method.ComplexityPair
+module Tct.Trs.Processor.ComplexityPair
   ( complexityPairDeclarations
   , complexityPairArg
   ) where
@@ -11,8 +11,8 @@ import qualified Tct.Core.Data                   as P (SParser)
 import qualified Tct.Core.Parse                  as P
 
 import           Tct.Trs.Data.ComplexityPair
-import           Tct.Trs.Method.Matrix.NaturalMI (matrixCPDeclaration)
-import           Tct.Trs.Method.Poly.NaturalPI   (polyCPDeclaration)
+import           Tct.Trs.Processor.Matrix.NaturalMI (matrixCPDeclaration)
+import           Tct.Trs.Processor.Poly.NaturalPI   (polyCPDeclaration)
 
 
 complexityPairDeclarations :: [ComplexityPairDeclaration]

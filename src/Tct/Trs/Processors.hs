@@ -44,26 +44,26 @@ import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.Rules as RS
 
-import           Tct.Trs.Method.Bounds                           as M
-import           Tct.Trs.Method.Decompose                        as M
-import           Tct.Trs.Method.ComplexityPair                   as M
-import           Tct.Trs.Method.DP.DependencyPairs               as M
-import           Tct.Trs.Method.DP.DPGraph.DecomposeDG           as M
-import           Tct.Trs.Method.DP.DPGraph.PathAnalysis          as M
-import           Tct.Trs.Method.DP.DPGraph.PredecessorEstimation as M
-import           Tct.Trs.Method.DP.DPGraph.RemoveHeads           as M
-import           Tct.Trs.Method.DP.DPGraph.RemoveInapplicable    as M
-import           Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes    as M
-import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           as M
-import           Tct.Trs.Method.DP.DPGraph.Trivial               as M
-import           Tct.Trs.Method.DP.UsableRules                   as M
-import           Tct.Trs.Method.Empty                            as M
-import           Tct.Trs.Method.EpoStar                          as M
-import           Tct.Trs.Method.InnermostRuleRemoval             as M
-import           Tct.Trs.Method.Matrix.NaturalMI                 as M
-import           Tct.Trs.Method.Poly.NaturalPI                   as M
-import           Tct.Trs.Method.ToInnermost                      as M
-import           Tct.Trs.Method.WithCertification                as M
+import           Tct.Trs.Processor.Bounds                           as M
+import           Tct.Trs.Processor.Decompose                        as M
+import           Tct.Trs.Processor.ComplexityPair                   as M
+import           Tct.Trs.Processor.DP.DependencyPairs               as M
+import           Tct.Trs.Processor.DP.DPGraph.DecomposeDG           as M
+import           Tct.Trs.Processor.DP.DPGraph.PathAnalysis          as M
+import           Tct.Trs.Processor.DP.DPGraph.PredecessorEstimation as M
+import           Tct.Trs.Processor.DP.DPGraph.RemoveHeads           as M
+import           Tct.Trs.Processor.DP.DPGraph.RemoveInapplicable    as M
+import           Tct.Trs.Processor.DP.DPGraph.RemoveWeakSuffixes    as M
+import           Tct.Trs.Processor.DP.DPGraph.SimplifyRHS           as M
+import           Tct.Trs.Processor.DP.DPGraph.Trivial               as M
+import           Tct.Trs.Processor.DP.UsableRules                   as M
+import           Tct.Trs.Processor.Empty                            as M
+import           Tct.Trs.Processor.EpoStar                          as M
+import           Tct.Trs.Processor.InnermostRuleRemoval             as M
+import           Tct.Trs.Processor.Matrix.NaturalMI                 as M
+import           Tct.Trs.Processor.Poly.NaturalPI                   as M
+import           Tct.Trs.Processor.ToInnermost                      as M
+import           Tct.Trs.Processor.WithCertification                as M
 
 
 type Degree = Int

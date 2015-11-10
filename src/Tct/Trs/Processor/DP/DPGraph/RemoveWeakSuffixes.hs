@@ -8,7 +8,7 @@ Let @Wl#@ be forward closed, then
     |- <S# / W# + Wl# + W, Q, T#> :f
 @
 -}
-module Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes
+module Tct.Trs.Processor.DP.DPGraph.RemoveWeakSuffixes
   ( removeWeakSuffixesDeclaration
   , removeWeakSuffixes
   ) where

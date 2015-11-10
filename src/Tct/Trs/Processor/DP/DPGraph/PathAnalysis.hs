@@ -1,5 +1,5 @@
 -- | This module provides the \Path Analysis\ processor.
-module Tct.Trs.Method.DP.DPGraph.PathAnalysis 
+module Tct.Trs.Processor.DP.DPGraph.PathAnalysis 
   ( pathAnalysisDeclaration
   , pathAnalysis
   , pathAnalysis'

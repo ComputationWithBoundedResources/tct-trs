@@ -1,6 +1,6 @@
 -- | This module provides the /With Certification/ processor.
 -- Is used to certify the proof output of a (sub) strategy.
-module Tct.Trs.Method.WithCertification 
+module Tct.Trs.Processor.WithCertification 
   ( withCertificationDeclaration
   , withCertification
   , withCertification'

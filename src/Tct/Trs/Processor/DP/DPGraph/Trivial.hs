@@ -7,7 +7,7 @@ Suppose the dependency graph contains no /non-trivial SCC/, then
     |- <S# / W# + W, Q, T#> :f
 @
 -}
-module Tct.Trs.Method.DP.DPGraph.Trivial
+module Tct.Trs.Processor.DP.DPGraph.Trivial
   ( trivialDeclaration
   , trivial
   ) where
@@ -24,7 +24,7 @@ import           Tct.Trs.Data
 import           Tct.Trs.Data.DependencyGraph as DG (isCyclicNode, nodes, empty)
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Rules as RS
-import qualified Tct.Trs.Method.Empty         as E (empty)
+import qualified Tct.Trs.Processor.Empty         as E (empty)
 
 
 data Trivial = Trivial deriving Show
