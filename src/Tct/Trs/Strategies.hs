@@ -1,16 +1,19 @@
--- | This module collects declarations from 'Tct.Trs.Processor.* and  'Tct.Trs.Strategy.*'.
-module Tct.Trs.Strategies (trsDeclarations) where
+-- | This module collects strategies and declarations from 'Tct.Trs.Processor.* and  'Tct.Trs.Strategy.*'.
+module Tct.Trs.Strategies (
+  trsDeclarations
+  , module M
+  ) where
 
 
 import Tct.Core
 
 import Tct.Trs.Data
-import Tct.Trs.Processors
-import Tct.Trs.Strategy.Certify
-import Tct.Trs.Strategy.Competition
-import Tct.Trs.Strategy.Derivational
-import Tct.Trs.Strategy.Runtime
-import Tct.Trs.Strategy.Web
+import Tct.Trs.Processors            as M
+import Tct.Trs.Strategy.Certify      as M
+import Tct.Trs.Strategy.Competition  as M
+import Tct.Trs.Strategy.Derivational as M
+import Tct.Trs.Strategy.Runtime      as M
+import Tct.Trs.Strategy.Web          as M
 
 
 trsDeclarations :: Declared Trs Trs => [TrsDeclaration]

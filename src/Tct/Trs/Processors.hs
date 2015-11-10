@@ -65,6 +65,7 @@ import           Tct.Trs.Processor.Poly.NaturalPI                   as M
 import           Tct.Trs.Processor.ToInnermost                      as M
 import           Tct.Trs.Processor.WithCertification                as M
 
+-- TODO: MS: move to strategies?
 
 type Degree = Int
 

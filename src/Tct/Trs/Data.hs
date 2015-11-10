@@ -1,4 +1,4 @@
--- | This module re-exports some types and functionalities of Tct.Trs.Data.*.
+-- | This module re-exports most types and some functionalities of Tct.Trs.Data.*.
 module Tct.Trs.Data 
   ( module M 
   , TrsStrategy
@@ -19,9 +19,9 @@ import Tct.Trs.Data.Precedence      as M (Order, Precedence)
 
 import qualified Tct.Core.Data      as T
 
--- | Specified strategy type for Trs.
+-- | Type synonym for Trs strategies.
 type TrsStrategy    = T.Strategy Trs Trs
 
--- | Specified declaration for Trs.
+-- | Type synonym for Trs declarations.
 type TrsDeclaration = T.StrategyDeclaration Trs Trs
 

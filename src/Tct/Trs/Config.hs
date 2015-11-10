@@ -6,11 +6,11 @@ The configuration is meant to work with 'Tct.Core.Main.tct3'
   * sets default strategies
   * provides the @--complexity <rc|rci|dc|dci>@ argument to set the complexity problem
     * this argument overrides the complexity problem returned by the parser
-  * provides @--ceta <total|partial>@ argument to set the complexity problem
+  * provides @--ceta <total|partial>@ argument to set the certification problem
 -}
 module Tct.Trs.Config
   (
-  trs
+  runTrs
   -- * Problem parser
   , parserIO
   , parser
@@ -44,8 +44,9 @@ import           Tct.Trs.Data.Problem
 import           Tct.Trs.Strategy.Competition (competition)
 
 
-trs :: T.Declared Trs Trs => TrsConfig -> IO ()
-trs = tct3WithOptions trsUpdate trsOptions
+-- | run trs module with predefined command line arguments.
+runTrs :: T.Declared Trs Trs => TrsConfig -> IO ()
+runTrs = runTctWithOptions trsUpdate trsOptions
 
 -- | Parses a Trs. Uses the @xml@ format if the file extension is @xml@, otherwise the @WST@ format.
 parserIO :: FilePath -> IO (Either String Trs)
