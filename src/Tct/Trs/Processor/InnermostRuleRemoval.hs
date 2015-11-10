@@ -8,7 +8,7 @@
 , where @irr(R)@ removes rules @f(l_1,...,l_n) -> r@ for wich @l_i (1 <= i <= n)@ is not in normal form.
 The processor applies only to innermost problems.
 -}
-module Tct.Trs.Method.InnermostRuleRemoval
+module Tct.Trs.Processor.InnermostRuleRemoval
   ( innermostRuleRemovalDeclaration
   , innermostRuleRemoval
   ) where
@@ -26,40 +26,40 @@ import           Tct.Common.ProofCombinators
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem         as Prob
 import           Tct.Trs.Data.Rewriting       (directSubterms)
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules as RS
 
 
 data InnermostRuleRemoval = InnermostRuleRemoval
   deriving Show
 
 data InnermostRuleRemovalProof
-  = InnermostRuleRemovalProof { removed_ :: Trs F V }
+  = InnermostRuleRemovalProof { removed_ :: Rules F V }
   | InnermostRuleRemovalFail
   deriving Show
 
 
 instance T.Processor InnermostRuleRemoval where
   type ProofObject InnermostRuleRemoval = ApplicationProof InnermostRuleRemovalProof
-  type In InnermostRuleRemoval          = TrsProblem
-  type Out InnermostRuleRemoval         = TrsProblem
+  type In InnermostRuleRemoval          = Trs
+  type Out InnermostRuleRemoval         = Trs
 
   execute InnermostRuleRemoval prob =
     maybe irr (\s -> T.abortWith (Inapplicable s :: ApplicationProof InnermostRuleRemovalProof)) (Prob.isInnermostProblem' prob)
     where
       irr
-        | Trs.null removed = T.abortWith (Applicable InnermostRuleRemovalFail)
+        | RS.null removed = T.abortWith (Applicable InnermostRuleRemovalFail)
         | otherwise        = T.succeedWith1 (Applicable proof) T.fromId nprob
 
         where
-          trsRules  = Trs.toList $ Prob.trsComponents prob
-          allRules  = Trs.toList $ Prob.allComponents prob
+          trsRules  = RS.toList $ Prob.trsComponents prob
+          allRules  = RS.toList $ Prob.allComponents prob
 
           removable = any (not . null . fullRewrite allRules) . directSubterms . lhs
-          removed   = Trs.fromList $ filter removable trsRules
+          removed   = RS.fromList $ filter removable trsRules
 
           nprob = Prob.sanitiseDPGraph $ prob
-            { Prob.strictTrs = Prob.strictTrs prob `Trs.difference` removed
-            , Prob.weakTrs   = Prob.weakTrs prob `Trs.difference` removed }
+            { Prob.strictTrs = Prob.strictTrs prob `RS.difference` removed
+            , Prob.weakTrs   = Prob.weakTrs prob `RS.difference` removed }
           proof = InnermostRuleRemovalProof { removed_ = removed }
 
 

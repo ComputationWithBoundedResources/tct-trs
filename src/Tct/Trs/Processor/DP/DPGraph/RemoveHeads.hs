@@ -7,13 +7,12 @@
 @
 , where @rem(R#)@ removes DP rules @l#->com(r1#,...,rn#)@ that occur at root positions of the DP graph and all @ri#@ are starting terms.
 -}
-module Tct.Trs.Method.DP.DPGraph.RemoveHeads
+module Tct.Trs.Processor.DP.DPGraph.RemoveHeads
   ( removeHeadsDeclaration
   , removeHeads
   ) where
 
 
-import           Control.Applicative          ((<$>))
 import qualified Data.Rewriting.Rule          as R (Rule, rhs)
 import qualified Data.Rewriting.Term          as R
 
@@ -29,7 +28,7 @@ import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
 import qualified Tct.Trs.Data.Signature       as Sig (isDefined)
 import qualified Tct.Trs.Data.Symbol          as Symb
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules           as RS
 
 
 data RemoveHeads = RemoveHeads deriving Show
@@ -43,10 +42,10 @@ data RemoveHeadsProof
 
 instance T.Processor RemoveHeads where
   type ProofObject RemoveHeads = ApplicationProof RemoveHeadsProof
-  type In RemoveHeads          = TrsProblem
-  type Out RemoveHeads         = TrsProblem
+  type In RemoveHeads          = Trs
+  type Out RemoveHeads         = Trs
 
-  execute p prob =
+  execute RemoveHeads prob =
     maybe remhead (\s -> T.abortWith (Inapplicable s :: ApplicationProof RemoveHeadsProof)) (Prob.isDTProblem' prob)
     where
       remhead
@@ -61,15 +60,15 @@ instance T.Processor RemoveHeads where
           isBasicC t@(R.Fun f ts)
             | Symb.isCompoundFun f = all isBasicC ts
             | isDefined f          = isStartTerm t
-            | otherwise            = error "Tct.Trs.Method.DP.DPGraph.RemoveHeads.solve.isBasicC: invalid rhs"
+            | otherwise            = error "Tct.RS.Method.DP.DPGraph.RemoveHeads.solve.isBasicC: invalid rhs"
             where
               isStartTerm = Prob.isStartTerm (Prob.startTerms prob)
               isDefined   = flip Sig.isDefined (Prob.signature prob)
 
-          (ns,rs) = Trs.fromList `fmap` unzip heads
+          (ns,rs) = RS.fromList `fmap` unzip heads
           nprob = prob
-            { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` rs
-            , Prob.weakDPs   = Prob.weakDPs prob `Trs.difference` rs
+            { Prob.strictDPs = Prob.strictDPs prob `RS.difference` rs
+            , Prob.weakDPs   = Prob.weakDPs prob `RS.difference` rs
             , Prob.dpGraph   = let ndgraph = wdg `removeNodes` ns in DependencyGraph
               { dependencyGraph = ndgraph
               , congruenceGraph = toCongruenceGraph ndgraph }}

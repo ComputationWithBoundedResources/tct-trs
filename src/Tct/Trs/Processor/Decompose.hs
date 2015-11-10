@@ -3,7 +3,7 @@
 -- [1] http://www.imn.htwk-leipzig.de/~waldmann/talk/06/rpt/rel/main.pdf>
 -- [2] A.~Stump, N.~Hirokawa, A Rewriting Approach to Automata-Based Parsing
 {-# LANGUAGE RecordWildCards #-}
-module Tct.Trs.Method.Decompose
+module Tct.Trs.Processor.Decompose
   ( DecomposeBound(..)
 
   , decomposeDeclaration
@@ -23,7 +23,6 @@ import           Data.Typeable
 import qualified Data.Rewriting.Rule           as R (Rule)
 import qualified Data.Rewriting.Term           as R (isVariantOf)
 
-import qualified Tct.Core.Common.Parser        as P
 import qualified Tct.Core.Common.Pretty        as PP
 import           Tct.Core.Common.SemiRing
 import qualified Tct.Core.Common.Xml           as Xml
@@ -38,9 +37,9 @@ import qualified Tct.Trs.Data.DependencyGraph  as DG
 import qualified Tct.Trs.Data.Problem          as Prob
 import qualified Tct.Trs.Data.Rewriting        as R
 import           Tct.Trs.Data.RuleSelector
-import qualified Tct.Trs.Data.Trs              as Trs
+import qualified Tct.Trs.Data.Rules            as RS
 
-import qualified Tct.Trs.Method.ComplexityPair as CP
+import qualified Tct.Trs.Processor.ComplexityPair as CP
 
 
 data DecomposeBound
@@ -54,10 +53,10 @@ data DecomposeBound
 -- checks condition on R and S
 isApplicableRandS :: (Ord f, Ord v) => Problem f v -> DecomposeBound -> Maybe String
 isApplicableRandS prob compfn = case compfn of
-  Add          -> Prob.isDCProblem' prob <|> Trs.isLinear' trs <|> Trs.isNonErasing' trs
+  Add          -> Prob.isDCProblem' prob <|> RS.isLinear' trs <|> RS.isNonErasing' trs
   RelativeAdd  -> Nothing
-  RelativeMul  -> Prob.isDCProblem' prob <|> Trs.isNonSizeIncreasing' trs
-  RelativeComp -> Prob.isDCProblem' prob <|> Trs.isNonDuplicating' trs
+  RelativeMul  -> Prob.isDCProblem' prob <|> RS.isNonSizeIncreasing' trs
+  RelativeComp -> Prob.isDCProblem' prob <|> RS.isNonDuplicating' trs
   where trs = Prob.allComponents prob
 
 -- for Add and RelativeComp rules in rProb have to be non-size increasing
@@ -68,12 +67,12 @@ selectForcedRules prob compfn = BigAnd $ [ SelectDP r | r <- forcedDps ] ++ [ Se
       RelativeComp -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
       Add          -> (fsi Prob.dpComponents, fsi Prob.trsComponents)
       _            -> ([],[])
-      where fsi f = [ rule | rule <- Trs.toList (f prob), not (R.isNonSizeIncreasing rule) ]
+      where fsi f = [ rule | rule <- RS.toList (f prob), not (R.isNonSizeIncreasing rule) ]
 
 -- for Add rProb and sProb commute
 isApplicableRModuloS :: (Ord f, Ord v) => Problem f v -> Problem f v -> DecomposeBound -> Maybe String
 isApplicableRModuloS rProb sProb Add = Prob.note (not $ isCommutative rRules sRules) "commutative criterion not fulfilled"
-  where (rRules, sRules)   = (Trs.toList $ Prob.allComponents rProb, Trs.toList $ Prob.allComponents sProb)
+  where (rRules, sRules)   = (RS.toList $ Prob.allComponents rProb, RS.toList $ Prob.allComponents sProb)
 isApplicableRModuloS _ _ _ = Nothing
 
 isCommutative :: (Ord f, Ord v) => [R.Rule f v] -> [R.Rule f v] -> Bool
@@ -85,19 +84,19 @@ isCommutative rRules' sRules' = isCommutative' 5 cps
     cps              = R.toPairs $ R.forwardPairs rRules' sRules'
     isCommutative' n = all (\(l,r) -> r `reductOf` take n (reducts l))
 
-mkProbs :: (Fun f, Show f, Show v, Ord f, Ord v) => Problem f v -> DecomposeBound -> Trs f v -> Trs f v -> (Problem f v, Problem f v)
+mkProbs :: (Fun f, Show f, Show v, Ord f, Ord v) => Problem f v -> DecomposeBound -> Rules f v -> Rules f v -> (Problem f v, Problem f v)
 mkProbs prob compfn dps trs = (rProb, sProb)
   where
-    rDps = dps `Trs.intersect` Prob.strictDPs prob
-    rTrs = trs `Trs.intersect` Prob.strictTrs prob
-    sDps = Prob.strictDPs prob `Trs.difference` rDps
-    sTrs = Prob.strictTrs prob `Trs.difference` rTrs
+    rDps = dps `RS.intersect` Prob.strictDPs prob
+    rTrs = trs `RS.intersect` Prob.strictTrs prob
+    sDps = Prob.strictDPs prob `RS.difference` rDps
+    sTrs = Prob.strictTrs prob `RS.difference` rTrs
 
     rProb = prob
       { Prob.strictDPs = rDps
       , Prob.strictTrs = rTrs
-      , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDps
-      , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs
+      , Prob.weakDPs   = Prob.weakDPs prob `RS.union` sDps
+      , Prob.weakTrs   = Prob.weakTrs prob `RS.union` sTrs
       , Prob.dpGraph   = DG.setWeak sDps (Prob.dpGraph prob) }
 
     sProb = Prob.sanitiseDPGraph $
@@ -105,8 +104,8 @@ mkProbs prob compfn dps trs = (rProb, sProb)
         then prob
           { Prob.strictDPs  = sDps
           , Prob.strictTrs  = sTrs
-          , Prob.weakDPs    = Prob.weakDPs prob `Trs.union` rDps
-          , Prob.weakTrs    = Prob.weakTrs prob `Trs.union` rTrs }
+          , Prob.weakDPs    = Prob.weakDPs prob `RS.union` rDps
+          , Prob.weakTrs    = Prob.weakTrs prob `RS.union` rTrs }
         else prob
           { Prob.strictTrs  = sTrs
           , Prob.strictDPs  = sDps }
@@ -117,13 +116,13 @@ mkProbs prob compfn dps trs = (rProb, sProb)
 data DecomposeProof
   = DecomposeProof
     { bound_       :: DecomposeBound
-    , selectedTrs_ :: Trs F V
-    , selectedDPs_ :: Trs F V
-    , rProb_       :: TrsProblem
-    , sProb_       :: TrsProblem }
+    , selectedTrs_ :: Rules F V
+    , selectedDPs_ :: Rules F V
+    , rProb_       :: Trs
+    , sProb_       :: Trs }
   | DecomposeCPProof
     { bound_   :: DecomposeBound
-    , sProb_   :: TrsProblem
+    , sProb_   :: Trs
     , cp_      :: ComplexityPair
     , cpproof_ :: ComplexityPairProof
     , cpcert_  :: T.Certificate }
@@ -133,10 +132,10 @@ data DecomposeProof
 progress :: DecomposeProof -> Bool
 progress DecomposeProof{..} =
   case bound_ of
-    Add -> not $ Trs.null (Prob.allComponents rProb_) || Trs.null (Prob.allComponents sProb_)
+    Add -> not $ RS.null (Prob.allComponents rProb_) || RS.null (Prob.allComponents sProb_)
     _   -> not $ Prob.isTrivial rProb_ || Prob.isTrivial sProb_
 progress DecomposeCPProof{..} =
-  not $ Trs.null (CP.removableDPs cpproof_) && Trs.null (CP.removableTrs cpproof_)
+  not $ RS.null (CP.removableDPs cpproof_) && RS.null (CP.removableTrs cpproof_)
 progress DecomposeFail = False
 
 certfn :: DecomposeBound -> T.Pair T.Certificate -> T.Certificate
@@ -157,11 +156,11 @@ data Decompose = Decompose
 
 instance T.Processor Decompose where
   type ProofObject Decompose = ApplicationProof DecomposeProof
-  type In  Decompose         = TrsProblem
-  type Out Decompose         = TrsProblem
+  type In  Decompose         = Trs
+  type Out Decompose         = Trs
   type Forking Decompose     = T.Pair
 
-  execute p@Decompose{..} prob =
+  execute Decompose{..} prob =
     maybe decomposition (\s -> T.abortWith (Inapplicable s :: ApplicationProof DecomposeProof)) maybeApplicable
     where
       decomposition
@@ -189,11 +188,11 @@ data DecomposeCP = DecomposeCP
 
 instance T.Processor DecomposeCP where
   type ProofObject DecomposeCP = ApplicationProof DecomposeProof
-  type In  DecomposeCP         = TrsProblem
-  type Out DecomposeCP         = TrsProblem
+  type In  DecomposeCP         = Trs
+  type Out DecomposeCP         = Trs
   type Forking DecomposeCP     = T.Pair
 
-  execute p@DecomposeCP{..} prob = do
+  execute DecomposeCP{..} prob = do
     app <- runApplicationT $ do
       test (isApplicableRandS prob withBoundCP_)
       let
@@ -275,12 +274,11 @@ instance Xml.Xml DecomposeProof where
 --- * instances ------------------------------------------------------------------------------------------------------
 
 boundArg :: T.Argument 'T.Required DecomposeBound
-boundArg = T.arg { T.argName = "allow", T.argDomain = "<bound>"} `T.withHelp` help where
-  help =
-    [ "This argument type determines"
-    , "how the complexity certificate should be obtained from subproblems (R) and (S)."
-    , "Consequently, this argument also determines the shape of (S)."
-    , "<bound> is one of " ++ show [Add, RelativeAdd, RelativeMul, RelativeComp] ]
+boundArg = T.flag "allow"
+  [ "This argument type determines"
+  , "how the complexity certificate should be obtained from subproblems (R) and (S)."
+  , "Consequently, this argument also determines the shape of (S)." ]
+  `T.withDomain` fmap show [(minBound :: DecomposeBound)..]
 
 desc :: [String]
 desc =
@@ -290,9 +288,6 @@ desc =
   , "The processor closely follows the ideas presented in"
   , "/Complexity Bounds From Relative Termination Proofs/"
   , "(<http://www.imn.htwk-leipzig.de/~waldmann/talk/06/rpt/rel/main.pdf>)" ]
-
-instance T.SParsable i i DecomposeBound where
-  parseS = P.enum
 
 bndArg :: T.Argument 'T.Optional DecomposeBound
 bndArg = boundArg `T.optional` RelativeAdd

@@ -1,5 +1,5 @@
 {- |
-Module      :  Tct.Method.Bounds
+Module      :  Tct.Processor.Bounds
 Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>,
                Georg Moser <georg.moser@uibk.ac.at>,
                Andreas Schnabl <andreas.schnabl@uibk.ac.at>
@@ -13,7 +13,7 @@ Portability :  unportable
 This module implements the (relative-) bounds processor.
 -}
 
-module Tct.Trs.Method.Bounds
+module Tct.Trs.Processor.Bounds
   ( boundsDeclaration
   , bounds
   , bounds'
@@ -29,7 +29,6 @@ import           Data.Typeable                      (Typeable)
 
 import qualified Data.Rewriting.Term                as R
 
-import qualified Tct.Core.Common.Parser             as P
 import qualified Tct.Core.Common.Pretty             as PP
 import           Tct.Core.Common.SemiRing           as PP (add)
 import qualified Tct.Core.Common.Xml                as Xml
@@ -43,8 +42,8 @@ import qualified Tct.Trs.Data.Problem               as Prob
 import qualified Tct.Trs.Data.ProblemKind           as Prob
 import qualified Tct.Trs.Data.Rewriting             as R
 import qualified Tct.Trs.Data.Signature             as Sig
-import qualified Tct.Trs.Data.Trs                   as Trs
-import qualified Tct.Trs.Method.Empty               as E (empty)
+import qualified Tct.Trs.Data.Rules                 as RS
+import qualified Tct.Trs.Processor.Empty               as E (empty)
 
 import           Tct.Trs.Encoding.Bounds.Automata
 import           Tct.Trs.Encoding.Bounds.Violations
@@ -107,20 +106,20 @@ data GAutomaton f = GAutomaton
 data BoundsProof = BoundsProof
   { enrichment_ :: Enrichment
   , automaton_  :: GAutomaton F
-  , strict_     :: Trs F V }
+  , strict_     :: Rules F V }
   deriving Show
 
 instance T.Processor Bounds where
   type ProofObject Bounds = ApplicationProof BoundsProof
-  type In  Bounds         = TrsProblem
-  type Out Bounds         = TrsProblem
+  type In  Bounds         = Trs
+  type Out Bounds         = Trs
 
-  execute p prob = 
+  execute p prob =
     maybe apply (\s -> T.abortWith (Inapplicable s :: ApplicationProof BoundsProof)) maybeApplicable
     where
       apply = boundHeight_ automaton `seq`
         T.succeedWith1 (Applicable proof) (flip T.updateTimeUBCert (`add` T.linear) . T.fromId) nprob
-      maybeApplicable = Trs.isRightLinear' (strict `Trs.union` weak)
+      maybeApplicable = RS.isRightLinear' (strict `RS.union` weak)
 
       strict = Prob.strictComponents prob
       weak   = Prob.weakComponents prob
@@ -131,16 +130,16 @@ instance T.Processor Bounds where
 
       -- MS: the problem is actually already solved; but we return a trivial problem so certificatioin is easier to handle
       nprob = Prob.sanitiseDPGraph $ prob
-        { Prob.strictDPs = Trs.empty
-        , Prob.strictTrs = Trs.empty
-        , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` Prob.strictDPs prob
-        , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` Prob.strictTrs prob }
+        { Prob.strictDPs = RS.empty
+        , Prob.strictTrs = RS.empty
+        , Prob.weakDPs   = Prob.weakDPs prob `RS.union` Prob.strictDPs prob
+        , Prob.weakTrs   = Prob.weakTrs prob `RS.union` Prob.strictTrs prob }
       proof = BoundsProof
         { enrichment_ = enrichment p
         , automaton_  = automaton
         , strict_     = strict }
 
-computeAutomaton :: (Ord f, Ord v) => Signature f -> StartTerms f -> Trs f v -> Trs f v -> Enrichment -> InitialAutomaton -> GAutomaton f
+computeAutomaton :: (Ord f, Ord v) => Signature f -> StartTerms f -> Rules f v -> Rules f v -> Enrichment -> InitialAutomaton -> GAutomaton f
 computeAutomaton sig st strict weak enrich initial = toGautomaton $ compatibleAutomaton strict' weak' enrich $ case initial of
   PerSymbol -> perSymInitialAutomaton  st' sig'
   Minimal   -> minimalInitialAutomaton st' sig'
@@ -164,18 +163,16 @@ computeAutomaton sig st strict weak enrich initial = toGautomaton $ compatibleAu
     tcano = R.map fcano id
     rcano = R.rmap tcano
 
-    strict' = Trs.map rcano strict
-    weak'   = Trs.map rcano weak
+    strict' = RS.map rcano strict
+    weak'   = RS.map rcano weak
     st'     = Prob.mapStartTerms fcano st
     sig'    = Sig.map fcano sig
 
 
 --- * instances ------------------------------------------------------------------------------------------------------
 
-initialAutomatonArg :: T.Argument T.Required InitialAutomaton
-initialAutomatonArg = T.arg
-  `T.withName` "initial"
-  `T.withHelp`
+initialAutomatonArg :: T.Argument 'T.Required InitialAutomaton
+initialAutomatonArg = T.flag "initial"
     [ "The employed initial automaton."
     , "If 'perSymbol' is set then the initial automaton admits one dedicated"
     , "state per function symbols."
@@ -184,18 +181,10 @@ initialAutomatonArg = T.arg
     , "two states are used in order to distinguish defined symbols from constructors." ]
   `T.withDomain` fmap show [(minBound :: InitialAutomaton)..]
 
-enrichmentArg :: T.Argument T.Required Enrichment
-enrichmentArg = T.arg
-  `T.withName` "enrichment"
-  `T.withHelp`
+enrichmentArg :: T.Argument 'T.Required Enrichment
+enrichmentArg = T.flag "enrichment"
     [ "The employed enrichment." ]
   `T.withDomain` fmap show [(minBound :: Enrichment)..]
-
-instance T.SParsable i i InitialAutomaton where
-  parseS = P.enum
-
-instance T.SParsable i i Enrichment where
-  parseS = P.enum
 
 description :: [String]
 description =

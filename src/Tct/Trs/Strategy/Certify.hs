@@ -19,7 +19,7 @@ import qualified Tct.Core.Data          as T
 import           Tct.Trs.Data           (TrsStrategy)
 import qualified Tct.Trs.Data.Problem   as Prob
 import qualified Tct.Trs.Data.Signature as Sig
-import qualified Tct.Trs.Data.Trs       as Trs
+import qualified Tct.Trs.Data.Rules as RS
 import           Tct.Trs.Processors
 
 
@@ -48,7 +48,7 @@ certifyStrategy deg = withProblem k where
 
 matchbounds :: TrsStrategy
 matchbounds = withProblem $ \prob ->
-  when (Trs.isLeftLinear $ Prob.allComponents prob) (bounds PerSymbol Match)
+  when (RS.isLeftLinear $ Prob.allComponents prob) (bounds PerSymbol Match)
 
 shifts :: (?ua :: UsableArgs) => Degree -> Degree -> TrsStrategy
 shifts l u = chain [ tew (intes d) | d <- [(max 0 l) .. u] ]
@@ -114,7 +114,7 @@ certifyRCI deg =
         ,                                 shifts 3 deg .>>> empty ]
 
     dt = dependencyTuples
-    wdp p1 = withProblem $ \p2 -> if Sig.defineds (Prob.signature p1) == Sig.defineds (Trs.signature (Prob.allComponents p2)) then dependencyPairs' WDP else abort
+    wdp p1 = withProblem $ \p2 -> if Sig.defineds (Prob.signature p1) == Sig.defineds (RS.signature (Prob.allComponents p2)) then dependencyPairs' WDP else abort
     trivialRCI = shifts 0 0 .>>> dependencyTuples .>>> try usableRules .>>> shifts 0 0 .>>> empty
 
 certifyDC :: Degree -> TrsStrategy

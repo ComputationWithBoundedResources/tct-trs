@@ -7,7 +7,7 @@
 @
 , where @rem(R#)@ removes DPs that can not occur in any derivation wrt to the starting terms.
 -}
-module Tct.Trs.Method.DP.DPGraph.RemoveInapplicable
+module Tct.Trs.Processor.DP.DPGraph.RemoveInapplicable
   ( removeInapplicableDeclaration
   , removeInapplicable
   ) where
@@ -27,7 +27,7 @@ import           Tct.Trs.Data
 import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules           as RS
 
 
 data RemoveInapplicable = RemoveInapplicable deriving Show
@@ -43,8 +43,8 @@ data RemoveInapplicableProof
 
 instance T.Processor RemoveInapplicable where
   type ProofObject RemoveInapplicable = ApplicationProof RemoveInapplicableProof
-  type In  RemoveInapplicable         = TrsProblem
-  type Out RemoveInapplicable         = TrsProblem
+  type In  RemoveInapplicable         = Trs
+  type Out RemoveInapplicable         = Trs
 
   execute RemoveInapplicable prob =
     maybe reminapp (\s -> T.abortWith (Inapplicable s :: ApplicationProof RemoveInapplicableProof)) (Prob.isDTProblem' prob)
@@ -68,8 +68,8 @@ instance T.Processor RemoveInapplicable where
 
           rs = snd $ unzip lreachable
           nprob = Prob.sanitiseDPGraph $ prob
-            { Prob.strictDPs = Trs.fromList [ theRule r| r <- rs, isStrict r ]
-            , Prob.weakDPs   = Trs.fromList [ theRule r| r <- rs, not (isStrict r) ] }
+            { Prob.strictDPs = RS.fromList [ theRule r| r <- rs, isStrict r ]
+            , Prob.weakDPs   = RS.fromList [ theRule r| r <- rs, not (isStrict r) ] }
 
           toRS ns = [ (n, theRule cn) | (n,cn) <- ns ]
           proof = RemoveInapplicableProof

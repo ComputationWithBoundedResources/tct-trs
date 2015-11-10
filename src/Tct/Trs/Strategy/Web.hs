@@ -6,23 +6,25 @@ import           Tct.Core
 import           Tct.Trs.Processors
 
 webDeclaration = strategy "web"
-  ( degreeArg
-  , bool `withName` "matchbounds"
-  , bool `withName` "matrices"
-  , bool `withName` "matricesusableargs"
-  , bool `withName` "matricesusablerules"
-  , bool `withName` "polys"
-  , bool `withName` "polysusableargs"
-  , bool `withName` "polysusablerules"
-  , bool `withName` "toi"
-  , bool `withName` "compose"
-  , bool `withName` "dp"
-  , bool `withName` "dpusetuples"
-  , bool `withName` "dpsimps"
+  ( --degreeArg
+  ba "matchbounds"
+  , ba "matrices"
+  , ba "matricesusableargs"
+  , ba "matricesusablerules"
+  , ba "polys"
+  , ba "polysusableargs"
+  , ba "polysusablerules"
+  , ba "toi"
+  , ba "compose"
+  , ba "dp"
+  , ba "dpusetuples"
+  , ba "dpsimps"
   ) web
 
+ba s = bool s ["Wether to use " ++ s ++ "."]
+
 web
-  deg
+  -- deg
   -- base
   useMatchbounds
   useMatrices
@@ -40,6 +42,7 @@ web
   useDPSimps
 
   =
+  let deg = 3 in 
 
   when useToi (try toInnermost)
   .>>>

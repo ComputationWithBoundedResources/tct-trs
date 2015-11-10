@@ -8,7 +8,7 @@ Let @Wl#@ be forward closed, then
     |- <S# / W# + Wl# + W, Q, T#> :f
 @
 -}
-module Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes
+module Tct.Trs.Processor.DP.DPGraph.RemoveWeakSuffixes
   ( removeWeakSuffixesDeclaration
   , removeWeakSuffixes
   ) where
@@ -25,7 +25,7 @@ import qualified Tct.Core.Data                as T
 import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
-import qualified Tct.Trs.Data.Trs as Trs
+import qualified Tct.Trs.Data.Rules as RS
 import           Tct.Trs.Data.DependencyGraph
 import qualified Tct.Trs.Data.Problem         as Prob
 
@@ -41,8 +41,8 @@ data RemoveWeakSuffixesProof
 
 instance T.Processor RemoveWeakSuffixes where
   type ProofObject RemoveWeakSuffixes = ApplicationProof RemoveWeakSuffixesProof
-  type In  RemoveWeakSuffixes         = TrsProblem
-  type Out RemoveWeakSuffixes         = TrsProblem
+  type In  RemoveWeakSuffixes         = Trs
+  type Out RemoveWeakSuffixes         = Trs
 
   -- an scc in the congruence graph is considered weak if all rules in the scc are weak
   -- compute maximal weak suffix bottom-up
@@ -78,7 +78,7 @@ instance T.Processor RemoveWeakSuffixes where
 
           (wdgTail, rs) = unzip wdgLabTail
           nprob = prob
-            { Prob.weakDPs   = Prob.weakDPs prob `Trs.difference` Trs.fromList rs
+            { Prob.weakDPs   = Prob.weakDPs prob `RS.difference` RS.fromList rs
             , Prob.dpGraph   = DependencyGraph
               { dependencyGraph = wdg `removeNodes` wdgTail
               , congruenceGraph = cdg `removeNodes` cdgTail }}
@@ -98,7 +98,7 @@ removeWeakSuffixesDeclaration = T.declare "removeWeakSuffixes" desc () (T.Apply 
 -- graph are on trailing weak paths.
 --
 -- Only applicable on DP-problems as obtained by 'dependencyPairs' or 'dependencyTuples'. Also
--- not applicable when @strictTrs prob \= Trs.empty@.
+-- not applicable when @strictTrs prob \= RS.empty@.
 removeWeakSuffixes :: TrsStrategy
 removeWeakSuffixes = T.declFun removeWeakSuffixesDeclaration
 

@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------------------
 -- |
--- Module      :  Tct.Method.Bounds.Violations.Fix
+-- Module      :  Tct.Processor.Bounds.Violations.Fix
 -- Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>, 
 --                Georg Moser <georg.moser@uibk.ac.at>, 
 --                Andreas Schnabl <andreas.schnabl@uibk.ac.at>

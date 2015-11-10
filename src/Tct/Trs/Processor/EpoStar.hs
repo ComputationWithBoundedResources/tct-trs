@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -- Implementation details can be found in the technical report 'http://arxiv.org/pdf/1010.1128v3.pdf'.
 -- | This module provides the \EpoStar\ processor.
-module Tct.Trs.Method.EpoStar
+module Tct.Trs.Processor.EpoStar
   ( epoStarDeclaration
   , epoStar
   , epoStar'
@@ -22,7 +22,6 @@ import           Data.Monoid                  ((<>))
 import qualified Data.Set                     as S
 import           Data.Typeable
 
-import qualified Tct.Core.Common.Parser       as P
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
 import qualified Tct.Core.Data                as T
@@ -42,7 +41,7 @@ import qualified Tct.Trs.Data.Precedence      as Prec
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Rewriting       as R (directSubterms)
 import qualified Tct.Trs.Data.Signature       as Sig
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules as RS
 import qualified Tct.Trs.Encoding.SafeMapping as SM
 
 
@@ -54,7 +53,7 @@ useExtComp :: ExtComp -> Bool
 useExtComp = (ExtComp==)
 
 data EpoStarProof f v = EpoStarProof
-  { stricts_             :: Trs f v          -- ^ The oriented input TRS.
+  { stricts_             :: Rules f v          -- ^ The oriented input TRS.
   , safeMapping_         :: SM.SafeMapping f -- ^ The safe mapping.
   , precedence_          :: Precedence f     -- ^ The precedence.
   , argumentPermutation_ :: MuMapping f      -- ^ Employed argument permutation.
@@ -63,15 +62,15 @@ data EpoStarProof f v = EpoStarProof
 
 instance T.Processor EpoStar where
   type ProofObject EpoStar = ApplicationProof (OrientationProof (EpoStarProof F V))
-  type In  EpoStar         = TrsProblem
-  type Out EpoStar         = TrsProblem
+  type In  EpoStar         = Trs
+  type Out EpoStar         = Trs
   type Forking EpoStar     = T.Judgement
 
   execute p prob =
     maybe epo (\s -> T.abortWith (Inapplicable s :: ApplicationProof (OrientationProof (EpoStarProof F V)))) maybeApplicable
     where
 
-      maybeApplicable = Prob.isRCProblem' prob <|> Prob.isInnermostProblem' prob <|> Trs.isConstructorTrs' sig trs
+      maybeApplicable = Prob.isRCProblem' prob <|> Prob.isInnermostProblem' prob <|> RS.isConstructorTrs' sig trs
 
       trs    = Prob.allComponents prob
       sig    = Prob.signature prob
@@ -220,7 +219,7 @@ unorientable sig u v =
 
 entscheide :: (Functor m, Monad m, Ord f, Ord v, Show f, Show v) =>
   SMT.SmtSolver m Int
-  -> Trs f v
+  -> Rules f v
   -> Signature f
   -> ExtComp
   -> m (SMT.Result (Precedence f, SM.SafeMapping f, MuMapping f))
@@ -254,7 +253,7 @@ entscheide solver trs sig ecomp = do
     return $ SMT.decode (prenc, sfenc, muenc)
   return $ res
     where
-      rs = Trs.toList trs
+      rs = RS.toList trs
 
 orient :: (Show v, Show f, Ord v, Ord f) =>
   Bool
@@ -441,15 +440,11 @@ orient allowEcomp sig prec safe mu a =
 --- * instances ------------------------------------------------------------------------------------------------------
 
 extCompArg :: T.Argument 'T.Required ExtComp
-extCompArg = T.arg
-  `T.withName` "extended"
-  `T.withHelp`
-    [ "Extended Composition: If this flag is enabled, then the slightly more ."
-    , "liberal composition scheme 'f(x;y) = h(g(;x);k(x;y))' is permitted."
-    , "Currently it is not known whether this extension is sound." ]
+extCompArg = T.flag "extend"
+  [ "Extended Composition: If this flag is enabled, then the slightly more ."
+  , "liberal composition scheme 'f(x;y) = h(g(;x);k(x;y))' is permitted."
+  , "Currently it is not known whether this extension is sound." ]
   `T.withDomain` fmap show [(minBound :: ExtComp)..]
-
-instance T.SParsable i i ExtComp where parseS = P.enum
 
 description :: [String]
 description = [ unwords

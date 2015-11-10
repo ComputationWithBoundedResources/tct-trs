@@ -1,5 +1,5 @@
 name:          tct-trs
-version:       3.0.0
+version:       3.1.0
 stability:     experimental
 author:
   Martin Avanzini, Andreas Kochesser, Georg Moser, Michael Schaper, Maria Schett
@@ -44,9 +44,9 @@ executable tct-trs
     term-rewriting-xml == 0.1.0.*,
 
     slogic             == 0.*,
-    tct-common         == 3.0.*,
-    tct-core           == 3.0.*,
-    tct-trs            == 3.0.*
+    tct-common         == 3.1.*,
+    tct-core           == 3.1.*,
+    tct-trs            == 3.1.*
 
   extensions:
     ConstraintKinds,
@@ -81,12 +81,11 @@ library
     Tct.Trs.Data.Problem
     Tct.Trs.Data.ProblemKind
     Tct.Trs.Data.Rewriting
+    Tct.Trs.Data.Rules
     Tct.Trs.Data.RuleSelector
     Tct.Trs.Data.RuleSet
     Tct.Trs.Data.Signature
     Tct.Trs.Data.Symbol
-    Tct.Trs.Data.Trs
-    Tct.Trs.Declarations
     Tct.Trs.Encoding.ArgumentFiltering
     Tct.Trs.Encoding.Bounds.Automata
     Tct.Trs.Encoding.Bounds.Violations
@@ -99,30 +98,32 @@ library
     Tct.Trs.Encoding.UsablePositions
     Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interactive
-    Tct.Trs.Method.Bounds
-    Tct.Trs.Method.ComplexityPair
-    Tct.Trs.Method.Decompose
-    Tct.Trs.Method.DP.DependencyPairs
-    Tct.Trs.Method.DP.DPGraph.DecomposeDG
-    Tct.Trs.Method.DP.DPGraph.PathAnalysis
-    Tct.Trs.Method.DP.DPGraph.PredecessorEstimation
-    Tct.Trs.Method.DP.DPGraph.RemoveHeads
-    Tct.Trs.Method.DP.DPGraph.RemoveInapplicable
-    Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes
-    Tct.Trs.Method.DP.DPGraph.SimplifyRHS
-    Tct.Trs.Method.DP.DPGraph.Trivial
-    Tct.Trs.Method.DP.UsableRules
-    Tct.Trs.Method.Empty
-    Tct.Trs.Method.EpoStar
-    Tct.Trs.Method.InnermostRuleRemoval
-    Tct.Trs.Method.Matrix.NaturalMI
-    Tct.Trs.Method.Poly.NaturalPI
-    Tct.Trs.Method.ToInnermost
-    Tct.Trs.Method.WithCertification
+    Tct.Trs.Processor.Bounds
+    Tct.Trs.Processor.ComplexityPair
+    Tct.Trs.Processor.Decompose
+    Tct.Trs.Processor.DP.DependencyPairs
+    Tct.Trs.Processor.DP.DPGraph.DecomposeDG
+    Tct.Trs.Processor.DP.DPGraph.PathAnalysis
+    Tct.Trs.Processor.DP.DPGraph.PredecessorEstimation
+    Tct.Trs.Processor.DP.DPGraph.RemoveHeads
+    Tct.Trs.Processor.DP.DPGraph.RemoveInapplicable
+    Tct.Trs.Processor.DP.DPGraph.RemoveWeakSuffixes
+    Tct.Trs.Processor.DP.DPGraph.SimplifyRHS
+    Tct.Trs.Processor.DP.DPGraph.Trivial
+    Tct.Trs.Processor.DP.UsableRules
+    Tct.Trs.Processor.Empty
+    Tct.Trs.Processor.EpoStar
+    Tct.Trs.Processor.InnermostRuleRemoval
+    Tct.Trs.Processor.Matrix.NaturalMI
+    Tct.Trs.Processor.Poly.NaturalPI
     Tct.Trs.Processors
+    Tct.Trs.Processor.ToInnermost
+    Tct.Trs.Processor.WithCertification
+    Tct.Trs.Strategies
     Tct.Trs.Strategy.Certify
-    Tct.Trs.Strategy.Runtime
+    Tct.Trs.Strategy.Competition
     Tct.Trs.Strategy.Derivational
+    Tct.Trs.Strategy.Runtime
     Tct.Trs.Strategy.Web
   build-depends:
     array              == 0.5.*,
@@ -140,8 +141,8 @@ library
     term-rewriting-xml == 0.1.0.*,
 
     slogic             == 0.*,
-    tct-common         == 3.0.*,
-    tct-core           == 3.0.*
+    tct-common         == 3.1.*,
+    tct-core           == 3.1.*
 
   ghc-options:
     -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N

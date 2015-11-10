@@ -49,7 +49,7 @@ import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Rewriting      as R
 import qualified Tct.Trs.Data.RuleSet        as Rs
 import qualified Tct.Trs.Data.Symbol         as Symb
-import qualified Tct.Trs.Data.Trs            as Trs
+import qualified Tct.Trs.Data.Rules          as RS
 
 
 --- * dependency graph -----------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ estimatedDependencyGraph rs strat  = DependencyGraph wdg cdg where
 estimatedDependencyGraph' :: (Ord v, Ord f, Symb.Fun f) => Rs.RuleSet f v -> Prob.Strategy -> Graph (DGNode f v) Int
 estimatedDependencyGraph' rs strat = mkGraph ns es
   where
-    (strictDPs, weakDPs) = (Trs.toList $ Rs.sdps rs, Trs.toList $ Rs.wdps rs)
+    (strictDPs, weakDPs) = (RS.toList $ Rs.sdps rs, RS.toList $ Rs.wdps rs)
     ns = zip [1..] $ [ DGNode r True | r <- strictDPs ] ++ [ DGNode r False | r <- weakDPs ]
     es = [ (n1, n2, i) | (n1,r1) <- ns, (n2,r2) <- ns, i <- theRule r1 `edgesTo` theRule r2 ]
 
@@ -126,7 +126,7 @@ estimatedDependencyGraph' rs strat = mkGraph ns es
         u'   = R.rename (Right . R.Old) u
         t' f = R.rename Left . f $ R.rename R.Old t
 
-        trsComponents = Trs.toList (Rs.strs rs) ++ Trs.toList (Rs.wtrs rs)
+        trsComponents = RS.toList (Rs.strs rs) ++ RS.toList (Rs.wtrs rs)
         lhss          = RS.lhss trsComponents
       in
       case strat of
@@ -203,12 +203,12 @@ updateDGNode k dg = dg
     updateSCCNode (nid, n) = (nid, k n)
 
 -- | @setWeak trs gr@ updates label information indicating strictness of a rule.
-setWeak :: (Ord f, Ord v) => Trs.Trs f v -> DependencyGraph f v -> DependencyGraph f v
-setWeak trs = updateDGNode (\ n -> n {isStrict = isStrict n && not (theRule n `Trs.member` trs)})
+setWeak :: (Ord f, Ord v) => RS.Rules f v -> DependencyGraph f v -> DependencyGraph f v
+setWeak trs = updateDGNode (\ n -> n {isStrict = isStrict n && not (theRule n `RS.member` trs)})
 
 -- | @setStrict trs gr@ updates label information indicating strictness of a rule.
-setStrict :: (Ord f, Ord v) => Trs.Trs f v -> DependencyGraph f v -> DependencyGraph f v
-setStrict trs = updateDGNode (\ n -> n {isStrict = isStrict n || not (theRule n `Trs.member` trs)})
+setStrict :: (Ord f, Ord v) => RS.Rules f v -> DependencyGraph f v -> DependencyGraph f v
+setStrict trs = updateDGNode (\ n -> n {isStrict = isStrict n || not (theRule n `RS.member` trs)})
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

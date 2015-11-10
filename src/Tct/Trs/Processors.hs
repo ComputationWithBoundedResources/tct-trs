@@ -36,64 +36,61 @@ import           Data.Typeable
 
 import           Tct.Core
 import qualified Tct.Core.Data                                   as T
-import qualified Tct.Core.Common.Parser       as P
 
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.DependencyGraph                    as DG
 import qualified Tct.Trs.Data.Problem                            as Prob
 import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.RuleSet                            as Prob
-import qualified Tct.Trs.Data.Trs                                as Trs
+import qualified Tct.Trs.Data.Rules as RS
 
-import           Tct.Trs.Method.Bounds                           as M
-import           Tct.Trs.Method.Decompose                        as M
-import           Tct.Trs.Method.ComplexityPair                   as M
-import           Tct.Trs.Method.DP.DependencyPairs               as M
-import           Tct.Trs.Method.DP.DPGraph.DecomposeDG           as M
-import           Tct.Trs.Method.DP.DPGraph.PathAnalysis          as M
-import           Tct.Trs.Method.DP.DPGraph.PredecessorEstimation as M
-import           Tct.Trs.Method.DP.DPGraph.RemoveHeads           as M
-import           Tct.Trs.Method.DP.DPGraph.RemoveInapplicable    as M
-import           Tct.Trs.Method.DP.DPGraph.RemoveWeakSuffixes    as M
-import           Tct.Trs.Method.DP.DPGraph.SimplifyRHS           as M
-import           Tct.Trs.Method.DP.DPGraph.Trivial               as M
-import           Tct.Trs.Method.DP.UsableRules                   as M
-import           Tct.Trs.Method.Empty                            as M
-import           Tct.Trs.Method.EpoStar                          as M
-import           Tct.Trs.Method.InnermostRuleRemoval             as M
-import           Tct.Trs.Method.Matrix.NaturalMI                 as M
-import           Tct.Trs.Method.Poly.NaturalPI                   as M
-import           Tct.Trs.Method.ToInnermost                      as M
-import           Tct.Trs.Method.WithCertification                as M
+import           Tct.Trs.Processor.Bounds                           as M
+import           Tct.Trs.Processor.Decompose                        as M
+import           Tct.Trs.Processor.ComplexityPair                   as M
+import           Tct.Trs.Processor.DP.DependencyPairs               as M
+import           Tct.Trs.Processor.DP.DPGraph.DecomposeDG           as M
+import           Tct.Trs.Processor.DP.DPGraph.PathAnalysis          as M
+import           Tct.Trs.Processor.DP.DPGraph.PredecessorEstimation as M
+import           Tct.Trs.Processor.DP.DPGraph.RemoveHeads           as M
+import           Tct.Trs.Processor.DP.DPGraph.RemoveInapplicable    as M
+import           Tct.Trs.Processor.DP.DPGraph.RemoveWeakSuffixes    as M
+import           Tct.Trs.Processor.DP.DPGraph.SimplifyRHS           as M
+import           Tct.Trs.Processor.DP.DPGraph.Trivial               as M
+import           Tct.Trs.Processor.DP.UsableRules                   as M
+import           Tct.Trs.Processor.Empty                            as M
+import           Tct.Trs.Processor.EpoStar                          as M
+import           Tct.Trs.Processor.InnermostRuleRemoval             as M
+import           Tct.Trs.Processor.Matrix.NaturalMI                 as M
+import           Tct.Trs.Processor.Poly.NaturalPI                   as M
+import           Tct.Trs.Processor.ToInnermost                      as M
+import           Tct.Trs.Processor.WithCertification                as M
 
+-- TODO: MS: move to strategies?
 
 type Degree = Int
 
 -- | Argument for degree. @:degree nat@
 degreeArg :: Argument 'Required T.Nat
-degreeArg = nat `withName` "degree" `withHelp` ["set max degree"]
+degreeArg = nat "degree" ["set max degree"]
 
 -- | Arguments for bounded degrees. @:form nat :to nat@
 boundedArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat)
 boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
   where
-    lArg = nat `withName` "from" `withHelp` ["from degree"]
-    uArg = nat `withName` "to"   `withHelp` ["to degree"]
+    lArg = nat "from" ["from degree"]
+    uArg = nat "to"   ["to degree"]
 
 -- | Argument for timeout. @:timeout nat@
 timeoutArg :: Argument 'Required T.Nat
-timeoutArg = nat `withName` "timeout" `withHelp` ["set a timeout"]
+timeoutArg = nat "timeout" ["set a timeout"]
 
 -- | Parsable Flag. Usually used to dynamically select 'fastest' or 'best' combinator.
 data CombineWith = Best | Fastest    deriving (Show, Enum, Bounded, Typeable)
-instance T.SParsable i i CombineWith where parseS = P.enum
 
--- | Argument for combine. @comine <Best|Fastest>@
-combineWithArg :: Argument 'Required a
-combineWithArg = T.arg
-  `withName` "combineWith"
+-- | Argument for combine. @combine <Best|Fastest>@
+combineWithArg :: Argument 'Required CombineWith
+combineWithArg = T.flag "combineWith" ["Set race conditions."]
   `T.withDomain` fmap show [(minBound :: CombineWith) ..]
-  `withHelp` ["combine with"]
 
 
 (.>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
@@ -205,7 +202,7 @@ cleanSuffix = force $
   .>>> try (removeWeakSuffixes .>>> try (simplifyRHS .>>> try usableRules))
   where
     sel = RS.selAllOf (RS.selFromWDG f) { RS.rsName = "simple predecessor estimation selector" }
-    f wdg = Prob.emptyRuleSet { Prob.sdps = Trs.fromList rs }
+    f wdg = Prob.emptyRuleSet { Prob.sdps = RS.fromList rs }
       where rs = [ DG.theRule nl | (n,nl) <- DG.lnodes wdg, all (not . DG.isStrict . (\(_,l,_) -> l)) (DG.lsuccessors wdg n) ]
 
 -- | Using the decomposition processor (c.f. 'Compose.decomposeBy') this transformation
@@ -257,7 +254,7 @@ toDP =
 -- by (i) orienting using predecessor extimation and the given processor,
 -- and (ii) using 'DPSimp.removeWeakSuffix' and various sensible further simplifications.
 -- Fails only if (i) fails.
-removeLeaf :: ComplexityPair -> T.Strategy TrsProblem TrsProblem
+removeLeaf :: ComplexityPair -> T.Strategy Trs Trs
 removeLeaf cp =
   predecessorEstimationCP anyStrictLeaf cp
   .>>> try (removeWeakSuffixes .>>> try simplifyRHS)

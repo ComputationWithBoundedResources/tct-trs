@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Tct.Trs.Method.Poly.NaturalPI
+module Tct.Trs.Processor.Poly.NaturalPI
   (
   -- * Declaration
     polyDeclaration
@@ -19,7 +19,6 @@ module Tct.Trs.Method.Poly.NaturalPI
   ) where
 
 
-import           Control.Monad.Error                 (throwError)
 import qualified Data.List                           as L
 import qualified Data.Map.Strict                     as M
 import           Data.Maybe                          (fromMaybe)
@@ -29,6 +28,7 @@ import qualified Data.Set                            as S
 import qualified Data.Rewriting.Rule                 as R (Rule (..))
 import qualified Data.Rewriting.Term                 as R
 
+import           Tct.Core.Common.Error               (throwError)
 import qualified Tct.Core.Common.Pretty              as PP
 import qualified Tct.Core.Common.Xml                 as Xml
 import qualified Tct.Core.Data                       as T
@@ -50,7 +50,7 @@ import qualified Tct.Trs.Data.Problem                as Prob
 import qualified Tct.Trs.Data.ProblemKind            as Prob
 import qualified Tct.Trs.Data.RuleSelector           as RS
 import qualified Tct.Trs.Data.Signature              as Sig
-import qualified Tct.Trs.Data.Trs                    as Trs
+import qualified Tct.Trs.Data.Rules as RS
 import qualified Tct.Trs.Encoding.Interpretation     as I
 import qualified Tct.Trs.Encoding.UsableRules        as UREnc
 
@@ -76,8 +76,8 @@ type NaturalPIProof = OrientationProof (PolyOrder Int)
 
 instance T.Processor NaturalPI where
   type ProofObject NaturalPI = ApplicationProof NaturalPIProof
-  type In  NaturalPI         = TrsProblem
-  type Out NaturalPI         = TrsProblem
+  type In  NaturalPI         = Trs
+  type Out NaturalPI         = Trs
   type Forking NaturalPI     = T.Optional T.Id
 
   execute p prob
@@ -120,7 +120,7 @@ interpretf ebsi = I.interpretTerm interpretFun interpretVar
       where k m g = error ("NaturalPI.interpretf: " ++ show g) `fromMaybe` M.lookup g m
     interpretVar v = P.variable v
 
-entscheide :: NaturalPI -> TrsProblem -> T.TctM (T.Return NaturalPI)
+entscheide :: NaturalPI -> Trs -> T.TctM (T.Return NaturalPI)
 entscheide p prob = do
   let
     orientM                   = I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
@@ -165,7 +165,7 @@ entscheide1 _ aorder encoding decoding forceAny prob
       where
 
         assertx st e = st {SMT.asserts = e: SMT.asserts st}
-        srules = Trs.toList $ Prob.strictComponents prob
+        srules = RS.toList $ Prob.strictComponents prob
 
         mkOrder (inter, ufuns) = aorder { pint_ = mkInter (pint_ aorder) inter ufuns }
         mkInter aproof inter ufuns = aproof
@@ -179,10 +179,10 @@ entscheide1 _ aorder encoding decoding forceAny prob
 
           (sDPs,wDPs) = L.partition isStrict (rs $ Prob.dpComponents prob)
           (sTrs,wTrs) = L.partition isStrict (rs $ Prob.trsComponents prob)
-          isStrict (r,(lpoly,rpoly)) = r `Trs.member` Prob.strictComponents prob && P.constantValue (lpoly `sub` rpoly) > 0
+          isStrict (r,(lpoly,rpoly)) = r `RS.member` Prob.strictComponents prob && P.constantValue (lpoly `sub` rpoly) > 0
           rs trs =
             [ (r, (interpretf inter lhs, interpretf inter rhs))
-            | r@(R.Rule lhs rhs) <- Trs.toList trs
+            | r@(R.Rule lhs rhs) <- RS.toList trs
             , isUsable ufuns r ]
 
           isUsable Nothing _                = True
@@ -194,7 +194,7 @@ entscheide1 _ aorder encoding decoding forceAny prob
 description :: [String]
 description =  [ "This processor tries to find a polynomial interpretation and shifts strict oriented rules to the weak components." ]
 
-selectorArg :: T.Argument 'T.Required (ExpressionSelector f v)
+selectorArg :: (Ord f, Ord v) => T.Argument 'T.Required (ExpressionSelector f v)
 selectorArg = RS.selectorArg
   `T.withName` "shift"
   `T.withHelp` [ "This argument specifies which rules to orient strictly and shift to the weak components." ]
@@ -245,9 +245,9 @@ instance IsComplexityPair NaturalPI where
     else case T.open pt of
       [nprob] -> Right $ CP.ComplexityPairProof
         { CP.result = pt
-        , CP.removableDPs = Prob.strictDPs prob `Trs.difference` Prob.strictDPs nprob
-        , CP.removableTrs = Prob.strictTrs prob `Trs.difference` Prob.strictTrs nprob }
-      _ -> error "Tct.Trs.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
+        , CP.removableDPs = Prob.strictDPs prob `RS.difference` Prob.strictDPs nprob
+        , CP.removableTrs = Prob.strictTrs prob `RS.difference` Prob.strictTrs nprob }
+      _ -> error "Tct.RS.Method.Poly.NaturalPI.solveComplexityPair: the impossible happened"
 
 polyProcessorCP :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
 polyProcessorCP sh li ua ur = CP.toComplexityPair $ NaturalPI

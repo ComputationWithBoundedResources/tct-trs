@@ -14,7 +14,7 @@ import qualified Tct.Core.Data                as T
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.DependencyGraph as DG
 import qualified Tct.Trs.Data.Problem         as Prob
-import qualified Tct.Trs.Data.Trs             as Trs
+import qualified Tct.Trs.Data.Rules as RS
 import           Tct.Trs.Processors
 
 
@@ -91,7 +91,7 @@ withDP =
       | otherwise                    = linearPathAnalysis
 
     wgOnTrs = withProblem $ \ prob ->
-      if Trs.null (Prob.strictTrs prob)
+      if RS.null (Prob.strictTrs prob)
         then identity
         else wgOnUsable 1 1 .<||> wgOnUsable 2 1
 
@@ -178,7 +178,7 @@ rc =
   dp = withProblem $ loopFrom 1
     where
       loopFrom i prob
-        | Trs.null (Prob.strictTrs prob) = dpi
+        | RS.null (Prob.strictTrs prob) = dpi
         | otherwise                      = tew (is i) .>>! withProblem (loopFrom $ succ i)
       is i =
         let ?sel = Just selAnyRule in

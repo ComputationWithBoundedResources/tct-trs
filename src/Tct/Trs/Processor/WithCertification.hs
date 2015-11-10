@@ -1,6 +1,6 @@
 -- | This module provides the /With Certification/ processor.
 -- Is used to certify the proof output of a (sub) strategy.
-module Tct.Trs.Method.WithCertification 
+module Tct.Trs.Processor.WithCertification 
   ( withCertificationDeclaration
   , withCertification
   , withCertification'
@@ -9,10 +9,8 @@ module Tct.Trs.Method.WithCertification
   ) where
 
 
-import           Control.Monad.Error    (throwError)
 import           Data.Typeable
 
-import qualified Tct.Core.Common.Parser as P
 import qualified Tct.Core.Data          as T
 
 import           Tct.Trs.Data
@@ -30,8 +28,6 @@ import qualified Tct.Trs.Data.CeTA      as CeTA
 data TotalProof = TotalProof | PartialProof
   deriving (Show, Eq, Enum, Bounded, Typeable)
 
-instance T.SParsable i i TotalProof where parseS = P.enum 
-
 data WithCertification = WithCertification
   { kind       :: TotalProof
   , onStrategy :: TrsStrategy
@@ -40,8 +36,8 @@ data WithCertification = WithCertification
 
 instance T.Processor WithCertification where
   type ProofObject WithCertification = ()
-  type In  WithCertification         = TrsProblem
-  type Out WithCertification         = TrsProblem
+  type In  WithCertification         = Trs
+  type Out WithCertification         = Trs
 
   execute p prob = do
     pt  <- T.evaluate (onStrategy p) (T.Open prob)
@@ -58,26 +54,25 @@ instance T.Processor WithCertification where
 withCertificationStrategy :: TotalProof -> TrsStrategy -> TrsStrategy
 withCertificationStrategy t st = T.Apply $ WithCertification { kind = t, onStrategy = st }
 
-withCertificationDeclaration :: T.Declaration(
+withCertificationDeclaration :: T.Declared Trs Trs => T.Declaration(
   '[ T.Argument 'T.Optional TotalProof
    , T.Argument 'T.Required TrsStrategy]
    T.:-> TrsStrategy)
-withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, T.strat) withCertificationStrategy
+withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, stratArg) withCertificationStrategy
   where
+    stratArg = T.strat "toCertify" ["The strategy to certify."]
     desc = "This processor invokes CeTA on the result of the provided strategy."
-    totalArg = T.arg
-      `T.withName` "kind"
-      `T.withHelp` [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ]
+    totalArg = (T.flag "kind"
+      [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ])
       `T.optional` TotalProof
-      `T.withDomain` fmap show [(minBound :: TotalProof)..]
 
 -- | 
 -- > withCertification (dependencyTuples .>>> matrix .>>> empty)
 -- > dependencyPairs' WIDP .>>> withCertification (matrix .>>> empty)
 withCertification :: TrsStrategy -> TrsStrategy
-withCertification = T.deflFun withCertificationDeclaration
+withCertification = undefined --T.deflFun withCertificationDeclaration
 
 -- | > (withCertification' PartialProof dependencyTuples) .>>> matrix >>> empty
 withCertification' :: TotalProof -> TrsStrategy -> TrsStrategy
-withCertification' = T.declFun withCertificationDeclaration
+withCertification' = undefined --T.declFun withCertificationDeclaration
 
