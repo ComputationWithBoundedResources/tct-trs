@@ -140,9 +140,9 @@ dpi =
       where dp n = maximum $ 0 : [ 1 + dp m | m <- DG.successors cwdg n]
 
 
-    shiftLeafs = removeLeafs 0 .<||> (removeLeafs 1 .<|> removeLeafs 2)
+    shiftLeafs = force $ removeLeafs 0 .<||> (removeLeafs 1 .<|> removeLeafs 2)
 
-    removeLeafs 0 = tew $ removeLeaf (mxCP 1 0)
+    removeLeafs 0 = force $ tew $ removeLeaf (mxCP 1 0)
     removeLeafs i =
       removeLeaf (mxCP i i)
       .<||> removeLeaf (mxCP (i+1) i)
