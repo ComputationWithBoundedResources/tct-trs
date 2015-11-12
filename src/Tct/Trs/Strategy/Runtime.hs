@@ -121,8 +121,8 @@ rci =
 interpretations =
   tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
   .>>> fastest
-    [ tew (px 2) .>>> tew (px 3)
-    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 ]
+    [ tew (px 2) .>>> tew (px 3) .>>> empty
+    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty ]
   where
     mxs1 = mx 2 1 .<||> mx 3 1
     mxs2 = mx 2 2 .<||> mx 3 2 .<||> wg 2 2
