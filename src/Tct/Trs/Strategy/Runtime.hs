@@ -146,8 +146,8 @@ dpi =
     removeLeafs i =
       removeLeaf (mxCP i i)
       .<||> removeLeaf (mxCP (i+1) i)
-      .<||> when (i == 1) (removeLeaf (mxCP 3 1))
-      .<||> when (i == 2) (removeLeaf (pxCP 2))
+      .<||> when' (i == 1) (removeLeaf (mxCP 3 1))
+      .<||> when' (i == 2) (removeLeaf (pxCP 2))
 
     removeFirstCongruence = decomposeDG decomposeDGselect (Just proc) Nothing .>>! try simps
       where proc = try simps .>>> tew shiftLeafs .>>> basics .>>> empty
@@ -161,7 +161,7 @@ dpi =
       .>>! try trivial
       .>>> try usableRules
 
-
+when' b st = if b then st else abort
 
 --- ** rc ------------------------------------------------------------------------------------------------------------
 
@@ -184,6 +184,6 @@ rc =
         let ?sel = Just selAnyRule in
         mx i i
         .<||> wg i i
-        .<||> when (i == 2 || i == 3) (px i)
-        .<||> when (i < 4) (mx (succ i) i .<||> wg (succ i) i)
+        .<||> when' (i == 2 || i == 3) (px i)
+        .<||> when' (i < 4) (mx (succ i) i .<||> wg (succ i) i)
 
