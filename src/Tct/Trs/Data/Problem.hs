@@ -16,6 +16,7 @@ module Tct.Trs.Data.Problem
 
   -- * construction
   , fromRewriting
+  , toRewriting
 
   -- * updates
   , sanitiseDPGraph
@@ -174,6 +175,26 @@ fromRewriting prob =
     sig  = RS.signature trs
     defs = Sig.defineds sig
     cons = Sig.constructors sig
+
+-- | The counterpart of 'fromRewriting'.
+--
+-- NOTE: In general 'fromRewriting . toRewriting = id' and 'toRewriting . fromRewriting = id' does not hold.
+toRewriting :: (Ord f, Ord v) => Problem f v -> RP.Problem f v
+toRewriting p =
+  RP.Problem
+    { RP.startTerms = if isRCProblem p then RP.BasicTerms else RP.AllTerms
+    , RP.strategy   = case strategy p of
+        Innermost -> RP.Innermost
+        Full      -> RP.Full
+        Outermost -> RP.Outermost
+    , RP.theory     = Nothing
+    , RP.rules      = RP.RulesPair
+       { RP.strictRules = RS.toList $ strictComponents p
+       , RP.weakRules   = RS.toList $ weakComponents p }
+    , RP.variables  = S.toList $ RS.vars rs
+    , RP.symbols    = S.toList $ RS.funs rs
+    , RP.comment    = Nothing }
+  where rs = allComponents p
 
 
 --- ** updates  ------------------------------------------------------------------------------------------------------

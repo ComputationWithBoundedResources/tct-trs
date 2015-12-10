@@ -9,6 +9,7 @@ module Tct.Trs.Data.Rules
   , map
   , toList, toAscList, fromList
   , funs
+  , vars
 
   -- , definedSymbols
   -- , constructorSymbols
@@ -70,6 +71,10 @@ data SelectorExpression f v
 funs :: Ord f => Rules f v -> S.Set f
 funs (RulesT rs) = S.foldl k S.empty rs
   where k acc = S.union acc . S.fromList . R.funs
+
+vars :: Ord v => Rules f v -> S.Set v
+vars (RulesT rs) = S.foldl k S.empty rs
+  where k acc = S.union acc . S.fromList . R.vars
 
 map :: (Ord f2, Ord v2) => (Rule f1 v1 -> Rule f2 v2) -> Rules f1 v1 -> Rules f2 v2
 map k = fromList . fmap k . toList
@@ -158,10 +163,10 @@ isSubset :: (Ord f, Ord v) => Rules f v -> Rules f v -> Bool
 isSubset = lift2 S.isSubsetOf
 
 isWellformed :: Ord v => Rules f v -> Bool
-isWellformed trs = all T.isFun (R.lhss rules) && all (\r -> vars (R.rhs r) `S.isSubsetOf` vars (R.lhs r)) rules
+isWellformed trs = all T.isFun (R.lhss rules) && all (\r -> vs (R.rhs r) `S.isSubsetOf` vs (R.lhs r)) rules
   where 
     rules = toList trs
-    vars = S.fromList . T.vars
+    vs    = S.fromList . T.vars
 
 isLinear, isLeftLinear, isRightLinear, isDuplicating, isCollapsing :: (Ord f, Ord v) => Rules f v -> Bool
 isLinear      = all' R.isLinear
