@@ -1,12 +1,12 @@
 -- | This module provides the custom strategy for the web interface.
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-module Tct.Trs.Strategy.Web where
+module Tct.Trs.Strategy.WebCustom where
 
 import           Tct.Core
 import           Tct.Trs.Processors
 
 webDeclaration = strategy "web"
-  ( --degreeArg
+  ( --degreeArgxo
   ba "matchbounds"
   , ba "matrices"
   , ba "matricesusableargs"
@@ -19,6 +19,7 @@ webDeclaration = strategy "web"
   , ba "dp"
   , ba "dpusetuples"
   , ba "dpsimps"
+  , ba "dpdecompose"
   ) web
 
 ba s = bool s ["Wether to use " ++ s ++ "."]
@@ -40,9 +41,10 @@ web
   useDP
   useTuples
   useDPSimps
+  useDPDecompose
 
   =
-  let deg = 3 in 
+  let deg = 3 in
 
   when useToi (try toInnermost)
   .>>>
@@ -52,9 +54,9 @@ web
 
   where
 
-  tDP =
+  tDP =  
     if useTuples then dependencyTuples else dependencyPairs
-    .>>> try (when useDPSimps dpsimps)
+    .>>> try (when useDPDecompose decomposeDG') .>>> try (when useDPSimps dpsimps)
 
   basics l u = matchbounds .<||> interpretations
     where

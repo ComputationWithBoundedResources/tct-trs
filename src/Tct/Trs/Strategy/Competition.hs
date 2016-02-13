@@ -2,6 +2,7 @@
 module Tct.Trs.Strategy.Competition
   ( competition
   , competitionDeclaration
+  , competitionStrategy
   ) where
 
 

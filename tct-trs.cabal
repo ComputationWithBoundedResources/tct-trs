@@ -124,7 +124,8 @@ library
     Tct.Trs.Strategy.Competition
     Tct.Trs.Strategy.Derivational
     Tct.Trs.Strategy.Runtime
-    Tct.Trs.Strategy.Web
+    Tct.Trs.Strategy.WebCustom
+    Tct.Trs.Strategy.WebAutomatic
   build-depends:
     array              == 0.5.*,
     base               == 4.*,
