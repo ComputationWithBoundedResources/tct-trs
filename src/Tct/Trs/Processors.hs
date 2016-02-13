@@ -207,8 +207,8 @@ cleanSuffix = force $
 
 -- | Using the decomposition processor (c.f. 'Compose.decomposeBy') this transformation
 -- decomposes dependency pairs into two independent sets, in the sense that these DPs
--- constitute unconnected sub-graphs of the dependency graph. Applies 'cleanSuffix' on the resulting sub-problems,
--- if applicable.
+-- constitute unconnected sub-graphs of the dependency graph. Applies 'cleanSuffix' on the
+-- resulting sub-problems, if applicable.
 decomposeIndependent :: TrsStrategy
 decomposeIndependent =
   decompose' (RS.selAllOf RS.selIndependentSG) RelativeAdd
@@ -261,4 +261,5 @@ removeLeaf cp =
   .>>> try usableRules
   .>>> try trivial
   where anyStrictLeaf = RS.selAnyOf $ RS.selLeafCDG `RS.selInter` RS.selStricts
+
 

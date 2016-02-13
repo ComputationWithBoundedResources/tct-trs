@@ -151,3 +151,4 @@ trsUpdate cfg (TrsOptions ccM cpM) = setParseProblem $ setPutProof cfg
           where
             prover = if cp' == TotalProof then totalProof else partialProof
 
+
