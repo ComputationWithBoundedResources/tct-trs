@@ -13,8 +13,7 @@ import Tct.Trs.Strategy.Certify      as M
 import Tct.Trs.Strategy.Competition  as M
 import Tct.Trs.Strategy.Derivational as M
 import Tct.Trs.Strategy.Runtime      as M
-import Tct.Trs.Strategy.WebAutomatic as M
-import Tct.Trs.Strategy.WebCustom    as M
+import Tct.Trs.Strategy.Web          as M
 
 
 trsDeclarations :: Declared Trs Trs => [TrsDeclaration]
@@ -70,7 +69,7 @@ trsDeclarations =
   , SD derivationalDeclaration
   , SD runtimeDeclaration
   , SD competitionDeclaration
-  , SD webDeclaration
-  , SD webAutomatic 
+  , SD webCustomDeclaration
+  , SD webAutomaticDeclaration
   ]
 

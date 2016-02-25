@@ -1,33 +1,38 @@
 -- | The competition strategy. Wrapper for default runtime/derivational complexity.
 module Tct.Trs.Strategy.Competition
   ( competition
+  , competition'
   , competitionDeclaration
-  , competitionStrategy
   ) where
 
 
-import           Tct.Core
-import           Tct.Core.Data                 (deflFun)
+import Tct.Core
+import Tct.Core.Data                 (declFun, deflFun)
 
-import           Tct.Trs.Data
-import           Tct.Trs.Data.Problem          (isRCProblem)
-import           Tct.Trs.Processors
-import           Tct.Trs.Strategy.Derivational
-import           Tct.Trs.Strategy.Runtime
+import Tct.Trs.Data
+import Tct.Trs.Data.Problem          (isRCProblem)
+import Tct.Trs.Processors
+import Tct.Trs.Strategy.Derivational
+import Tct.Trs.Strategy.Runtime
 
 
 -- | Declaration for "competition" strategy.
-competitionDeclaration :: Declaration ('[] :-> TrsStrategy)
-competitionDeclaration = strategy "competition" () competitionStrategy
+competitionDeclaration :: Declaration ('[Argument 'Optional CombineWith] :-> TrsStrategy)
+competitionDeclaration = strategy "competition" (OneTuple cmb) competitionStrategy
+  where cmb = combineWithArg `optional` Best
 
 -- | Default competition strategy.
 competition :: TrsStrategy
 competition = deflFun competitionDeclaration
 
-competitionStrategy :: TrsStrategy
-competitionStrategy =
+-- | Default competition strategy.
+competition' :: CombineWith -> TrsStrategy
+competition' = declFun competitionDeclaration
+
+competitionStrategy :: CombineWith -> TrsStrategy
+competitionStrategy cmb =
   withProblem $ \p ->
     if isRCProblem p
-      then runtime' Best
+      then runtime' cmb
       else derivational
 
