@@ -26,7 +26,7 @@ webCustomDeclaration = strategy "webCustom"
   , ba "toi"
   , ba "compose"
   , ba "dp"
-  , ba "dpusetuples"
+  , ba "dptuples"
   , ba "dpsimps"
   , ba "dpdecompose"
   ) custom
@@ -70,7 +70,7 @@ custom
        else dependencyPairs
   onDP =
      try (when useDPSimps dpsimps)
-    .>>> try (when useDPDecompose (force decomposeDG') .>>> try (when useDPSimps dpsimps))
+    .>>> te (when useDPDecompose (force decomposeDG') .>>> try (when useDPSimps dpsimps))
 
   basics l u = matchbounds .<||> interpretations
     where
