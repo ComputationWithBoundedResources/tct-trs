@@ -46,7 +46,7 @@ instance T.Processor RemoveWeakSuffixes where
 
   -- an scc in the congruence graph is considered weak if all rules in the scc are weak
   -- compute maximal weak suffix bottom-up
-  execute RemoveWeakSuffixes prob = 
+  execute RemoveWeakSuffixes prob =
     maybe remtail (\s -> T.abortWith (Inapplicable s :: ApplicationProof RemoveWeakSuffixesProof)) (Prob.isDTProblem' prob)
     where
       remtail

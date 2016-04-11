@@ -1,6 +1,6 @@
 -- | This module re-exports most types and some functionalities of Tct.Trs.Data.*.
-module Tct.Trs.Data 
-  ( module M 
+module Tct.Trs.Data
+  ( module M
   , TrsStrategy
   , TrsDeclaration
   ) where

@@ -84,7 +84,7 @@ instance T.Processor (PredecessorEstimation) where
   type In  PredecessorEstimation         = Trs
   type Out PredecessorEstimation         = Trs
 
-  execute p prob = 
+  execute p prob =
     maybe estimate  (\s -> T.abortWith (Inapplicable s :: ApplicationProof PredecessorEstimationProof)) (Prob.isDPProblem' prob)
     where
       wdg  = Prob.dependencyGraph prob

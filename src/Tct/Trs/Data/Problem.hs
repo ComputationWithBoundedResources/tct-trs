@@ -48,7 +48,6 @@ module Tct.Trs.Data.Problem
 
 import           Control.Applicative          ((<|>))
 import qualified Data.Set                     as S
-import           Data.Typeable
 
 import qualified Data.Rewriting.Problem       as RP
 import qualified Data.Rewriting.Rule          as R (Rule (..))
@@ -95,7 +94,7 @@ data Problem f v = Problem
   , weakTrs    :: Rules f v
 
   , dpGraph    :: DependencyGraph f v
-  } deriving (Show, Eq, Typeable)
+  } deriving (Show, Eq)
 
 
 -- | Returns the dependency graph of the problem.

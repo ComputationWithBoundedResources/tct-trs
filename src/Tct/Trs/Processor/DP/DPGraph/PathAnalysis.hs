@@ -1,5 +1,5 @@
 -- | This module provides the \Path Analysis\ processor.
-module Tct.Trs.Processor.DP.DPGraph.PathAnalysis 
+module Tct.Trs.Processor.DP.DPGraph.PathAnalysis
   ( pathAnalysisDeclaration
   , pathAnalysis
   , pathAnalysis'
@@ -68,12 +68,12 @@ instance T.Processor PathAnalysis where
   type Out PathAnalysis         = Trs
   type Forking PathAnalysis     = []
 
-  execute p prob = 
+  execute p prob =
     maybe computePaths (\s -> T.abortWith $ (Inapplicable s :: ApplicationProof PathAnalysisProof)) (Prob.isDPProblem' prob)
     where
       computePaths
         | null (drop 1 paths) = T.abortWith (Applicable PathAnalysisFail)
-        | otherwise           = T.succeedWith (Applicable proof) (foldl add (T.timeUBCert T.linear)) (map nprob probPaths) 
+        | otherwise           = T.succeedWith (Applicable proof) (foldl add (T.timeUBCert T.linear)) (map nprob probPaths)
         where
 
           wdg = Prob.dependencyGraph prob
@@ -164,8 +164,8 @@ quadraticPathAnalysis = pathAnalysisStrategy False
 instance PP.Pretty PathAnalysisProof where
   pretty PathAnalysisFail      = PP.text "Path analysis is not successfull."
   pretty p@PathAnalysisProof{} = PP.vcat $
-    [ PP.text $ "We employ '" ++ nm ++ "path analysis' using the following approximated dependency graph:" 
-    , PP.indent 2 $ PP.pretty (wdg_ p) 
+    [ PP.text $ "We employ '" ++ nm ++ "path analysis' using the following approximated dependency graph:"
+    , PP.indent 2 $ PP.pretty (wdg_ p)
     , PP.text $ "Obtaining following paths:"
     , PP.indent 2 $ PP.enumerate (map ppPath $ paths_ p) ]
     where
@@ -174,10 +174,10 @@ instance PP.Pretty PathAnalysisProof where
 
 instance Xml.Xml PathAnalysisProof where
   toXml PathAnalysisFail = Xml.elt "pathAnalysis" []
-  toXml p@PathAnalysisProof{} = Xml.elt "pathAnalysis" 
+  toXml p@PathAnalysisProof{} = Xml.elt "pathAnalysis"
     [ Xml.toXml (wdg_ p)
     , Xml.elt "kind" [ Xml.text $ if isLinearProof_ p then "linear" else "quadratic" ]
-    , Xml.elt "paths" 
+    , Xml.elt "paths"
       [ Xml.elt "congruence"
         [ Xml.elt "elt" [ Xml.int m | m <- congruence (cdg_ p) n] | n <- path ]
       | path <- paths_ p ] ]

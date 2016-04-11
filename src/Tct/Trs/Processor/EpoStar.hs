@@ -20,7 +20,6 @@ import qualified Data.Map.Strict              as M
 import           Data.Maybe                   (fromMaybe)
 import           Data.Monoid                  ((<>))
 import qualified Data.Set                     as S
-import           Data.Typeable
 
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
@@ -47,7 +46,7 @@ import qualified Tct.Trs.Encoding.SafeMapping as SM
 
 newtype EpoStar = EpoStar { extComp_ :: ExtComp } deriving Show
 
-data ExtComp = ExtComp | NoExtComp deriving (Bounded, Enum, Eq, Typeable, Show)
+data ExtComp = ExtComp | NoExtComp deriving (Bounded, Enum, Eq, Show)
 
 useExtComp :: ExtComp -> Bool
 useExtComp = (ExtComp==)
@@ -179,9 +178,9 @@ muMappingEncoder sig = MuMappingEncoder . M.fromList <$> mapM bijection (Sig.ele
 
       return (f,ar)
 
-    exactlyOne1 (ar,l,r) x vs = SMT.bigOr vs .&& 
+    exactlyOne1 (ar,l,r) x vs = SMT.bigOr vs .&&
       SMT.bigAnd [ SMT.bigAnd [ SMT.bnot (ar Ar.! (x,i)) .|| SMT.bnot (ar Ar.! (x,j)) | j <- [i+1..r] ] | i <- [l..r-1] ]
-    exactlyOne2 (ar,l,r) x vs = SMT.bigOr vs .&& 
+    exactlyOne2 (ar,l,r) x vs = SMT.bigOr vs .&&
       SMT.bigAnd [ SMT.bigAnd [ SMT.bnot (ar Ar.! (i,x)) .|| SMT.bnot (ar Ar.! (j,x)) | j <- [i+1..r] ] | i <- [l..r-1] ]
 
 
@@ -269,7 +268,7 @@ orient allowEcomp sig prec safe mu a =
     Eq s t     -> s `equivimp` t
   where
     ite g t e = SMT.implies g t `SMT.band` SMT.implies (SMT.bnot g) e
-    unsatisfiable u v = unorientable sig u v
+    unsatisfiable = unorientable sig
 
     s `epo` t    = orient allowEcomp sig prec safe mu (Epo s t)
     s `eposub` t = orient allowEcomp sig prec safe mu (Eposub s t)
@@ -281,7 +280,7 @@ orient allowEcomp sig prec safe mu a =
       | unorientable sig u v      = SMT.bot
       | otherwise                 = SMT.bigOr [u `epo1` v, u `epo23` v]
       where
-        isProperSupertermOf s t = any (t==) (concatMap R.subterms $ R.directSubterms s)
+        isProperSupertermOf s t = t `elem` (concatMap R.subterms $ R.directSubterms s)
 
         epo1 (R.Fun _ ss) t = SMT.bigOr [ SMT.bigOr [si `epo` t, si `equiv` t] | si <- ss ]
         epo1 _            _ = SMT.bot
@@ -444,7 +443,6 @@ extCompArg = T.flag "extend"
   [ "Extended Composition: If this flag is enabled, then the slightly more ."
   , "liberal composition scheme 'f(x;y) = h(g(;x);k(x;y))' is permitted."
   , "Currently it is not known whether this extension is sound." ]
-  `T.withDomain` fmap show [(minBound :: ExtComp)..]
 
 description :: [String]
 description = [ unwords

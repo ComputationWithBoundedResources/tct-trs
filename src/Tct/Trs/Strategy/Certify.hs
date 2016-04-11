@@ -2,12 +2,12 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 -- | This module provides a strategy for certification with \CeTA\.
 -- All proofs produced should be certifiable.
--- 
+--
 -- Example calls (assumes the standard tct-trs executable).
--- 
+--
 -- > tct-trs s "withCertification certify" $file
 -- > tct-trs -a s --ceta -s certify $file > $file.xml
-module Tct.Trs.Strategy.Certify 
+module Tct.Trs.Strategy.Certify
   ( certify
   , certify'
   , certifyDeclaration
@@ -18,9 +18,9 @@ import qualified Tct.Core.Data          as T
 
 import           Tct.Trs.Data           (TrsStrategy)
 import qualified Tct.Trs.Data.Problem   as Prob
+import qualified Tct.Trs.Data.Rules     as RS
 import qualified Tct.Trs.Data.Signature as Sig
-import qualified Tct.Trs.Data.Rules as RS
-import           Tct.Trs.Processors
+import           Tct.Trs.Processors     hiding (matchbounds)
 
 
 -- | Declaration for strategy "certify".

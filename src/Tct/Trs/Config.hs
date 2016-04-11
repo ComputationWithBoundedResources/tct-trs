@@ -141,9 +141,9 @@ trsUpdate cfg (TrsOptions ccM cpM) = setParseProblem $ setPutProof cfg
       (Just DCI) -> toDC . toInnermost
       (Just RC)  -> toRC . toFull
       (Just RCI) -> toRC . toInnermost
-    proofing cp pt = case cp of
-      Nothing  -> putProof cfg pt
-      Just cp' -> case pt of
+    proofing cp = case cp of
+      Nothing  -> putProof cfg
+      Just cp' -> Right $ \pt -> case pt of
         T.Failure r -> PP.putPretty r
         pt'         -> case prover pt' of
           Left s    -> print s

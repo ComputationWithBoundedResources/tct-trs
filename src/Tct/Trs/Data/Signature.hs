@@ -101,7 +101,7 @@ arity sig f = err `fromMaybe` M.lookup f (signature_ sig)
   where err = error "Signature: symbol not found "
 
 -- | Returns the positions of a symbol. By convention we start with index @1@.
--- 
+--
 -- positions sig f = [1..arity sig f].
 positions :: Ord f => Signature f ->  f -> [Int]
 positions sig f = err `fromMaybe` (M.lookup f (signature_ sig) >>= \ar -> return [1..ar])
@@ -134,7 +134,7 @@ union sig1 sig2 = Signature
   { signature_    = M.unionWith err1 (signature_ sig1) (signature_ sig2)
   , defineds_     = ds
   , constructors_ = cs `S.difference` ds }
-  where 
+  where
     ds = defineds_ sig1 `S.union` defineds_ sig2
     cs = constructors_ sig1 `S.union` constructors_ sig2
     err1 ar1 ar2 = if ar1 == ar2 then ar1 else error "Tct.Trs.Data.Signature.union: same symbol with different arities"
@@ -163,9 +163,9 @@ restrictToSignature sig fs = symbols sig `S.intersection` fs
 
 instance (Ord f, PP.Pretty f) => PP.Pretty (Signature f) where
   pretty sig = PP.set (k `fmap` ds) PP.<+> PP.char '/' PP.<+> PP.set (k `fmap` cs)
-    where 
+    where
       ds = elems $ restrictSignature sig (defineds sig)
-      cs = elems $ restrictSignature sig (constructors sig) 
+      cs = elems $ restrictSignature sig (constructors sig)
       k (f,i) = PP.pretty f PP.<> PP.char '/' PP.<> PP.int i
 
 instance Xml.Xml f => Xml.Xml (Signature f) where

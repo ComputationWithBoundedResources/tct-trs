@@ -21,11 +21,10 @@ module Tct.Trs.Processor.Bounds
   , Enrichment (..)
   ) where
 
-import Data.Maybe (fromMaybe)
+
 import qualified Data.Map                           as M
 import           Data.Monoid                        ((<>))
 import qualified Data.Set                           as S
-import           Data.Typeable                      (Typeable)
 
 import qualified Data.Rewriting.Term                as R
 
@@ -55,7 +54,7 @@ data InitialAutomaton
               -- in the case of runtime complexity analysis.
   | PerSymbol -- ^ Employ a state per function symbol.
               -- Slower, but more precise compared to 'Minimal'.
-  deriving (Typeable, Eq, Enum, Bounded)
+  deriving (Eq, Enum, Bounded)
 
 mkMinRules :: S.Set Symbol -> Signature Symbol -> [State] -> State -> [Rule]
 mkMinRules fs sig qs q = [ Collapse (f,0) (take (Sig.arity sig f) qs) q | f <- S.toList $ fs ]
@@ -153,7 +152,8 @@ computeAutomaton sig st strict weak enrich initial = toGautomaton $ compatibleAu
         k (Collapse (s,l) qs q) = GCollapse (canof s,l) qs q
         k (Epsilon p q)         = GEpsilon p q
 
-    find m f = error ("Bounds.cano: not found:") `fromMaybe` M.lookup f m
+    -- find m f = error ("Bounds.cano: not found:" ++ show f) `fromMaybe` M.lookup f m
+    find m f = m M.! f
 
     (fcano, canof) = (find fm, find rm)
       where
@@ -179,12 +179,10 @@ initialAutomatonArg = T.flag "initial"
     , "If 'minimal' is set then the initial automaton admits exactly"
     , "one state for derivational-complexity analysis. For runtime-complexity analysis, "
     , "two states are used in order to distinguish defined symbols from constructors." ]
-  `T.withDomain` fmap show [(minBound :: InitialAutomaton)..]
 
 enrichmentArg :: T.Argument 'T.Required Enrichment
 enrichmentArg = T.flag "enrichment"
     [ "The employed enrichment." ]
-  `T.withDomain` fmap show [(minBound :: Enrichment)..]
 
 description :: [String]
 description =
@@ -193,7 +191,7 @@ description =
   , "For non-right-linear problems this processor fails immediately."]
 
 boundsStrategy :: InitialAutomaton -> Enrichment -> TrsStrategy
-boundsStrategy i e = T.Apply (Bounds { initialAutomaton = i, enrichment = e }) .>>> E.empty
+boundsStrategy i e = T.processor Bounds{ initialAutomaton = i, enrichment = e } .>>> E.empty
 
 boundsDeclaration :: T.Declaration (
   '[ T.Argument 'T.Optional InitialAutomaton

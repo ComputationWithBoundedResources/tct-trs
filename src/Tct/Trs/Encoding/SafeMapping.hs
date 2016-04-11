@@ -72,7 +72,7 @@ prettySafeTrs sm = PP.vcat . fmap ppr . RS.toList
     ppt v@(R.Var _)    = PP.pretty v
     ppt t@(R.Fun _ []) = PP.pretty t
     ppt t@(R.Fun f _)  = PP.pretty f PP.<> PP.parens ( ppa nrm PP.<> PP.semi `sa` ppa sf )
-      where 
+      where
         (sf,nrm) = partitionArguments t sm
         sa       = if null sf then (PP.<>) else (PP.<+>)
     ppa ts = PP.hsep $ PP.punctuate PP.comma [ppt t_i | t_i <- ts]

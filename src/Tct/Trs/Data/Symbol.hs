@@ -8,7 +8,6 @@ module Tct.Trs.Data.Symbol
 
 
 import qualified Data.ByteString.Char8  as BS
-import           Data.Typeable
 
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml    as Xml
@@ -29,16 +28,16 @@ data AFun f
   = TrsFun f
   | DpFun f
   | ComFun Int
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show)
 
 newtype F = F (AFun BS.ByteString)
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show)
 
-fun  :: String -> F 
+fun  :: String -> F
 fun = F . TrsFun . BS.pack
 
 newtype V = V BS.ByteString
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show)
 
 var  :: String -> V
 var = V . BS.pack

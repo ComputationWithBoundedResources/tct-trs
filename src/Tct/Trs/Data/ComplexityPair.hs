@@ -13,8 +13,6 @@ module Tct.Trs.Data.ComplexityPair
   ) where
 
 
-import           Data.Typeable
-
 import qualified Tct.Core.Data             as T
 
 import           Tct.Trs.Data.Problem
@@ -39,7 +37,6 @@ class IsComplexityPair p where
 -- | A 'ComplexityPair' is a processor that can returns 'ComplexityPairProof'.
 data ComplexityPair where
   ComplexityPair :: (T.Processor p, IsComplexityPair p) => p -> ComplexityPair
-  deriving Typeable
 
 instance Show ComplexityPair where
   show (ComplexityPair p) = show p

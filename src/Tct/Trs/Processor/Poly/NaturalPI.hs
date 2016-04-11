@@ -205,7 +205,7 @@ selectorArg = RS.selectorArg
 polyStrategy :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> Maybe (ExpressionSelector F V) -> Arg.Greedy -> TrsStrategy
 polyStrategy sh li ua ur sl gr = T.Apply $ NaturalPI
   { shape    = sh
-  , restrict = li 
+  , restrict = li
   , uargs    = ua
   , urules   = ur
   , selector = sl
@@ -240,7 +240,7 @@ poly' = T.declFun polyDeclaration
 instance IsComplexityPair NaturalPI where
   solveComplexityPair p sel prob = do
   pt <- T.evaluate (T.Apply p{selector=Just sel, greedy=NoGreedy}) (T.Open prob)
-  return $ if T.isFailure pt
+  return $ if T.isFailing pt
     then Left $ "application of cp failed"
     else case T.open pt of
       [nprob] -> Right $ CP.ComplexityPairProof
@@ -252,7 +252,7 @@ instance IsComplexityPair NaturalPI where
 polyProcessorCP :: PI.Shape -> Arg.Restrict -> Arg.UsableArgs -> Arg.UsableRules -> ComplexityPair
 polyProcessorCP sh li ua ur = CP.toComplexityPair $ NaturalPI
   { shape    = sh
-  , restrict = li 
+  , restrict = li
   , uargs    = ua
   , urules   = ur
   , selector = Nothing

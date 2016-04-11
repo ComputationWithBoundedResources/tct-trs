@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module Tct.Trs.Processors
   ( module M
 
@@ -21,6 +20,7 @@ module Tct.Trs.Processors
   , selAllRules
 
   -- * Basic Strategies
+  , matchbounds
   , matrices
   , polys
   , ints
@@ -32,7 +32,6 @@ module Tct.Trs.Processors
   , removeLeaf
   ) where
 
-import           Data.Typeable
 
 import           Tct.Core
 import qualified Tct.Core.Data                                   as T
@@ -85,12 +84,11 @@ timeoutArg :: Argument 'Required T.Nat
 timeoutArg = nat "timeout" ["set a timeout"]
 
 -- | Parsable Flag. Usually used to dynamically select 'fastest' or 'best' combinator.
-data CombineWith = Best | Fastest    deriving (Show, Enum, Bounded, Typeable)
+data CombineWith = Best | Fastest    deriving (Show, Enum, Bounded)
 
 -- | Argument for combine. @combine <Best|Fastest>@
 combineWithArg :: Argument 'Required CombineWith
 combineWithArg = T.flag "combineWith" ["Set race conditions."]
-  `T.withDomain` fmap show [(minBound :: CombineWith) ..]
 
 
 (.>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
@@ -121,6 +119,11 @@ selAnyRule = RS.selAnyOf $ RS.selStricts `RS.selInter` RS.selRules
 -- | Select all strict trs rules.
 selAllRules :: ExpressionSelector F V
 selAllRules = RS.selAllOf RS.selRules
+
+
+--- * default matchbounds --------------------------------------------------------------------------------------------
+matchbounds :: TrsStrategy
+matchbounds = bounds Minimal Match .<||> bounds PerSymbol Match
 
 
 --- * interpretations ------------------------------------------------------------------------------------------------

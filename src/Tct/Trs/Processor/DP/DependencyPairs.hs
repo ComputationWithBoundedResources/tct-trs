@@ -13,7 +13,6 @@ module Tct.Trs.Processor.DP.DependencyPairs
 import           Control.Applicative         ((<|>))
 import           Control.Monad.State.Strict
 import qualified Data.Traversable            as F
-import           Data.Typeable
 import qualified Data.Set                    as S
 
 import qualified Data.Rewriting.Rule         as R
@@ -34,7 +33,7 @@ import qualified Tct.Trs.Data.Symbol         as Symb
 
 
 data DPKind = WDP | WIDP | DT
-  deriving (Show, Eq, Enum, Bounded, Typeable)
+  deriving (Show, Eq, Enum, Bounded)
 
 isTuples :: DPKind -> Bool
 isTuples = (DT==)
@@ -198,7 +197,6 @@ instance Xml.Xml DependencyPairsProof where
 dpKindArg :: T.Argument 'T.Required DPKind
 dpKindArg = T.flag "kind"
   ["Specifies preferred kind of dependency pairs. Overrides to wdp for non-innermost problems."]
-  `T.withDomain` fmap show [(minBound :: DPKind)..]
 
 description :: [String]
 description = ["Applies the (weak) dependency pairs transformation."]

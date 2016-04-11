@@ -1,6 +1,6 @@
 -- | This module provides the /With Certification/ processor.
 -- Is used to certify the proof output of a (sub) strategy.
-module Tct.Trs.Processor.WithCertification 
+module Tct.Trs.Processor.WithCertification
   ( withCertificationDeclaration
   , withCertification
   , withCertification'
@@ -8,8 +8,6 @@ module Tct.Trs.Processor.WithCertification
   , TotalProof (..)
   ) where
 
-
-import           Data.Typeable
 
 import qualified Tct.Core.Data          as T
 
@@ -20,13 +18,13 @@ import qualified Tct.Trs.Data.CeTA      as CeTA
 -- TODO: MS: the behaviour should be changed; return some feedback (not an error) if certification is applied/successful
 -- | Indicates wether to allow partial proofs.
 -- A partial proof uses unknown proofs/assumptions to handle unsupported transformations and open problems.
--- 
+--
 -- The current implementation behaves as follows
 --  * if TotalProof is set, certification is ignored if there are open problems left
 --  * throws an error if certification is not successful
 --  * silent return if certification is successful.
 data TotalProof = TotalProof | PartialProof
-  deriving (Show, Eq, Enum, Bounded, Typeable)
+  deriving (Show, Eq, Enum, Bounded)
 
 data WithCertification = WithCertification
   { kind       :: TotalProof
@@ -66,13 +64,14 @@ withCertificationDeclaration = T.declare "withCertification" [desc] (totalArg, s
       [ "This argument specifies wheter to invoke CeTA with '--allow-assumptions' to provide certification of partial proofs." ])
       `T.optional` TotalProof
 
--- | 
+-- | Invokes CeTA on the result of the strategy.
 -- > withCertification (dependencyTuples .>>> matrix .>>> empty)
 -- > dependencyPairs' WIDP .>>> withCertification (matrix .>>> empty)
 withCertification :: TrsStrategy -> TrsStrategy
-withCertification = undefined --T.deflFun withCertificationDeclaration
+withCertification = withCertificationStrategy TotalProof-- T.deflFun withCertificationDeclaration
 
+-- | Invokes CeTA on the result of the strategy.
 -- | > (withCertification' PartialProof dependencyTuples) .>>> matrix >>> empty
 withCertification' :: TotalProof -> TrsStrategy -> TrsStrategy
-withCertification' = undefined --T.declFun withCertificationDeclaration
+withCertification' = withCertificationStrategy --T.declFun withCertificationDeclaration
 

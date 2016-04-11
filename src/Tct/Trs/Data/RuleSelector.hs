@@ -35,8 +35,6 @@ module Tct.Trs.Data.RuleSelector
   ) where
 
 
-import           Data.Typeable
-
 import qualified Tct.Core.Common.Parser       as P
 import qualified Tct.Core.Data                as T
 
@@ -53,7 +51,7 @@ data RuleSelector f v a = RuleSelector
   { rsName   :: String            -- ^ Name of the rule selector.
   , rsSelect :: Prob.Problem f v -> a -- ^ Given a problem, computes an 'SelectorExpression' that
                                   -- determines which rules to select.
-  } deriving Typeable
+  }
 
 instance Show (RuleSelector f v a) where show = rsName
 
@@ -152,21 +150,21 @@ selWeaks = RuleSelector { rsName = "weak-rules" , rsSelect = fn } where
 -- | Select from the dependency graph, using the given function.
 -- The first parameter should specify a short name for the rule-selector.
 selFromDG :: (DependencyGraph f v -> Rs.RuleSet f v) -> RuleSetSelector f v
-selFromDG f = RuleSelector 
+selFromDG f = RuleSelector
   { rsName   = "selected from DG"
   , rsSelect = f . Prob.dpGraph }
 
 -- | Select from the dependency graph, using the given function.
 -- The first parameter should specify a short name for the rule-selector.
 selFromWDG :: (DG f v -> Rs.RuleSet f v) -> RuleSetSelector f v
-selFromWDG f = RuleSelector 
+selFromWDG f = RuleSelector
   { rsName   = "selected from WDG"
   , rsSelect = f . Prob.dependencyGraph }
 
 -- | Select from the congruence dependency graph, using the given function.
 -- The first parameter should specify a short name for the rule-selector.
 selFromCDG :: (CDG f v -> Rs.RuleSet f v) -> RuleSetSelector f v
-selFromCDG f = RuleSelector 
+selFromCDG f = RuleSelector
   { rsName   = "selected from CWDG"
   , rsSelect = f . Prob.congruenceGraph }
 
@@ -207,8 +205,8 @@ selIndependentSG :: (Ord f, Ord v) => RuleSetSelector f v
 selIndependentSG = (selFromWDG f) { rsName = "independent sub-graph" } where
   f wdg = case DG.nodes wdg' of
     []  -> Rs.emptyRuleSet
-    n:_ -> Rs.emptyRuleSet 
-      { Rs.sdps = RS.fromList . DG.asRules $ DG.filterStrict rs 
+    n:_ -> Rs.emptyRuleSet
+      { Rs.sdps = RS.fromList . DG.asRules $ DG.filterStrict rs
       , Rs.wdps = RS.fromList . DG.asRules $ DG.filterWeak rs }
       where rs = DG.withNodeLabels' wdg' $ DG.reachablesBfs wdg' [n]
     where wdg' = DG.undirect wdg
@@ -217,10 +215,10 @@ selCycleIndependentSG :: (Ord f, Ord v) => RuleSetSelector f v
 selCycleIndependentSG = (selFromWDG f) { rsName = "cycle independent sub-graph" } where
   f wdg = case DG.nodes wdg of
     []  -> Rs.emptyRuleSet
-    n:_ -> Rs.emptyRuleSet 
-      { Rs.sdps = RS.fromList . DG.asRules $ DG.filterStrict rs 
+    n:_ -> Rs.emptyRuleSet
+      { Rs.sdps = RS.fromList . DG.asRules $ DG.filterStrict rs
       , Rs.wdps = RS.fromList . DG.asRules $ DG.filterWeak rs }
-      where 
+      where
         ns = walk wdg n [n]
         rs = DG.withNodeLabels' wdg ns
   walk wdg n ns
@@ -282,13 +280,13 @@ selOr ss = RuleSelector { rsName = "any [" ++ concat (intersperse ", " [rsName s
 
 -- | Selects the first alternative from the given rule selector.
 selFirstAlternative :: (Ord f, Ord v) => ExpressionSelector f v -> ExpressionSelector f v
-selFirstAlternative rs = RuleSelector 
+selFirstAlternative rs = RuleSelector
   { rsName = "first alternative of " ++ rsName rs
-  , rsSelect = \ prob -> 
+  , rsSelect = \ prob ->
     let (dps, trs) = selectFirst $ rsSelect rs prob
     in BigAnd $ [SelectDP d | d <- RS.toList dps] ++ [SelectTrs r | r <- RS.toList trs] }
 
-  where 
+  where
     selectFirst (BigAnd ss)     = (RS.unions dpss, RS.unions trss)
       where (dpss, trss) = unzip [selectFirst sel | sel <- ss]
     selectFirst (BigOr [])      = (RS.empty,RS.empty)

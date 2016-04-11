@@ -19,7 +19,7 @@ import Tct.Trs.Strategy.Web          as M
 trsDeclarations :: Declared Trs Trs => [TrsDeclaration]
 trsDeclarations =
   [ SD emptyDeclaration
-  -- , SD withCertificationDeclaration
+  , SD withCertificationDeclaration
 
   , SD decomposeDeclaration
   , SD decomposeCPDeclaration
@@ -65,6 +65,8 @@ trsDeclarations =
   , SD $ strategy "removeLeaf"             (OneTuple complexityPairArg) removeLeaf
 
   -- Strategies
+  , SD $ strategy "matchbounds"           () matchbounds
+
   , SD certifyDeclaration
   , SD derivationalDeclaration
   , SD runtimeDeclaration

@@ -36,7 +36,7 @@ makeRuleCompatible r !e !str !wb !ml !a
 
 compatibleAutomaton :: Ord v => RS.Rules Symbol v -> RS.Rules Symbol v -> Enrichment -> Automaton -> Automaton
 compatibleAutomaton strict weak e a = eitherVal (iter a (1 :: Int))
-  where 
+  where
     iter a' !i = case r of
       Left  a'' -> iter a'' (i + 1)
       Right a'' -> Right a''

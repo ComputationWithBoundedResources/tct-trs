@@ -68,7 +68,7 @@ reachableFromLifted a t qs = runMemoAction reachableFromLiftedM
                                           S.empty  [(l, args) | (l,argss) <- bstepUL a f q , args <- S.toList argss]
           labeledSubterms fl subproblems = do ltis <- mapM reachLiftS subproblems
                                               return $ S.fromList [F fl lts | lts <- listProduct $ map S.toList ltis]
-              
+
           -- identifyVars (T.Var _) = T.Var (Var.canonical 0)
           identifyVars = T.map id (const (0::Int))
           -- TODO: MS what happens here

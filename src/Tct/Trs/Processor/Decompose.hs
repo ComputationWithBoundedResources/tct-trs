@@ -18,7 +18,6 @@ module Tct.Trs.Processor.Decompose
 
 import           Control.Applicative
 import           Control.Monad.Trans           (lift)
-import           Data.Typeable
 
 import qualified Data.Rewriting.Rule           as R (Rule)
 import qualified Data.Rewriting.Term           as R (isVariantOf)
@@ -47,7 +46,7 @@ data DecomposeBound
   | RelativeAdd
   | RelativeMul
   | RelativeComp
-  deriving (Eq, Show, Bounded, Enum, Typeable)
+  deriving (Eq, Show, Bounded, Enum)
 
 
 -- checks condition on R and S
@@ -278,7 +277,6 @@ boundArg = T.flag "allow"
   [ "This argument type determines"
   , "how the complexity certificate should be obtained from subproblems (R) and (S)."
   , "Consequently, this argument also determines the shape of (S)." ]
-  `T.withDomain` fmap show [(minBound :: DecomposeBound)..]
 
 desc :: [String]
 desc =

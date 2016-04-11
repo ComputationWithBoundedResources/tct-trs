@@ -33,8 +33,6 @@ runtime' = T.declFun runtimeDeclaration
 
 --- * direct ---------------------------------------------------------------------------------------------------------
 
-matchbounds = bounds Minimal Match .<||> bounds PerSymbol Match
-
 mx dim deg   = matrix' dim deg Algebraic ?ua ?ur ?sel ?gr
 mxCP dim deg = matrixCP' dim deg Algebraic ?ua ?ur
 
@@ -67,7 +65,7 @@ runtimeStrategy' combineWith mto =
   withProblem $ \ prob ->
     if Prob.isInnermostProblem prob
       then rci
-      else iteProgress toInnermost rci rc
+      else ite toInnermost rci rc
 
 withDP =
   try (withProblem toDP')
@@ -122,7 +120,7 @@ interpretations =
   tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
   .>>> fastest
     [ tew (px 2) .>>> tew (px 3) .>>> empty
-    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty ]
+    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty]
   where
     mxs1 = mx 2 1 .<||> mx 3 1
     mxs2 = mx 2 2 .<||> mx 3 2 .<||> wg 2 2

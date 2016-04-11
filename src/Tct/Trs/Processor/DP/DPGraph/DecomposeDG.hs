@@ -77,17 +77,17 @@ instance T.Processor DecomposeDG where
   type Out DecomposeDG         = Trs
   type Forking DecomposeDG     = T.Pair
 
-  execute p prob = do
+  execute p prob =
     maybe decomposition (\s -> T.abortWith (Inapplicable s :: ApplicationProof DecomposeDGProof)) (Prob.isDPProblem' prob)
     where
       decomposition
-        | RS.null initialDPs             = abortx (DecomposeDGFail "no rules were selected")
+        | RS.null initialDPs              = abortx (DecomposeDGFail "no rules were selected")
         | not (any isCut unselectedNodes) = abortx (DecomposeDGFail "no rule was cut")
         | prob `isSubsetDP` lowerProb     = abortx (DecomposeDGFail "lower component not simpler")
         | otherwise                       = do
           lowerProof <- mapply (onLower p) lowerProb
           upperProof <- mapply (onUpper p) upperProb
-          if T.isFailure lowerProof || T.isFailure upperProof
+          if T.isFailing lowerProof || T.isFailing upperProof
             then abortx (DecomposeDGFail "a strategy failed")
             else return $ T.Progress (Applicable proof) certfn (T.Pair (upperProof, lowerProof))
         where

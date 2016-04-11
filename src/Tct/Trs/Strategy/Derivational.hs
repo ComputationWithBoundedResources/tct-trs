@@ -67,8 +67,6 @@ compose =
     (mul 1 .<|> mul 2 .<|> (mul 3 .<||> mul 4))
     (com 1 .<|> com 2 .<|> (com 3 .<||> com 4))
 
-matchbounds :: TrsStrategy
-matchbounds = bounds Minimal Match .<||> bounds PerSymbol Match
 
 type Dimension = Int
 

@@ -152,7 +152,7 @@ orient inter prob absi mselector useUP useUR = do
     sOrderConstraints = SMT.bigAnd [ usable r .=> sOrder r | r <- srules ]
       where sOrder r = interpretf (R.lhs r) .>=. (interpretf (R.rhs r) .+. strict r)
 
-    -- MS: TODO: the greedy component should work on the expression selector; so we could express eg selAnyOf $ selRules `inter` selStricts 
+    -- MS: TODO: the greedy component should work on the expression selector; so we could express eg selAnyOf $ selRules `inter` selStricts
     forceAny rs
       | null rs   = SMT.bot
       | otherwise = SMT.bigOr [ usable r .&& strict r .> zero | r <- rs ]
@@ -185,7 +185,7 @@ orient inter prob absi mselector useUP useUR = do
     allowUR = useUR && Prob.isRCProblem prob && Prob.isInnermostProblem prob
     allowAF = allowUR
 
-    proof uposs = InterpretationProof 
+    proof uposs = InterpretationProof
       { sig_       = Prob.signature prob
       , inter_     = Interpretation M.empty
       , uargs_     = uposs
@@ -253,7 +253,7 @@ xmlProof proof itype =
     [ orderingConstraintProof
     , Xml.elt "trs" [Xml.toXml $ RS.fromList trs]          -- strict part
     -- ceta complains if usableRules are set for non-innermost; even if all rules are given
-    , if useURules_ proof 
+    , if useURules_ proof
         then Xml.elt "usableRules" [Xml.toXml $ RS.fromList usr] -- usable part
         else Xml.empty
     ]

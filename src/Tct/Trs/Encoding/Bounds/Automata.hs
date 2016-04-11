@@ -27,7 +27,6 @@ import qualified Data.Map                  as M
 import           Data.Maybe                (fromMaybe)
 import           Data.Set                  (Set)
 import qualified Data.Set                  as S
-import           Data.Typeable
 import           Data.List                 (nub)
 
 import qualified Data.Rewriting.Term       as R
@@ -37,8 +36,8 @@ import qualified Data.Rewriting.Term       as R
 type MemoAction k a = St.State (M.Map k a)
 
 memo :: Ord k => k -> MemoAction k a a -> MemoAction k a a
-memo k  m = do 
-  s <- St.get 
+memo k  m = do
+  s <- St.get
   case M.lookup k s of
     Just old -> return old
     Nothing  -> do { new <- m;
@@ -67,7 +66,7 @@ listProduct (xs:xss) = foldl f [] xs
 snub :: Ord a => [a] -> [a]
 snub = S.toList . S.fromList
 
-data Strictness = StrictRule | WeakRule 
+data Strictness = StrictRule | WeakRule
 
 
 
@@ -77,7 +76,7 @@ data Enrichment =
   Match -- ^ Matchbounds.
   | Roof -- ^ Roofbounds.
   | Top -- ^ Topbounds.
-  deriving (Typeable, Enum, Bounded, Eq)
+  deriving (Enum, Bounded, Eq)
 
 instance Show Enrichment where
     show Match   = "match"
@@ -94,7 +93,7 @@ type State     = Int
 
 
 
-data LTerm 
+data LTerm
   = F LSym [LTerm]
   | S State
   deriving (Eq, Ord)
@@ -103,7 +102,7 @@ data LTerm
 
 data Rule
   = Collapse LSym [State] State
-  | Epsilon State State 
+  | Epsilon State State
   deriving (Eq, Ord, Show)
 
 
@@ -115,7 +114,7 @@ type FwdAutomaton = IntMap (IntMap (Map [State] (Set State)))
 type BwdAutomaton = IntMap (IntMap (IntMap (Set [State])))
 -- sym -> q -> l -> argss <=> forall args \in argss. sym_l(args) -> q \in A
 
-data Automaton = Automaton 
+data Automaton = Automaton
   { fwd                :: FwdAutomaton
   , bwd                :: BwdAutomaton
   , epsilonTransitions :: Set (State,State)

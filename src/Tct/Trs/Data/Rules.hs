@@ -1,5 +1,5 @@
 -- | This module provides a set like interface to TRSs.
--- 
+--
 -- Should be imported qualified.
 module Tct.Trs.Data.Rules
   (
@@ -37,7 +37,6 @@ import qualified Data.Set               as S
 import qualified Data.Map               as M
 import qualified Data.List              as L
 
-import           Data.Typeable
 import           Prelude                hiding (concat, filter, map, null)
 
 import qualified Tct.Core.Common.Pretty as PP
@@ -65,7 +64,7 @@ data SelectorExpression f v
   | SelectTrs (Rule f v)
   | BigAnd [SelectorExpression f v]
   | BigOr [SelectorExpression f v]
-  deriving (Show, Typeable)
+  deriving Show
 
 
 funs :: Ord f => Rules f v -> S.Set f
@@ -95,12 +94,12 @@ definedSymbols (RulesT rs) = S.foldr ofRule S.empty rs
     ofTerm (T.Fun f _)  = (f `S.insert`)
     ofTerm _            = id
 
--- constructorSymbols :: Ord f => Rules f v -> S.Set f 
+-- constructorSymbols :: Ord f => Rules f v -> S.Set f
 -- constructorSymbols trs = funs trs `S.difference` definedSymbols trs
 
 symbols :: (Ord f, Ord v) => Rules f v -> (M.Map f Int, M.Map f Int)
 symbols trs = (toMap ds, toMap $ funs trs' `S.difference` ds)
-  where 
+  where
     trs' = map (\(R.Rule l r) -> R.Rule (T.withArity l) (T.withArity r)) trs
     ds           = definedSymbols trs'
 
@@ -164,7 +163,7 @@ isSubset = lift2 S.isSubsetOf
 
 isWellformed :: Ord v => Rules f v -> Bool
 isWellformed trs = all T.isFun (R.lhss rules) && all (\r -> vs (R.rhs r) `S.isSubsetOf` vs (R.lhs r)) rules
-  where 
+  where
     rules = toList trs
     vs    = S.fromList . T.vars
 
@@ -181,14 +180,14 @@ isNonSizeIncreasing = all' R.isNonSizeIncreasing
 isNonDuplicating    = not . isDuplicating
 
 isOverlay :: (Ord f, Ord v) => Rules f v -> Bool
-isOverlay = L.null . CP.cpsIn' . toList 
+isOverlay = L.null . CP.cpsIn' . toList
 
 isConstructorTrs :: Ord f => Sig.Signature f -> Rules f v -> Bool
 isConstructorTrs sig = all' (all (S.null . (`S.intersection` ds) . funsS) . R.directSubterms . R.lhs)
-  where 
+  where
     ds    = Sig.defineds sig
     funsS = S.fromList . T.funs
-    
+
 
 -- * property-tests; return Just msg if property is not fulfilled.
 -- TODO: MS: this is confusing as we comine with <|> eg. isLinear' <|> isNonDuplicating'

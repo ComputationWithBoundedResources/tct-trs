@@ -50,7 +50,7 @@ instance T.Processor RemoveHeads where
     where
       remhead
         | null heads = T.abortWith (Applicable RemoveHeadsFail)
-        | otherwise  = T.succeedWith (Applicable proof) T.fromId (T.toId nprob) 
+        | otherwise  = T.succeedWith (Applicable proof) T.fromId (T.toId nprob)
         where
           wdg = Prob.dependencyGraph prob
 

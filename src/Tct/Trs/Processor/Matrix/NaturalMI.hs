@@ -55,7 +55,6 @@ import qualified Data.Maybe                                 as DM
 import qualified Data.Set                                   as Set
 
 import qualified Data.Traversable                           as DT
-import qualified Data.Typeable                              as DT
 
 
 -- imports term-rewriting
@@ -147,7 +146,7 @@ data NaturalMIKind
   -- | Automaton    -- ^ Use automaton techniques to compute induced complexity function.
   | Triangular   -- ^ Use triangular matrices only.
   | Unrestricted -- ^ Put no further restrictions on the interpretations.
-  deriving (DT.Typeable, Bounded, Enum, Eq, Show)
+  deriving (Bounded, Enum, Eq, Show)
 
 
 -- | Proof information for matrix Interpretations.
@@ -661,7 +660,6 @@ description =  [ "description of the matrix interpretation processor: TODO"     
 nmiKindArg :: CD.Argument 'CD.Required NaturalMIKind
 nmiKindArg = CD.flag "kind"
   ["Specifies the kind of the matrix interpretation."]
-  `CD.withDomain` fmap show [(minBound :: NaturalMIKind)..]
 
 {- | dimension argument -}
 dimArg :: CD.Argument 'CD.Required Int
@@ -810,7 +808,7 @@ instance CD.Processor NaturalMI where
 instance CP.IsComplexityPair NaturalMI where
   solveComplexityPair p sel prob = do
   pt <- CD.evaluate (CD.Apply p{selector=Just sel, greedy=NoGreedy}) (CD.Open prob)
-  return $ if CD.isFailure pt
+  return $ if CD.isFailing pt
     then Left $ "application of cp failed"
     else case CD.open pt of
       [nprob] -> Right $ CP.ComplexityPairProof
@@ -886,7 +884,7 @@ instance Xml.Xml (MatrixOrder Int) where
 data WgOn
   = WgOnTrs -- ^ Orient at least all non-DP rules.
   | WgOnAny -- ^ Orient some rule.
-  deriving (Eq, Show, DT.Typeable, Bounded, Enum)
+  deriving (Eq, Show, Bounded, Enum)
 
 data WeightGap = WeightGap
   { wgDimension :: Int
@@ -919,7 +917,7 @@ instance CD.Processor WeightGap where
       res <- wgEntscheide p prob
       case res of
         SMT.Sat order -> CD.succeedWith (PC.Applicable $ PC.Order order) cert (CD.toId nprob)
-          where 
+          where
             nprob = I.newProblem' prob (mint_ $ wgProof order)
             bound = upperbound (wgDimension p) (wgKind p) (kind_ $ wgProof order) (I.inter_ $ mint_ (wgProof order))
             cert  = (flip CD.updateTimeUBCert (`SR.add` bound) . CD.fromId)
@@ -1066,7 +1064,6 @@ weightGapDeclaration = CD.declare  "weightgap" wgDescription (argDim,argDeg, arg
       , "Here 'trs' refers to all strict non-dependency-pair rules of the considered problem, "
       , "while 'any' only demands any rule at all to be strictly oriented. "
       , "The default value is 'trs'."]
-     `CD.withDomain` fmap show [(minBound :: WgOn)..]
      `CD.optional` WgOnAny
 
 weightgap :: TrsStrategy

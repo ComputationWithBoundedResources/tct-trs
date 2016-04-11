@@ -72,9 +72,9 @@ custom
      try (when useDPSimps dpsimps)
     .>>> te (when useDPDecompose (force decomposeDG') .>>> try (when useDPSimps dpsimps))
 
-  basics l u = matchbounds .<||> interpretations
+  basics l u = mbounds .<||> interpretations
     where
-    matchbounds     = force $ when useMatchbounds $ bounds Minimal Match .<||> bounds PerSymbol Match
+    mbounds         = force $ when useMatchbounds matchbounds
     interpretations = force $
       if useDecompose
         then chain [ tew (int d) | d <- [(max 0 l) .. (max l u)] ]
