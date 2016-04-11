@@ -294,20 +294,24 @@ noWeakComponents' prob = note (not $ noWeakComponents prob) " contains weak comp
 
 instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
   pretty prob = PP.vcat
-    [ PP.text "Strict DP Rules:"
-    , PP.indent 2 $ PP.pretty (strictDPs prob)
-    , PP.text "Strict TRS Rules:"
-    , PP.indent 2 $ PP.pretty (strictTrs prob)
-    , PP.text "Weak DP Rules:"
-    , PP.indent 2 $ PP.pretty (weakDPs prob)
-    , PP.text "Weak TRS Rules:"
-    , PP.indent 2 $ PP.pretty (weakTrs prob)
-    , PP.text "Signature:"
-    , PP.indent 2 $ PP.pretty (signature prob)
-    , PP.text "Obligation:"
-    , PP.indent 2 $ PP.pretty (strategy prob)
-    , PP.indent 2 $ PP.pretty (startTerms prob) ]
-
+    [ ppRules [ (n,PP.pretty rs) | (n,a) <- [ ("Strict DPs",strictDPs)
+                                            , ("Strict TRS", strictTrs)
+                                            , ("Weak DPs", weakDPs)
+                                            , ("Weak TRS", weakTrs)]
+                                 , let rs = a prob
+                                 , not (RS.null rs)]
+    , ppBlock "Signature" (PP.pretty (signature prob))
+    , ppBlock "Obligation" obligation ] where
+        ppBlock n e = PP.nest 4 (PP.text "-" PP.<+> PP.text n PP.<> PP.char ':' PP.<$$> e)
+        ppRules = PP.vcat . map (uncurry ppBlock)
+        obligation = strat PP.<+> sts where
+          strat = case strategy prob of
+                    Innermost -> PP.text "innermost"
+                    _ -> PP.empty
+          sts = case startTerms prob of
+                 st@AllTerms{} -> PP.text "derivational complexity wrt. signature" PP.<+> PP.set' (alls st)
+                 st@BasicTerms {} -> PP.text "runtime complexity wrt. defined symbols" 
+                                     PP.<+> PP.set' (defineds st) PP.<+> PP.text "and constructors" PP.<+> PP.set' (constructors st)
 
 -- MS: the ceta instance is not complete as it contains a tag <complexityClass> which depends on ProofTree
 -- furthermore CeTA (2.2) only supports polynomial bounds; so we add the tag manually in the output
