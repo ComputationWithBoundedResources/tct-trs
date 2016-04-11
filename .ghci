@@ -1,0 +1,6 @@
+-- run with = STACK_YAML=./stack.dev.yaml stack ghci --no-load tct-trs
+:set prompt "tct> "
+:module +Tct.Core.Interactive
+:l Main
+welcome
+help
