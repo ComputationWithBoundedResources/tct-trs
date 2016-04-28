@@ -71,8 +71,8 @@ compose =
 type Dimension = Int
 
 mx,mx' :: Dimension -> Degree -> TrsStrategy
-mx dim deg  = matrix' dim deg Algebraic NoUArgs NoURules (Just selAny) NoGreedy
-mx' dim deg = matrix' dim deg Algebraic NoUArgs NoURules Nothing NoGreedy
+mx dim deg  = matrix' dim deg Algebraic NoUArgs NoURules (Just selAny)
+mx' dim deg = matrix' dim deg Algebraic NoUArgs NoURules Nothing
 
 mxCP :: Dimension -> Degree -> ComplexityPair
 mxCP dim deg = matrixCP' dim deg Algebraic NoUArgs NoURules

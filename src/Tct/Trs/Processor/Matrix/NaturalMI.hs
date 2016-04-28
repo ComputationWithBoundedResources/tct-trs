@@ -31,7 +31,6 @@ module Tct.Trs.Processor.Matrix.NaturalMI
   , NaturalMIKind (..)
   , UsableArgs (..)
   , UsableRules (..)
-  , Greedy (..)
 
   -- * Complexity Pair
   , matrixCPDeclaration
@@ -79,7 +78,7 @@ import           Tct.Core.Parse            ()
 -- imports tct-trs
 import Tct.Trs.Data
 import qualified Tct.Trs.Data.Arguments                     as Arg
-import           Tct.Trs.Data.Arguments                     (UsableArgs (..), UsableRules (..), Greedy (..))
+import           Tct.Trs.Data.Arguments                     (UsableArgs (..), UsableRules (..))
 
 import qualified Tct.Trs.Data.ComplexityPair as CP
 import qualified Tct.Trs.Data.Problem                       as Prob
@@ -165,7 +164,6 @@ data NaturalMI = NaturalMI
                  , uargs       :: Arg.UsableArgs -- ^ usable arguments
                  , urules      :: Arg.UsableRules -- ^ usable rules
                  , selector    :: Maybe (TD.ExpressionSelector F V)
-                 , greedy      :: Arg.Greedy
                  } deriving (Show)
 
 -- | Proof type of matrix interpretations
@@ -639,16 +637,14 @@ entscheide1 p aorder encoding decoding forceAny prob
 {- | create options/ configuration  for the NaturalMI strategy -}
 matrixStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector F V)
-               -> Arg.Greedy
                -> CD.Strategy Prob.Trs Prob.Trs
-matrixStrategy dim deg nmiKind ua ur sl gr = CD.Apply $
+matrixStrategy dim deg nmiKind ua ur sl = CD.Apply $
   NaturalMI { miDimension = dim
             , miDegree = deg
             , miKind = nmiKind
             , uargs = ua
             , urules = ur
             , selector = sl
-            , greedy = gr
             }
 
 
@@ -682,16 +678,14 @@ args ::
   , CD.Argument 'CD.Optional NaturalMIKind
   , CD.Argument 'CD.Optional Arg.UsableArgs
   , CD.Argument 'CD.Optional Arg.UsableRules
-  , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V))
-  , CD.Argument 'CD.Optional Arg.Greedy )
+  , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V)) )
 args =
   ( dimArg          `CD.optional` 1
   , degArg          `CD.optional` 1
   , nmiKindArg      `CD.optional` Algebraic
   , Arg.usableArgs  `CD.optional` Arg.UArgs
   , Arg.usableRules `CD.optional` Arg.URules
-  , slArg           `CD.optional` Just (RS.selAnyOf RS.selStricts)
-  , Arg.greedy      `CD.optional` Arg.Greedy )
+  , slArg           `CD.optional` Just (RS.selAnyOf RS.selStricts) )
 
 {- | declare the matrix strategy -}
 matrixDeclaration :: CD.Declaration (
@@ -701,7 +695,6 @@ matrixDeclaration :: CD.Declaration (
    , CD.Argument 'CD.Optional Arg.UsableArgs
    , CD.Argument 'CD.Optional Arg.UsableRules
    , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V))
-   , CD.Argument 'CD.Optional Arg.Greedy
   ] CD.:-> CD.Strategy Prob.Trs Prob.Trs)
 matrixDeclaration = CD.declare "matrix" description args matrixStrategy
 
@@ -710,7 +703,6 @@ matrix = CD.deflFun matrixDeclaration
 
 matrix' :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector F V)
-               -> Arg.Greedy
                -> CD.Strategy Prob.Trs Prob.Trs
 matrix' = CD.declFun matrixDeclaration
 
@@ -807,7 +799,7 @@ instance CD.Processor NaturalMI where
 
 instance CP.IsComplexityPair NaturalMI where
   solveComplexityPair p sel prob = do
-  pt <- CD.evaluate (CD.Apply p{selector=Just sel, greedy=NoGreedy}) (CD.Open prob)
+  pt <- CD.evaluate (CD.Apply p{selector=Just sel}) (CD.Open prob)
   return $ if CD.isFailing pt
     then Left $ "application of cp failed"
     else case CD.open pt of
@@ -825,7 +817,6 @@ matrixComplexityPair dim deg nmiKind ua ur = CP.toComplexityPair $
             , uargs = ua
             , urules = ur
             , selector = Nothing
-            , greedy = NoGreedy
             }
 
 matrixCPDeclaration :: CD.Declaration (

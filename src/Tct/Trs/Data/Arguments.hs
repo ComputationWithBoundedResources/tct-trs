@@ -15,12 +15,6 @@ module Tct.Trs.Data.Arguments
   , usableRules
   , useUsableRules
 
-  -- * Greedy
-  , HasGreedy (..)
-  , Greedy (..)
-  , greedy
-  , useGreedy
-
   -- * Restrict
   , Restrict (..)
   , restrict
@@ -67,20 +61,6 @@ usableRules = T.flag "urules"
 
 useUsableRules :: UsableRules -> Bool
 useUsableRules = (URules==)
-
-
-data Greedy = Greedy | NoGreedy
-  deriving (Bounded, Enum, Eq, Show)
-
-class HasGreedy p where
-  withGreedy :: p -> Greedy -> p
-
-greedy :: T.Argument 'T.Required Greedy
-greedy = T.flag "greedy"
-    [ "This argument specifies whether to be greedy." ]
-
-useGreedy :: Greedy -> Bool
-useGreedy = (Greedy==)
 
 
 data Restrict = Restrict | NoRestrict

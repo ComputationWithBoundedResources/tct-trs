@@ -2,12 +2,6 @@
 module Tct.Trs.Encoding.Interpretation
   where
 
--- TODO: MS remove Greedy Components
--- we do not really gain anything from the greedy algorithm of the interpretations;
--- a) they do not work well together with parallel invocations
--- b) experiments (rc and certify) do not show really any improvement over NoGreedy (even when applied sequentially)
--- c) there is a (rare case) where there encoding of Greedy would change; namely if all strict trs rules are shifted to the weak; we get besser uargs
-
 import Data.Maybe (fromMaybe)
 import           Control.Monad                      (liftM)
 import qualified Data.Foldable                      as F
@@ -152,7 +146,6 @@ orient inter prob absi mselector useUP useUR = do
     sOrderConstraints = SMT.bigAnd [ usable r .=> sOrder r | r <- srules ]
       where sOrder r = interpretf (R.lhs r) .>=. (interpretf (R.rhs r) .+. strict r)
 
-    -- MS: TODO: the greedy component should work on the expression selector; so we could express eg selAnyOf $ selRules `inter` selStricts
     forceAny rs
       | null rs   = SMT.bot
       | otherwise = SMT.bigOr [ usable r .&& strict r .> zero | r <- rs ]

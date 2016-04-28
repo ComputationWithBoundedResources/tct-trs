@@ -33,11 +33,11 @@ runtime' = T.declFun runtimeDeclaration
 
 --- * direct ---------------------------------------------------------------------------------------------------------
 
-mx dim deg   = matrix' dim deg Algebraic ?ua ?ur ?sel ?gr
+mx dim deg   = matrix' dim deg Algebraic ?ua ?ur ?sel
 mxCP dim deg = matrixCP' dim deg Algebraic ?ua ?ur
 
-px 1 = poly' Linear Restrict ?ua ?ur ?sel ?gr
-px n = poly' (Mixed n) Restrict ?ua ?ur ?sel ?gr
+px 1 = poly' Linear Restrict ?ua ?ur ?sel
+px n = poly' (Mixed n) Restrict ?ua ?ur ?sel
 
 pxCP 1 = polyCP' Linear Restrict ?ua ?ur
 pxCP n = polyCP' (Mixed n) Restrict ?ua ?ur
@@ -58,7 +58,6 @@ runtimeStrategy' combineWith mto =
     ?combine    = case combineWith of { Best -> best cmpTimeUB; Fastest -> fastest }
     ?ua         = UArgs
     ?ur         = URules
-    ?gr         = NoGreedy
     ?sel        = Just selAny
   in
 
