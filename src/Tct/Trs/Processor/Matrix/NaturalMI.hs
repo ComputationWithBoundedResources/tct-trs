@@ -555,78 +555,102 @@ kindConstraints (MI.ConstructorEda cs mdeg) absmi = do
     filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
 
 
-entscheide :: NaturalMI -> Prob.Trs -> CD.TctM (CD.Return NaturalMI)
-entscheide p prob = do
-  let
-    orientM = do
-      res@(_, (pint,_), _) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
-      SMT.assertM $ (kindConstraints kind pint)
-      return $ res
-    (ret, encoding)           = SMT.runSolverSt orientM SMT.initialState
-    (apint,decoding,forceAny) = ret
-    aorder = MatrixOrder
-      { kind_ = kind
-      , dim_  = miDimension p
-      , mint_ = apint }
 
-  entscheide1 p aorder encoding decoding forceAny prob
-  where
+entscheide :: NaturalMI -> Trs -> CD.TctM (CD.Return NaturalMI)
+entscheide p@NaturalMI{miDimension=dim, miKind=kind} prob = undefined -- do
+  -- res :: SMT.Result (I.InterpretationProof () (), I.Interpretation F (MI.LinearInterpretation MI.SomeIndeterminate Int), Maybe (UREnc.UsableSymbols F))
+  --   <- SMT.smtSolveSt (SMT.smtSolveTctM prob) $ do
+  --     encoding@(_,pint,_) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
+  --     SMT.assertM $ kindConstraints p pint
+  --     return $ SMT.decode encoding
+  -- case res of
+  --   SMT.Sat a -> let order = mkOrder a in
+  --     CD.succeedWith
+  --       (PC.Applicable $ PC.Order order)
+  --       (certification (Prob.startTerms prob) p order)
+  --       (I.newProblem prob (mint_ order))
 
-    absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (miDimension p)) (Sig.toMap sig)
+  --   SMT.Error s -> throwError (userError s)
+  --   _           -> CD.abortWith "Incompatible"
 
-    sig   = Prob.signature prob
-    kind = mxKind (miKind p) (miDimension p) (miDegree p) (Prob.startTerms prob)
+  -- where
 
-    shift = maybe I.All I.Shift (selector p)
+  --   absi =  I.Interpretation $ MI.abstractInterpretation (Prob.startTerms prob) (miKind p) (miDimension p) sig
+  --   sig   = Prob.signature prob
+  --   shift = maybe I.All I.Shift (selector p)
 
+  --   mkOrder (proof, inter, ufuns) = MatrixOrder
+  --     { kind_ = kind
+  --     , dim_  = dim
+  --     , mint_ = proof
+  --       { I.inter_     = inter
+  --       , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
+  --       , I.strictDPs_ = sDPs
+  --       , I.strictTrs_ = sTrs
+  --       , I.weakDPs_   = wDPs
+  --       , I.weakTrs_   = wTrs }}
+  --     where
 
+  --         (sDPs,wDPs) = List.partition isStrict' (rs $ Prob.dpComponents prob)
+  --         (sTrs,wTrs) = List.partition isStrict' (rs $ Prob.trsComponents prob)
+  --         isStrict' (r,i) = r `RS.member` Prob.strictComponents prob && uncurry isStrict i
 
-entscheide1 ::
-  NaturalMI
-  -> MatrixOrder c
-  -> SMT.SmtState Int
-  -> (I.Interpretation F (SomeLInter (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
-  -> I.ForceAny
-  -> Prob.Trs
-  -> CD.TctM (CD.Return NaturalMI)
-entscheide1 p aorder encoding decoding forceAny prob
-  | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
-  | otherwise           = do
-    res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
-      <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
-    case res of
-      SMT.Sat a -> CD.succeedWith  (PC.Applicable $ PC.Order order) (certification p order) (I.newProblem prob (mint_ order))
-        where order = mkOrder a
+  --         rs trs =
+  --           [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
+  --           | r@(RR.Rule lhs rhs) <- DF.toList trs
+  --           , isUsable ufuns r]
 
-      SMT.Error s -> throwError (userError s)
-      _           -> CD.abortWith (PC.Applicable PC.Incompatible :: PC.ApplicationProof NaturalMIProof)
-      where
-
-        assertx st e = st {SMT.asserts = e: SMT.asserts st}
-        srules = RS.toList $ Prob.strictComponents prob
-
-        mkOrder (inter, ufuns) = aorder { mint_ = mkInter (mint_ aorder) inter ufuns }
-        mkInter aproof inter ufuns = aproof
-          { I.inter_     = inter
-          , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
-          , I.strictDPs_ = sDPs
-          , I.strictTrs_ = sTrs
-          , I.weakDPs_   = wDPs'
-          , I.weakTrs_   = wTrs' }
-          where
+  --         isUsable Nothing _ = True
+  --         isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
 
 
-          (sDPs,wDPs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
-          (sTrs,wTrs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
-          wDPs' = filter (uncurry isWeak . snd) wDPs
-          wTrs' = filter (uncurry isWeak . snd) wTrs
-          rs trs =
-            [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
-            | r@(RR.Rule lhs rhs) <- RS.toList trs
-            , isUsable ufuns r]
 
-          isUsable Nothing _ = True
-          isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
+
+-- entscheide1 ::
+--   NaturalMI
+--   -> MatrixOrder c
+--   -> SMT.SmtState Int
+--   -> (I.Interpretation F (SomeLInter (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
+--   -> Prob.Trs
+--   -> CD.TctM (CD.Return NaturalMI)
+-- entscheide1 p aorder encoding decoding forceAny prob
+--   | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
+--   | otherwise           = do
+--     res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
+--       <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+--     case res of
+--       SMT.Sat a -> CD.succeedWith  (PC.Applicable $ PC.Order order) (certification p order) (I.newProblem prob (mint_ order))
+--         where order = mkOrder a
+
+--       SMT.Error s -> throwError (userError s)
+--       _           -> CD.abortWith (PC.Applicable PC.Incompatible :: PC.ApplicationProof NaturalMIProof)
+--       where
+
+--         assertx st e = st {SMT.asserts = e: SMT.asserts st}
+--         srules = RS.toList $ Prob.strictComponents prob
+
+--         mkOrder (inter, ufuns) = aorder { mint_ = mkInter (mint_ aorder) inter ufuns }
+--         mkInter aproof inter ufuns = aproof
+--           { I.inter_     = inter
+--           , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
+--           , I.strictDPs_ = sDPs
+--           , I.strictTrs_ = sTrs
+--           , I.weakDPs_   = wDPs'
+--           , I.weakTrs_   = wTrs' }
+--           where
+
+
+--           (sDPs,wDPs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
+--           (sTrs,wTrs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
+--           wDPs' = filter (uncurry isWeak . snd) wDPs
+--           wTrs' = filter (uncurry isWeak . snd) wTrs
+--           rs trs =
+--             [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
+--             | r@(RR.Rule lhs rhs) <- RS.toList trs
+--             , isUsable ufuns r]
+
+--           isUsable Nothing _ = True
+--           isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
 
 
 ----------------------------------------------------------------------

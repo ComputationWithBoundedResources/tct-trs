@@ -119,72 +119,94 @@ interpretf ebsi = I.interpretTerm interpretFun interpretVar
     interpretVar v = P.variable v
 
 entscheide :: NaturalPI -> Trs -> T.TctM (T.Return NaturalPI)
-entscheide p prob = do
-  let
-    orientM                   = I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
-    (ret, encoding)           = SMT.runSolverSt orientM SMT.initialState
-    (apint,decoding,forceAny) = ret
-    aorder = PolyOrder
-      { kind_ = kind
-      , pint_ = apint }
+entscheide p prob = undefined 
+-- do
+--   -- return result
+--   (proof,result) <- SMT.smtSolveSt (SMT.smtSolveTctM prob) $ do
+--       (proof, encoding) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
+--       return $ 
+--         ( proof
+--         , SMT.decode encoding :: SMT.Environment Int (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F)))
+--   undefined
+--   -- let
+--   --   smt = do
+--   --     res :: SMT.Result (M.Map Coefficient (Maybe Int), M.Map Strict Int) <- SMT.smtSolveTctM prob $kkk
+--   --       (ret,encode) I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
 
-  entscheide1 p aorder encoding decoding forceAny prob
-  where
+--   --     <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+         
+  
+--   -- let
+--   --   orientM                   = I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
+--   --   res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
+--   --   res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
+--   --     <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+    
+    
+--   --   -- (ret, encoding)           = SMT.runSolverSt orientM SMT.initialState
+--   --   -- (apint,decoding,forceAny) = ret
+--   --   aorder = PolyOrder
+--   --     { kind_ = kind
+--   --     , pint_ = apint }
 
-    sig   = Prob.signature prob
-    kind  = case Prob.startTerms prob of
-      Prob.AllTerms{}                       -> PI.Unrestricted (shape p)
-      Prob.BasicTerms{Prob.constructors=cs} -> PI.ConstructorBased (shape p) $ if Arg.useRestrict (restrict p) then Sig.constructors sig else cs
+--   -- entscheide1 p aorder encoding decoding forceAny prob
+--   undefined
+--   where
 
-    absi  = I.Interpretation $ M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
-    shift = maybe I.All I.Shift (selector p)
+--     sig   = Prob.signature prob
+--     kind  = case Prob.startTerms prob of
+--       Prob.AllTerms{}                       -> PI.Unrestricted (shape p)
+--       Prob.BasicTerms{Prob.constructors=cs} -> PI.ConstructorBased (shape p) $ if Arg.useRestrict (restrict p) then Sig.constructors sig else cs
 
-entscheide1 ::
-  NaturalPI
-  -> PolyOrder c
-  -> SMT.SmtState Int
-  -> (I.Interpretation F (PI.SomePolynomial (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
-  -> I.ForceAny
-  -> Problem F V
-  -> T.TctM (T.Return NaturalPI)
-entscheide1 _ aorder encoding decoding forceAny prob
-  | Prob.isTrivial prob = T.abortWith (Applicable Incompatible :: ApplicationProof NaturalPIProof)
-  | otherwise           = do
-    res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
-      <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
-    case res of
-      SMT.Sat a -> T.succeedWith (Applicable $ Order order) (certification order) (I.newProblem prob (pint_ order))
+--     absi  = I.Interpretation $ M.mapWithKey (curry $ PI.mkInterpretation kind) (Sig.toMap sig)
+--     shift = maybe I.All I.Shift (selector p)
 
-        where
-          order = mkOrder a
+-- entscheide1 ::
+--   NaturalPI
+--   -> PolyOrder c
+--   -> SMT.SmtState Int
+--   -> (I.Interpretation F (PI.SomePolynomial (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
+--   -> I.ForceAny
+--   -> Problem F V
+--   -> T.TctM (T.Return NaturalPI)
+-- entscheide1 _ aorder encoding decoding forceAny prob
+--   | Prob.isTrivial prob = T.abortWith (Applicable Incompatible :: ApplicationProof NaturalPIProof)
+--   | otherwise           = do
+--     res :: SMT.Result (I.Interpretation F (PI.SomePolynomial Int), Maybe (UREnc.UsableSymbols F))
+--       <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+--     case res of
+--       SMT.Sat a -> T.succeedWith (Applicable $ Order order) (certification order) (I.newProblem prob (pint_ order))
 
-      SMT.Error s -> throwError (userError s)
-      _           -> T.abortWith (Applicable Incompatible :: ApplicationProof NaturalPIProof)
-      where
+--         where
+--           order = mkOrder a
 
-        assertx st e = st {SMT.asserts = e: SMT.asserts st}
-        srules = RS.toList $ Prob.strictComponents prob
+--       SMT.Error s -> throwError (userError s)
+--       _           -> T.abortWith (Applicable Incompatible :: ApplicationProof NaturalPIProof)
+--       where
 
-        mkOrder (inter, ufuns) = aorder { pint_ = mkInter (pint_ aorder) inter ufuns }
-        mkInter aproof inter ufuns = aproof
-          { I.inter_     = inter
-          , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
-          , I.strictDPs_ = sDPs
-          , I.strictTrs_ = sTrs
-          , I.weakDPs_   = wDPs
-          , I.weakTrs_   = wTrs }
-          where
+--         assertx st e = st {SMT.asserts = e: SMT.asserts st}
+--         srules = RS.toList $ Prob.strictComponents prob
 
-          (sDPs,wDPs) = L.partition isStrict (rs $ Prob.dpComponents prob)
-          (sTrs,wTrs) = L.partition isStrict (rs $ Prob.trsComponents prob)
-          isStrict (r,(lpoly,rpoly)) = r `RS.member` Prob.strictComponents prob && P.constantValue (lpoly `sub` rpoly) > 0
-          rs trs =
-            [ (r, (interpretf inter lhs, interpretf inter rhs))
-            | r@(R.Rule lhs rhs) <- RS.toList trs
-            , isUsable ufuns r ]
+--         mkOrder (inter, ufuns) = aorder { pint_ = mkInter (pint_ aorder) inter ufuns }
+--         mkInter aproof inter ufuns = aproof
+--           { I.inter_     = inter
+--           , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
+--           , I.strictDPs_ = sDPs
+--           , I.strictTrs_ = sTrs
+--           , I.weakDPs_   = wDPs
+--           , I.weakTrs_   = wTrs }
+--           where
 
-          isUsable Nothing _                = True
-          isUsable (Just fs) (R.Rule lhs _) = either (const False) (`S.member` UREnc.runUsableSymbols fs) (R.root lhs)
+--           (sDPs,wDPs) = L.partition isStrict (rs $ Prob.dpComponents prob)
+--           (sTrs,wTrs) = L.partition isStrict (rs $ Prob.trsComponents prob)
+--           isStrict (r,(lpoly,rpoly)) = r `RS.member` Prob.strictComponents prob && P.constantValue (lpoly `sub` rpoly) > 0
+--           rs trs =
+--             [ (r, (interpretf inter lhs, interpretf inter rhs))
+--             | r@(R.Rule lhs rhs) <- RS.toList trs
+--             , isUsable ufuns r ]
+
+--           isUsable Nothing _                = True
+--           isUsable (Just fs) (R.Rule lhs _) = either (const False) (`S.member` UREnc.runUsableSymbols fs) (R.root lhs)
 
 
 --- * instances ------------------------------------------------------------------------------------------------------

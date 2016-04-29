@@ -69,6 +69,9 @@ data InterpretationProof a b = InterpretationProof
   , weakTrs_   :: [(R.Rule F V, (b, b))]
   } deriving Show
 
+instance Monad m => SMT.Decode m (InterpretationProof a b) (InterpretationProof a b) where
+  decode = return
+
 -- MS: formally this is not so nice as in tct2; some extra work would be necessary
 -- on the other hand we now have an abstract orient function for interpretations
 -- see Tct.RS.Method.Poly.NaturalPI for an example
@@ -96,7 +99,7 @@ orient :: AbstractInterpretation i => i
   -> Shift
   -> Bool -- TODO: MS: Use Types
   -> Bool
-  -> SMT.SmtSolverSt Int (InterpretationProof a b , (Interpretation F (B i), Maybe (UREnc.UsableEncoder F Int)), ForceAny)
+  -> SMT.SmtSolverSt Int (InterpretationProof () (), Interpretation F (B i), Maybe (UREnc.UsableEncoder F Int))
 orient inter prob absi mselector useUP useUR = do
   SMT.setLogic SMT.QF_NIA
 
@@ -167,7 +170,7 @@ orient inter prob absi mselector useUP useUR = do
   SMT.assert usableRulesConstraints
   SMT.assert filteringConstraints
 
-  return (proof usablePositions, (ebsi, usenc), forceAny)
+  return (proof usablePositions, ebsi, usenc)
 
   where
     trs    = Prob.allComponents prob
