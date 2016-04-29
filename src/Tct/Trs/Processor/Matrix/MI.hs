@@ -263,7 +263,7 @@ instance I.AbstractInterpretation MI where
 
 --- * kind constraints -----------------------------------------------------------------------------------------------
 
--- | limit non-zero entries in the maximal matrix
+-- | sums up the diagonal entries of the coefficient and constraints the non-zero entries
 diagOnesConstraint :: Dim -> Int -> Interpretation f (LinearInterpretation v (IExpr w)) -> Formula w
 diagOnesConstraint dim deg inter = if deg < dim then Smt.num deg .>= sum nonZeros else Smt.top
   where
@@ -279,12 +279,28 @@ matrices :: Interpretation f (LinearInterpretation v k) -> [Matrix k]
 matrices (I.Interpretation m) = concatMap (M.elems . coefficients) $ M.elems m
 
 -- | the maximal matrix
-maxMatrix :: Num k => Dim -> Interpretation f (LinearInterpretation v k) -> Matrix k
-maxMatrix dim li = case matrices li of
+-- maximalMatrix :: (Ord k, Num k) => Dim -> Interpretation f (LinearInterpretation v k) -> Matrix k
+-- maximalMatrix dim li = case matrices li of
+--   []     -> Mat.fromList dim dim (repeat 0)
+--   (m:ms) -> foldr (Mat.elementwise max) m ms
+
+maxmimalNonIdMatrix :: (Ord k, Num k) => Dim -> Interpretation f (LinearInterpretation v k) -> Matrix k
+maxmimalNonIdMatrix dim li = case filter (/= idm) (matrices li) of
   []     -> Mat.fromList dim dim (repeat 0)
-  (m:ms) -> foldr (+) m ms
+  (m:ms) -> foldr (Mat.elementwise max) m ms
+  where idm = Mat.identity dim
+
+-- sumMatrix :: Num k => Dim -> Interpretation f (LinearInterpretation v k) -> Matrix k
+-- sumMatrix dim li = case matrices li of
+--   []     -> Mat.fromList dim dim (repeat 0)
+--   (m:ms) -> foldr (+) m ms
 
 -- TODO: MS: class Boolean, AbstrOrd, SemiRing...
+maxConstraintMatrix :: Dim -> Interpretation f (LinearInterpretation v (IExpr w)) -> Matrix (IExpr w)
+maxConstraintMatrix dim li = case matrices li of
+  [] -> Mat.fromList dim dim (repeat Smt.zero)
+  ms -> foldr1 (Mat.elementwise k) ms
+    where k c acc = Smt.ite (c .> acc) c acc
 
 triangularConstraint :: Matrix (IExpr v) -> Formula v
 triangularConstraint m = Smt.bigAnd
@@ -295,6 +311,12 @@ triangularConstraint m = Smt.bigAnd
       | i == j    = v .=< Smt.one
       | otherwise = Smt.top
 
+-- isLowerZeroConstraint :: Matrix (IExpr w) -> Formula w
+-- isLowerZeroConstraint m = Smt.bigAnd
+--   [ v .== Smt.zero | let dim = Mat.nrows m, i <- [1..dim], j <- [1..dim] , i > j, let v = Mat.unsafeGet i j m  ]
+
+almostTriangularConstraint :: Int -> Matrix (IExpr w) -> Formula w
+almostTriangularConstraint pot m = Smt.bigOr $ triangularConstraint `fmap` take (max 1 pot) (iterate (*m) m)
 
 -- | For a given maximal matrix finds a similar matrix in Jordan Normal Form. That is find P,J such that M = PJP-, J
 -- in JNF and PP- = I.
@@ -304,7 +326,7 @@ likeJordan m = do
   q <- someMatrix
   j <- someJordanMatrix
   let
-    f1 = (p*q) .==. eyed
+    f1 = (p*q) .==. idm
     f2 = m .==. (p*j*q)
   return $ f1 .&& f2
   where
@@ -315,21 +337,28 @@ likeJordan m = do
       | otherwise   = return Smt.zero
     someMatrix = sequenceA $ Mat.fromList dim dim (repeat Smt.nvarM')
     m1 .==. m2 = Smt.bigAnd $ zipWith (.==) (Mat.toList m1) (Mat.toList m2)
-    eyed = Mat.matrix dim dim $ \(i,j) -> if i == j then Smt.one else Smt.zero
+    idm = Mat.matrix dim dim $ \(i,j) -> if i == j then Smt.one else Smt.zero
     dim = Mat.nrows m
 
 
--- TODO: add dim here and check wether deg < dim
+-- TODO: return JNF und AT matrix here
 kindConstraints :: Smt.Fresh w => Ord f => StartTerms f -> Dim -> Kind -> Interpretation f (LinearInterpretation v (IExpr w)) -> Smt.SolverSt (Smt.SmtState w) (Formula w)
 kindConstraints st dim kind inter = case kind of
+  -- the triangular property is already implied by abstract interpretation
   Maximal Triangular (Ones (Just deg))             -> return $ diagOnesConstraint dim deg inter'
-  Maximal (AlmostTriangular pot) (Ones (Just deg)) -> return $ Smt.bigOr (triangularConstraint `fmap` take (max 1 pot) (iterate (*mm) mm)) .&& diagOnesConstraint' deg mm
-  Maximal (AlmostTriangular pot) _                 -> return $ Smt.bigOr (triangularConstraint `fmap` take (max 1 pot) (iterate (*mm) mm))
+
+  -- 
+  Maximal (AlmostTriangular pot) (Ones (Just deg))
+    | dim > 1                                      -> return $ almostTriangularConstraint pot mm .&& diagOnesConstraint' deg mm
+    | otherwise                                    -> return $ diagOnesConstraint' deg mm
+  Maximal (AlmostTriangular pot) _
+    | dim > 1                                      -> return $ almostTriangularConstraint pot mm
+    | otherwise                                    -> return $ Smt.top
   Maximal LikeJordan _                             -> likeJordan mm
   _                                                -> return $ Smt.top
   where
     inter' = restrictInterpretation st inter
-    mm     = maxMatrix dim inter'
+    mm     = maxConstraintMatrix dim inter'
 
 entscheide :: MI -> Trs -> T.TctM (T.Return MI)
 entscheide p@MI{miDimension=dim, miKind=kind} prob = do
@@ -517,7 +546,7 @@ upperbound st dim kind li = case kind of
   Unrestricted                        -> T.Exp (Just 1)
   where
     li' = restrictInterpretation st li
-    mm = maxMatrix dim li'
+    mm  = maxmimalNonIdMatrix dim li'
 
 dimArg :: T.Argument 'T.Required Int
 dimArg = T.nat "dimension" ["Specifies the dimension of the matrices used in the interpretation."]
