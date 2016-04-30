@@ -555,53 +555,53 @@ kindConstraints (MI.ConstructorEda cs mdeg) absmi = do
     filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
 
 
-
 entscheide :: NaturalMI -> Trs -> CD.TctM (CD.Return NaturalMI)
-entscheide p@NaturalMI{miDimension=dim, miKind=kind} prob = undefined -- do
-  -- res :: SMT.Result (I.InterpretationProof () (), I.Interpretation F (MI.LinearInterpretation MI.SomeIndeterminate Int), Maybe (UREnc.UsableSymbols F))
-  --   <- SMT.smtSolveSt (SMT.smtSolveTctM prob) $ do
-  --     encoding@(_,pint,_) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
-  --     SMT.assertM $ kindConstraints p pint
-  --     return $ SMT.decode encoding
-  -- case res of
-  --   SMT.Sat a -> let order = mkOrder a in
-  --     CD.succeedWith
-  --       (PC.Applicable $ PC.Order order)
-  --       (certification (Prob.startTerms prob) p order)
-  --       (I.newProblem prob (mint_ order))
+entscheide p@NaturalMI{miDimension=dim} prob = do
+  res :: SMT.Result (I.InterpretationProof () (), I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
+    <- SMT.smtSolveSt (SMT.smtSolveTctM prob) $ do
+      encoding@(_,pint,_) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
+      SMT.assertM $ kindConstraints kind pint
+      return $ SMT.decode encoding
+  case res of
+    SMT.Sat a -> let order = mkOrder a in
+      CD.succeedWith
+        (PC.Applicable $ PC.Order order)
+        (certification p order)
+        (I.newProblem prob (mint_ order))
 
-  --   SMT.Error s -> throwError (userError s)
-  --   _           -> CD.abortWith "Incompatible"
+    SMT.Error s -> throwError (userError s)
+    _           -> CD.abortWith "Incompatible"
 
-  -- where
+  where
 
-  --   absi =  I.Interpretation $ MI.abstractInterpretation (Prob.startTerms prob) (miKind p) (miDimension p) sig
-  --   sig   = Prob.signature prob
-  --   shift = maybe I.All I.Shift (selector p)
+    absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (miDimension p)) (Sig.toMap sig)
+    sig   = Prob.signature prob
+    shift = maybe I.All I.Shift (selector p)
+    kind = mxKind (miKind p) dim (miDegree p) (Prob.startTerms prob)
 
-  --   mkOrder (proof, inter, ufuns) = MatrixOrder
-  --     { kind_ = kind
-  --     , dim_  = dim
-  --     , mint_ = proof
-  --       { I.inter_     = inter
-  --       , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
-  --       , I.strictDPs_ = sDPs
-  --       , I.strictTrs_ = sTrs
-  --       , I.weakDPs_   = wDPs
-  --       , I.weakTrs_   = wTrs }}
-  --     where
+    mkOrder (proof, inter, ufuns) = MatrixOrder
+      { kind_ = kind
+      , dim_  = dim
+      , mint_ = proof
+        { I.inter_     = inter
+        , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
+        , I.strictDPs_ = sDPs
+        , I.strictTrs_ = sTrs
+        , I.weakDPs_   = wDPs
+        , I.weakTrs_   = wTrs }}
+      where
 
-  --         (sDPs,wDPs) = List.partition isStrict' (rs $ Prob.dpComponents prob)
-  --         (sTrs,wTrs) = List.partition isStrict' (rs $ Prob.trsComponents prob)
-  --         isStrict' (r,i) = r `RS.member` Prob.strictComponents prob && uncurry isStrict i
+          (sDPs,wDPs) = List.partition isStrict' (rs $ Prob.dpComponents prob)
+          (sTrs,wTrs) = List.partition isStrict' (rs $ Prob.trsComponents prob)
+          isStrict' (r,i) = r `RS.member` Prob.strictComponents prob && uncurry isStrict i
 
-  --         rs trs =
-  --           [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
-  --           | r@(RR.Rule lhs rhs) <- DF.toList trs
-  --           , isUsable ufuns r]
+          rs trs =
+            [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
+            | r@(RR.Rule lhs rhs) <- RS.toList trs
+            , isUsable ufuns r]
 
-  --         isUsable Nothing _ = True
-  --         isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
+          isUsable Nothing _ = True
+          isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
 
 
 
