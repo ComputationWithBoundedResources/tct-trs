@@ -34,7 +34,7 @@ Joint: M_1,...,M_n
 -}
 module Tct.Trs.Processor.Matrix.MI
   (
-  tmi,ami,jmi,umi
+  tmi,ami,jmi,umi,emi
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -189,9 +189,9 @@ absStdMatrix :: Dim -> Matrix AbsCoeff
 absStdMatrix dim = Mat.fromList dim dim (repeat Natural)
 
 -- | generate matrix where entries in the diagonal are restricted
--- absMaxMatrix :: Dim -> Matrix AbsCoeff
--- absMaxMatrix dim = Mat.matrix dim dim k
---   where k (i,j) = if i == j then ZeroOrOne else Natural
+absMaxMatrix :: Dim -> Matrix AbsCoeff
+absMaxMatrix dim = Mat.matrix dim dim k
+  where k (i,j) = if i == j then ZeroOrOne else Natural
 
 -- | generate triangular matrix
 absTriMatrix :: Dim -> Matrix AbsCoeff
@@ -210,7 +210,7 @@ absEdaMatrix dim = Mat.matrix dim dim k
 abstractInterpretation :: Ord f => StartTerms f -> Dim -> Kind -> Signature f -> M.Map f (LinearInterpretation ArgPos AbsCoeff)
 abstractInterpretation st dim kind sig = case kind of
   (Maximal Triangular _)           -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absTriMatrix) restricted
-  (Maximal (AlmostTriangular _) _) -> M.map (mk absStdMatrix) masse
+  (Maximal (AlmostTriangular _) _) -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absMaxMatrix) restricted
   Maximal LikeJordan _             -> M.map (mk absStdMatrix) masse
   Unrestricted                     -> M.map (mk absStdMatrix) masse
   Automaton                        -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absEdaMatrix) restricted
@@ -605,14 +605,16 @@ dimArg = T.nat "dimension" ["Specifies the dimension of the matrices used in the
 degArg :: T.Argument 'T.Required Int
 degArg = T.nat "degree" ["Specifies the maximal degree of the matrices used in the interpretation."]
 
-mis :: String -> (Maybe Int -> Kind) -> T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
-mis s k = T.strategy s (dimArg `T.optional` 1, T.some degArg `T.optional` Nothing) $ \dim degM ->
-  T.processor $ MI{miKind=k degM, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=Just (RS.selAnyOf RS.selStricts)}
+-- mis :: String -> (Maybe Int -> Kind) -> T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
+-- mis s k = T.strategy s (dimArg `T.optional` 1, T.some degArg `T.optional` Nothing) $ \dim degM ->
+--   T.processor $ MI{miKind=k degM, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=Just (RS.selAnyOf RS.selStricts)}
 
-tmi, ami, jmi, umi :: T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
-tmi = mis "tmi" $ Maximal Triangular . Ones
-ami = mis "ami" $ Maximal (AlmostTriangular 2) . Ones
-jmi = mis "jmi" $ Maximal LikeJordan . Ones
-umi = mis "umi" $ const Unrestricted
-emi = mis "emi" $ const Automaton
+mis dim kind sel = MI{miKind=kind, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=sel}
+
+-- tmi, ami, jmi, umi :: T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
+tmi dim deg = mis dim (Maximal Triangular          (Ones $ Just deg)) 
+ami dim deg = mis dim (Maximal (AlmostTriangular 2)(Ones $ Just deg))
+jmi dim deg = mis dim (Maximal LikeJordan Implicit)
+umi dim deg = mis dim Unrestricted
+emi dim deg = mis dim Automaton
 
