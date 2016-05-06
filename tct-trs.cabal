@@ -35,10 +35,12 @@ executable tct-trs
     containers         >= 0.5 && < 0.6,
     fgl                == 5.5.*,
     filepath           >= 1.3,
+    matrix             == 0.3.4.*,
     mtl                >= 2.1 && <= 2.3,
     base               == 4.*,
     process            >= 1.1,
     temporary          == 1.2.0.*,
+    vector             == 0.11.*,
 
     term-rewriting     == 0.*,
     term-rewriting-xml == 0.1.0.*,
@@ -114,6 +116,7 @@ library
     Tct.Trs.Processor.EpoStar
     Tct.Trs.Processor.InnermostRuleRemoval
     Tct.Trs.Processor.Matrix.NaturalMI
+    Tct.Trs.Processor.Matrix.MI
     Tct.Trs.Processor.Poly.NaturalPI
     Tct.Trs.Processors
     Tct.Trs.Processor.ToInnermost
@@ -131,10 +134,12 @@ library
     containers         >= 0.5 && < 0.6,
     fgl                == 5.5.*,
     filepath           >= 1.3,
+    matrix             == 0.3.4.*,
     mtl                >= 2.1 && <= 2.3,
     parsec             == 3.1.*,
     process            >= 1.1,
     temporary          == 1.2.0.*,
+    vector             == 0.11.*,
 
     term-rewriting     == 0.*,
     term-rewriting-xml == 0.1.0.*,

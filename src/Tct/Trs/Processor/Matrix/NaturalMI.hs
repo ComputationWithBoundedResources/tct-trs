@@ -63,7 +63,7 @@ import qualified Tct.Trs.Data                               as TD
 
 -- imports tct-common
 import qualified Tct.Common.ProofCombinators                as PC
-import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.=>), (.>), (.>=), (.&&))
+import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.=>), (.>), (.>=), (.&&), (.+))
 import qualified Tct.Common.SMT                             as SMT
 
 
@@ -337,14 +337,14 @@ dConstraints :: Int
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
 dConstraints dim rel done dtwo gtwo _ =
-  return $ foreapprox `SMT.band` forecompat `SMT.band` backapprox `SMT.band` backcompat `SMT.band` exactness
+  return $ foreapprox .&& forecompat .&& backapprox .&& backcompat .&& exactness
   where
     toD         = [1..dim]
     foreapprox  = SMT.bigAnd [ rel 1 x .=>  done x x x | x <- toD ]
-    forecompat  = SMT.bigAnd [ (done i x y `SMT.band` gtwo x y z u) .=> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    forecompat  = SMT.bigAnd [ (done i x y .&& gtwo x y z u) .=> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
     backapprox  = SMT.bigAnd [ rel 1 x .=> dtwo x x x | x <- toD ]
-    backcompat  = SMT.bigAnd [ (dtwo i x y `SMT.band` gtwo z u x y) .=> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
-    exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y `SMT.band` dtwo i x y) | i <- toD, x <- toD, y <- toD ]
+    backcompat  = SMT.bigAnd [ (dtwo i x y .&& gtwo z u x y) .=> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y .&& dtwo i x y) | i <- toD, x <- toD, y <- toD ]
 
 
 
@@ -354,12 +354,12 @@ hConstraints :: Int
              -> (Int -> Int -> SMT.Formula w)
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
-hConstraints dim deg jrel hrel _ = return $ unaryNotation `SMT.band` jDecrease
+hConstraints dim deg jrel hrel _ = return $ unaryNotation .&& jDecrease
   where
     toD = [1..dim]
     unaryNotation = SMT.bigAnd [ hrel x h .=> hrel x (h - 1) | x <- toD, h <- [2..deg - 1] ]
     jDecrease = SMT.bigAnd [ f i j | i <- toD, j <- toD ]
-    f i j = jrel i j .=> SMT.bigOr (map (\ h -> hrel i h `SMT.band` SMT.bnot (hrel j h)) [1..deg - 1])
+    f i j = jrel i j .=> SMT.bigOr (map (\ h -> hrel i h .&& SMT.bnot (hrel j h)) [1..deg - 1])
 
 
 iConstraints :: Int
@@ -382,7 +382,7 @@ jConstraints dim rel irel jrel _ =
   return $ SMT.bigAnd [ f i j | i <- toD, j <- toD ]
   where
     toD = [1..dim]
-    f i j = jrel i j .<=> SMT.bigOr (map (\ k -> irel i k `SMT.band` rel k j) toD)
+    f i j = jrel i j .<=> SMT.bigOr (map (\ k -> irel i k .&& rel k j) toD)
 
 
 rConstraints :: Int
@@ -390,13 +390,13 @@ rConstraints :: Int
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
 rConstraints dim rel mi =
-  return $ reflexivity `SMT.band` transitivity `SMT.band` compatibility `SMT.band` nocycle
+  return $ reflexivity .&& transitivity .&& compatibility .&& nocycle
   where
     toD = [1..dim]
     reflexivity   = SMT.bigAnd $ map (\ x -> rel x x) toD
-    transitivity  = SMT.bigAnd [ (rel x y `SMT.band` rel y z) .=> rel x z | x <- toD, y <- toD, z <- toD ]
+    transitivity  = SMT.bigAnd [ (rel x y .&& rel y z) .=> rel x z | x <- toD, y <- toD, z <- toD ]
     compatibility = SMT.bigAnd [ ggeqConstraint mi x y .=> rel x y | x <- toD, y <- toD ]
-    nocycle       = SMT.bigAnd [ (rel 1 y `SMT.band` ggrtConstraint mi x y) .=> SMT.bnot (rel y x) | x <- toD, y <- toD ]
+    nocycle       = SMT.bigAnd [ (rel 1 y .&& ggrtConstraint mi x y) .=> SMT.bnot (rel y x) | x <- toD, y <- toD ]
 
 rcConstraints :: Int
               -> (Int -> Int -> SMT.Formula w)
@@ -413,11 +413,11 @@ tConstraints :: Int
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
 tConstraints dim rel trel gthree _ =
-  return $ initial `SMT.band` gThreeStep
+  return $ initial .&& gThreeStep
   where
     toD = [1..dim]
-    initial = SMT.bigAnd [ if x == y then SMT.top else (rel 1 x `SMT.band` rel 1 y) .=> trel x x y | x <- toD, y <- toD ]
-    gThreeStep = SMT.bigAnd [ (trel x y z `SMT.band` gthree x y z u v w) .=> trel u v w | x <- toD, y <- toD, z <- toD, u <- toD, v <- toD, w <- toD ]
+    initial = SMT.bigAnd [ if x == y then SMT.top else (rel 1 x .&& rel 1 y) .=> trel x x y | x <- toD, y <- toD ]
+    gThreeStep = SMT.bigAnd [ (trel x y z .&& gthree x y z u v w) .=> trel u v w | x <- toD, y <- toD, z <- toD, u <- toD, v <- toD, w <- toD ]
 
 
 gThreeConstraints :: Int
@@ -429,7 +429,7 @@ gThreeConstraints dim gthree mi = return $
   where
     toD       = [1..dim]
     f i j k x y z = (gthree i j k x y z) .<=> SMT.bigOr (map (SMT.bigOr . map (g i j k x y z) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
-    g i j k x y z m = (EncM.mEntry i x m .>= one) `SMT.band` (EncM.mEntry j y m .>= one) `SMT.band` (EncM.mEntry k z m .>= one)
+    g i j k x y z m = (EncM.mEntry i x m .>= one) .&& (EncM.mEntry j y m .>= one) .&& (EncM.mEntry k z m .>= one)
 
 
 gtwoConstraints :: Int
@@ -441,7 +441,7 @@ gtwoConstraints dim gtwo mi =
   where
     toD = [1..dim]
     f i j k l   = (gtwo i j k l) .<=> SMT.bigOr (map (SMT.bigOr . map (g i j k l) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
-    g i j k l m = (EncM.mEntry i k m .>= one) `SMT.band` (EncM.mEntry j l m .>= one)
+    g i j k l m = (EncM.mEntry i k m .>= one) .&& (EncM.mEntry j l m .>= one)
 
 
 ggeqConstraint :: I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w)) -> Int -> Int
@@ -771,7 +771,7 @@ instance I.AbstractInterpretation NaturalMI where
   addConstant _ (MI.LInter coeffs vec) smtexpr =
     MI.LInter coeffs vec'
     where
-      vec' = EncM.adjustVector (SMT.add smtexpr) 1 vec
+      vec' = EncM.adjustVector (smtexpr .+) 1 vec
 
   {- | compares two concrete linear interpretations with the 'greater or equal' relation -}
   -- gte :: NaturalMI -> C NaturalMI -> C NaturalMI -> SMT.Expr
