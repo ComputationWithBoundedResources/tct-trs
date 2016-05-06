@@ -609,12 +609,12 @@ degArg = T.nat "degree" ["Specifies the maximal degree of the matrices used in t
 -- mis s k = T.strategy s (dimArg `T.optional` 1, T.some degArg `T.optional` Nothing) $ \dim degM ->
 --   T.processor $ MI{miKind=k degM, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=Just (RS.selAnyOf RS.selStricts)}
 
-mis dim kind sel = MI{miKind=kind, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=sel}
+mis sel dim kind = MI{miKind=kind, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=sel}
 
 -- tmi, ami, jmi, umi :: T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
-tmi dim deg = mis dim (Maximal Triangular          (Ones $ Just deg)) 
-ami dim deg = mis dim (Maximal (AlmostTriangular 2)(Ones $ Just deg))
-jmi dim deg = mis dim (Maximal LikeJordan Implicit)
-umi dim deg = mis dim Unrestricted
-emi dim deg = mis dim Automaton
+tmi sel dim deg = mis sel dim (Maximal Triangular          (Ones $ Just deg)) 
+ami sel dim deg = mis sel dim (Maximal (AlmostTriangular 2)(Ones $ Just deg))
+jmi sel dim deg = mis sel dim (Maximal LikeJordan Implicit)
+umi sel dim deg = mis sel dim Unrestricted
+emi sel dim deg = mis sel dim Automaton
 
