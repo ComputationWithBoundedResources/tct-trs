@@ -317,9 +317,9 @@ entscheide p@MI{miDimension=dim, miKind=kind} prob = do
 -- | sums up the diagonal entries of the coefficients and constraints number of the non-zero entries
 diagNonZerosConstraint :: Dim -> Int -> Interpretation f (LinearInterpretation v IExpr) -> SmtM ()
 diagNonZerosConstraint dim deg inter = Smt.assert $
-  if dim >= deg
-    then Smt.top
-    else Smt.num deg .>= Smt.bigAdd nonZeros 
+  if deg < dim
+    then Smt.num deg .>= Smt.bigAdd nonZeros 
+    else Smt.top
   where
     nonZeros  = fmap (signum' . Smt.bigAdd) . Mat.getDiagonal . Mat.fold (Mat.zeros dim dim) $ matrices inter
     signum' a = Smt.ite (a .> Smt.zero) Smt.one Smt.zero
@@ -343,7 +343,7 @@ maximalMatrixM dim li = do
   Smt.assert $ Smt.bigAnd (Mat.elementwise (.==) mx1 mx2)
   return mx1
 
-triangularConstraint :: Matrix IExpr -> Formula
+triangularConstraint :: (Smt.SSemiRing a, Smt.Order a, Smt.Boolean (Smt.B a)) => Matrix a -> Smt.B a
 triangularConstraint m = Smt.bigAnd
   [ k i j v  | let dim = Mat.nrows m, i <- [1..dim], j <- [1..dim] , i >= j, let v = Mat.entry i j m  ]
   where
@@ -351,10 +351,6 @@ triangularConstraint m = Smt.bigAnd
       | i > j     = v .== Smt.zero
       | i == j    = v .<= Smt.one
       | otherwise = Smt.top
-
--- isLowerZeroConstraint :: Matrix (IExpr w) -> Formula w
--- isLowerZeroConstraint m = Smt.bigAnd
---   [ v .== Smt.zero | let dim = Mat.nrows m, i <- [1..dim], j <- [1..dim] , i > j, let v = Mat.unsafeGet i j m  ]
 
 almostTriangularConstraint :: Int -> Matrix IExpr -> SmtM ()
 almostTriangularConstraint pot m = Smt.assert $ Smt.bany triangularConstraint $ take (max 1 pot) (iterate (.*m) m)
@@ -588,13 +584,14 @@ countNonZeros = sum . fmap signum . F.toList . Mat.getDiagonal
 
 upperbound :: StartTerms F -> Dim -> Kind -> I.Interpretation F (LinearInterpretation ArgPos Int) -> T.Complexity
 upperbound st dim kind li = case kind of
-  Maximal Triangular Implicit         -> T.Poly (Just dim)
-  Maximal Triangular (Ones _)         -> T.Poly (Just $ countNonZeros mm)
-  Maximal AlmostTriangular{} Implicit -> T.Poly (Just dim)
-  Maximal AlmostTriangular{} (Ones _) -> T.Poly (Just $ countNonZeros mm)
-  Maximal LikeJordan _                -> T.Poly (Just dim)
-  Unrestricted                        -> T.Exp  (Just 1)
-  Automaton                           -> T.Poly (Just dim)
+  Maximal Triangular Implicit                -> T.Poly (Just dim)
+  Maximal Triangular (Ones _)                -> T.Poly (Just $ countNonZeros mm)
+  Maximal AlmostTriangular{} Implicit        -> T.Poly (Just dim)
+  Maximal AlmostTriangular{} (Ones Nothing)  -> T.Poly (Just dim) -- FIXME: compute max matrix...
+  Maximal AlmostTriangular{} (Ones (Just d)) -> T.Poly (Just $ d) -- FIXME: compute max matrix...
+  Maximal LikeJordan _                       -> T.Poly (Just dim) -- FIXME: copute largest jordan block
+  Unrestricted                               -> T.Exp  (Just 1)
+  Automaton                                  -> T.Poly (Just dim)
   where
     li' = restrictInterpretation st li
     mm  = maxmimalNonIdMatrix dim li'
