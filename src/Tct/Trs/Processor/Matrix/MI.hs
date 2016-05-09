@@ -325,8 +325,8 @@ diagNonZerosConstraint dim deg inter = Smt.assert $
     signum' a = Smt.ite (a .> Smt.zero) Smt.one Smt.zero
 
 -- | restricts the trace of a matrix; if the matrix is triangular it restricts the number of the one entries
-traceConstraint :: Int -> Matrix IExpr -> SmtM ()
-traceConstraint deg m =  Smt.assert $ Smt.num deg .>= Smt.bigAdd (Mat.getDiagonal m)
+traceConstraint :: Int -> Matrix IExpr -> Formula
+traceConstraint deg m =  Smt.num deg .>= Smt.bigAdd (Mat.getDiagonal m)
 
 -- maximalMatrix :: (Smt.AAdditive a, Smt.Order a, Smt.Ite a, Smt.Boolean (Smt.B a)) => Int -> Interpretation f (LinearInterpretation v a) -> Matrix a
 maximalMatrix :: Int -> Interpretation f (LinearInterpretation v IExpr) -> Matrix IExpr
@@ -354,6 +354,9 @@ triangularConstraint m = Smt.bigAnd
 
 almostTriangularConstraint :: Int -> Matrix IExpr -> SmtM ()
 almostTriangularConstraint pot m = Smt.assert $ Smt.bany triangularConstraint $ take (max 1 pot) (iterate (.*m) m)
+
+almostTriangularConstraint' :: Int -> Int -> Matrix IExpr -> SmtM ()
+almostTriangularConstraint' pot deg m = Smt.assert $ Smt.bany (\mx -> triangularConstraint mx .&& traceConstraint deg mx) $ take (max 1 pot) (iterate (.*m) m)
 
 -- | For a given maximal matrix finds a similar matrix in Jordan Normal Form. That is find P,J such that M = PJP-, J
 -- in JNF and PP- = I.
@@ -385,8 +388,8 @@ kindConstraints st dim kind inter = case kind of
 
   --
   Maximal (AlmostTriangular pot) (Ones (Just deg))
-    | dim > 1                                      -> mm >>= \mx -> almostTriangularConstraint pot mx >> traceConstraint deg mx
-    | otherwise                                    -> traceConstraint deg =<< mm
+    | dim > 1                                      -> almostTriangularConstraint' pot deg =<< mm
+    | otherwise                                    -> diagNonZerosConstraint dim deg inter'
   Maximal (AlmostTriangular pot) _
     | dim > 1                                      -> almostTriangularConstraint pot =<< mm
     | otherwise                                    -> return ()
