@@ -34,7 +34,7 @@ Joint: M_1,...,M_n
 -}
 module Tct.Trs.Processor.Matrix.MI
   (
-  tmi,ami,jmi,umi,emi
+  rmi,tmi,ami,jmi,umi,emi
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -44,7 +44,7 @@ import qualified Data.Map                        as M
 import qualified Data.Set                        as S
 import qualified Data.Vector                     as V
 
-import           SLogic.Smt                      ((.&&), (.+), (.*), (.<=>), (.<=), (.==), (.=>), (.>), (.>=))
+import           SLogic.Smt                      ((.&&), (.||), (.+), (.*), (.<=>), (.<=), (.==), (.=>), (.>), (.>=))
 import qualified SLogic.Smt                      as Smt
 import           SLogic.Logic.Matrix             (Matrix)
 import qualified SLogic.Logic.Matrix             as Mat
@@ -74,7 +74,6 @@ import           Tct.Trs.Encoding.Interpretation (Interpretation)
 import qualified Tct.Trs.Encoding.Interpretation as I
 import qualified Tct.Trs.Encoding.UsableRules    as UREnc
 
-
 data MI = MI
   { miKind      :: Kind
   , miDimension :: Int
@@ -94,6 +93,7 @@ data Kind
 data MaximalShape
   = Triangular           -- ^ restrict to triangular maximal matrices
   | AlmostTriangular Int -- ^ restrict to almost triangular maximal matrices, ie if mat^k is triangular for some k
+  | NearlyTriangular
   | LikeJordan           -- ^ restrict to maximal matrices which are similar to JNF
   deriving (Show)
 
@@ -211,6 +211,7 @@ abstractInterpretation :: Ord f => StartTerms f -> Dim -> Kind -> Signature f ->
 abstractInterpretation st dim kind sig = case kind of
   (Maximal Triangular _)           -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absTriMatrix) restricted
   (Maximal (AlmostTriangular _) _) -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absMaxMatrix) restricted
+  (Maximal NearlyTriangular _)     -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absMaxMatrix) restricted
   Maximal LikeJordan _             -> M.map (mk absStdMatrix) masse
   Unrestricted                     -> M.map (mk absStdMatrix) masse
   Automaton                        -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absEdaMatrix) restricted
@@ -266,13 +267,13 @@ instance I.AbstractInterpretation MI where
 
 entscheide :: MI -> Trs -> T.TctM (T.Return MI)
 entscheide p@MI{miDimension=dim, miKind=kind} prob = do
-  res :: Smt.Result (I.InterpretationProof () (), I.Interpretation F (LinearInterpretation ArgPos Int), Maybe (UREnc.UsableSymbols F))
+  res :: Smt.Result ((I.InterpretationProof () (), I.Interpretation F (LinearInterpretation ArgPos Int), Maybe (UREnc.UsableSymbols F)), MProof Int)
     <- Smt.smtSolveSt (Smt.smtSolveTctM prob) $ do
       encoding@(_,pint,_) <- I.orient p prob absi shift (miUArgs p == Arg.UArgs) (miURules p == Arg.URules)
-      kindConstraints (Prob.startTerms prob) dim kind pint
-      return $ Smt.decode encoding
+      mp <- kindConstraints (Prob.startTerms prob) dim kind pint
+      return $ Smt.decode (encoding, mp)
   case res of
-    Smt.Sat a -> let order = mkOrder a in
+    Smt.Sat (a,_) -> let order = mkOrder a in
       T.succeedWith
         (Applicable $ Order order)
         (certification (Prob.startTerms prob) p order)
@@ -360,14 +361,14 @@ almostTriangularConstraint' pot deg m = Smt.assert $ Smt.bany (\mx -> triangular
 
 -- | For a given maximal matrix finds a similar matrix in Jordan Normal Form. That is find P,J such that M = PJP-, J
 -- in JNF and PP- = I.
-likeJordan :: Matrix IExpr -> SmtM ()
+likeJordan :: Matrix IExpr -> SmtM (MProof IExpr)
 likeJordan m = do
   p <- someMatrix
   q <- someMatrix
   j <- someJordanMatrix
-  Smt.assert $ (p.*q) .==. idm
-  Smt.assert $ m .==. (p.*j.*q)
-  return ()
+  Smt.assert $ (p.*q)    .==. idm
+  Smt.assert $ (p.*m.*q) .==. j
+  return $ Jordan (p,q,j,m)
   where
     someJordanMatrix = sequenceA $ Mat.matrix dim dim k
     k (i,j)
@@ -380,22 +381,37 @@ likeJordan m = do
     dim = Mat.nrows m
 
 
+data MProof a = Jordan (Matrix a, Matrix a, Matrix a, Matrix a) | Max (Matrix a) | NoM
+  deriving (Show, Functor, Foldable, Traversable)
+
+instance (Smt.Decode m c a) => Smt.Decode m (MProof c) (MProof a) where
+  decode = traverse Smt.decode
+
+nearlyTriangularConstraint :: Dim -> Interpretation f (LinearInterpretation v IExpr) -> SmtM ()
+nearlyTriangularConstraint dim mi = Smt.assert $
+  Smt.bigAnd [ mij | let m = mtwo mxm, i <- [1..dim], j <- [1..dim], i > j, let mij = m Mat.!. (i,j) ]
+  where
+    mtwo mx = Mat.matrix dim dim $ \(i,j) -> Smt.bigAnd [ isZero (mx Mat.!. (i,k)) .|| isZero (mx Mat.!. (k,j)) | k <- [1..dim] ]
+    isZero = Smt.ball (.== Smt.zero)
+    mxm = Mat.fold (Mat.zeros dim dim) $ matrices mi
+
 -- TODO: return JNF und AT matrix here
-kindConstraints :: Ord f => StartTerms f -> Dim -> Kind -> Interpretation f (LinearInterpretation v IExpr) -> SmtM ()
+kindConstraints :: Ord f => StartTerms f -> Dim -> Kind -> Interpretation f (LinearInterpretation v IExpr) -> SmtM (MProof IExpr)
 kindConstraints st dim kind inter = case kind of
   -- the triangular property is already implied by abstract interpretation
-  Maximal Triangular (Ones (Just deg))             -> diagNonZerosConstraint dim deg inter'
+  Maximal Triangular (Ones (Just deg))             -> diagNonZerosConstraint dim deg inter' >> return NoM
 
   --
   Maximal (AlmostTriangular pot) (Ones (Just deg))
-    | dim > 1                                      -> almostTriangularConstraint' pot deg =<< mm
-    | otherwise                                    -> diagNonZerosConstraint dim deg inter'
+    | dim > 1                                      -> mm >>= almostTriangularConstraint' pot deg >> return NoM
+    | otherwise                                    -> diagNonZerosConstraint dim deg inter' >> return NoM
   Maximal (AlmostTriangular pot) _
-    | dim > 1                                      -> almostTriangularConstraint pot =<< mm
-    | otherwise                                    -> return ()
-  Maximal LikeJordan _                             -> likeJordan =<< mm
-  Automaton                                        -> automatonConstraints st dim inter
-  _                                                -> return ()
+    | dim > 1                                      -> mm >>= almostTriangularConstraint pot >> return NoM
+    | otherwise                                    -> return NoM
+  Maximal NearlyTriangular _                       -> nearlyTriangularConstraint dim inter' >> return NoM
+  Maximal LikeJordan _                             -> mm >>= likeJordan
+  Automaton                                        -> automatonConstraints st dim inter >> return NoM
+  _                                                -> return NoM
   where
     inter' = restrictInterpretation st inter
     mm     = maximalMatrixM dim inter'
@@ -592,6 +608,7 @@ upperbound st dim kind li = case kind of
   Maximal AlmostTriangular{} Implicit        -> T.Poly (Just dim)
   Maximal AlmostTriangular{} (Ones Nothing)  -> T.Poly (Just dim) -- FIXME: compute max matrix...
   Maximal AlmostTriangular{} (Ones (Just d)) -> T.Poly (Just $ d) -- FIXME: compute max matrix...
+  Maximal NearlyTriangular _                 -> T.Poly (Just dim) -- FIXME: better bound
   Maximal LikeJordan _                       -> T.Poly (Just dim) -- FIXME: copute largest jordan block
   Unrestricted                               -> T.Exp  (Just 1)
   Automaton                                  -> T.Poly (Just dim)
@@ -612,6 +629,7 @@ degArg = T.nat "degree" ["Specifies the maximal degree of the matrices used in t
 mis sel dim kind = MI{miKind=kind, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=sel}
 
 -- tmi, ami, jmi, umi :: T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
+rmi sel dim deg = T.processor $ mis sel dim (Maximal Triangular          (Ones Nothing))
 tmi sel dim deg = T.processor $ mis sel dim (Maximal Triangular          (Ones $ Just deg)) 
 ami sel dim deg = T.processor $ mis sel dim (Maximal (AlmostTriangular 2)(Ones $ Just deg))
 jmi sel dim deg = T.processor $ mis sel dim (Maximal LikeJordan Implicit)
