@@ -1,50 +1,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{- Matrix Interpretations
-
-Overview:
-
-We differentiate how the actual bound is obtained:
-
-Max: M = max (M1,..,Mn)
-  for RC M1,...,Mn restricts to constructor start terms
-
-  Shape is used to restrict the shape of M1,...,Mn and thus the shape of M:
-    Triangular: lower diagonal entries are zero; diagonal entries at most one; upper diagonal entries are unrestricted
-    AlmostTriangular: requires that M^n is Triangular for some n
-  -- MS: some information obtained from tests
-  -- due to the monotonicity constraint this seems not to work for DC and dim 2;
-  -- use even potences only; there can be alternating matrices
-  -- in practice considering potences 2 (maybe 4) should be enough
-    Unrestricted: no restriction
-
-  Bound:
-    Implicit: if M is Triangular then O(d); otherwise Exp
-    Triangular: if M is Triangular then count (non Id) non-zero entries; otherwise Exp
-    Algebraic: multiplicity of eigenvalues of (minimal) characteristic polynomial
-    Automaton: ?
-
-Joint: M_1,...,M_n
-  for RC M1,...,Mn restricts to constructor start terms
-
-  Shape:
-    EDA: upper Triangular; all entries are either 0 or 1
-  Bound:
-    EDA:
-    not IDA:
--}
 module Tct.Trs.Processor.Matrix.MI
   (
-  rmi,tmi,ami,jmi,umi,emi
+  upperTriangular
+  , lowerTriangular
+  , almostTriangular
+  , likeJordan
+  , maxAutomaton
+  , automaton
+  , unrestricted
   ) where
 
 import qualified Data.Foldable                   as F (toList)
 import qualified Data.Ix                         as Ix
-import qualified Data.List                       as L (partition)
+import qualified Data.List                       as L (partition, transpose)
 import qualified Data.Map                        as M
 import qualified Data.Set                        as S
 import qualified Data.Vector                     as V
 
-import           SLogic.Smt                      ((.&&), (.||), (.+), (.*), (.<=>), (.<=), (.==), (.=>), (.>), (.>=))
+import           SLogic.Smt                      ((.&&), (.+), (.*), (.<=>), (.<=), (.==), (.=>), (.>), (.>=))
 import qualified SLogic.Smt                      as Smt
 import           SLogic.Logic.Matrix             (Matrix)
 import qualified SLogic.Logic.Matrix             as Mat
@@ -68,7 +41,6 @@ import qualified Tct.Trs.Data.Arguments          as Arg
 import qualified Tct.Trs.Data.Problem            as Prob
 import           Tct.Trs.Data.ProblemKind        (StartTerms (..))
 import qualified Tct.Trs.Data.Rules              as RS
-import qualified Tct.Trs.Data.RuleSelector       as RS
 import qualified Tct.Trs.Data.Signature          as Sig
 import           Tct.Trs.Encoding.Interpretation (Interpretation)
 import qualified Tct.Trs.Encoding.Interpretation as I
@@ -84,30 +56,23 @@ data MI = MI
 
 -- |
 data Kind
-  = Maximal MaximalShape MaximalBound -- ^ use maximal matrices
-  | Automaton                         -- ^ use automaton
-  | Unrestricted                      -- ^ no restriction
+  = MaximalMatrix MaximalMatrix -- ^ use maximal matrices
+  | Automaton                   -- ^ use automaton
+  | Unrestricted                -- ^ no restriction
   deriving (Show)
 
 -- | shape restrictions for maximum matrix
-data MaximalShape
-  = Triangular           -- ^ restrict to triangular maximal matrices
+data MaximalMatrix
+  = UpperTriangular TriangularBound          -- ^ restrict to triangular maximal matrices
+  | LowerTriangular TriangularBound          -- ^ restrict to triangular maximal matrices
   | AlmostTriangular Int -- ^ restrict to almost triangular maximal matrices, ie if mat^k is triangular for some k
-  | NearlyTriangular
   | LikeJordan           -- ^ restrict to maximal matrices which are similar to JNF
+  | MaxAutomaton
   deriving (Show)
 
--- | bound computation for maxim matrix; depends on shape
---  
---                  | Implicit | Ones Nothing           | Ones (Just deg)
--- Triangular       | dim      | count ones in diagonal | restrict ones in diagonal
--- AlmostTriangular | dim      | count ones in diagonal | restrict ones in diagonal
--- LikeJordan       | dim      | biggest jordan block   | restrict biggest jordan blcok
-data MaximalBound
+data TriangularBound
   = Implicit
-  | Ones (Maybe Int)
-  -- | Algebraic
-  -- | Automaton
+  | Multiplicity (Maybe Int)
   deriving (Show)
 
 
@@ -121,7 +86,7 @@ type Dim = Int
 
 -- | Canonical variable for the (abstract) interpretation.
 newtype ArgPos = ArgPos Int deriving (Eq, Ord, Show, Enum)
-instance PP.Pretty ArgPos where pretty (ArgPos i) = PP.int i
+instance PP.Pretty ArgPos where pretty (ArgPos i) = PP.text "x_" PP.<> PP.int i
 
 -- | Linear Interpretation where coefficents are (square) matrices of the same dimension and the constant a column vector.
 data LinearInterpretation v c = LInter
@@ -190,38 +155,45 @@ absStdMatrix dim = Mat.fromList dim dim (repeat Natural)
 
 -- | generate matrix where entries in the diagonal are restricted
 absMaxMatrix :: Dim -> Matrix AbsCoeff
-absMaxMatrix dim = Mat.matrix dim dim k
-  where k (i,j) = if i == j then ZeroOrOne else Natural
+absMaxMatrix = absEdaMatrix
 
 -- | generate triangular matrix
-absTriMatrix :: Dim -> Matrix AbsCoeff
-absTriMatrix dim =  Mat.matrix dim dim k where
+absUTriMatrix, absLTriMatrix :: Dim -> Matrix AbsCoeff
+absUTriMatrix dim =  Mat.matrix dim dim k where
   k (i,j)
     | i > j     = Zero
+    | i == j    = ZeroOrOne
+    | otherwise = Natural
+absLTriMatrix dim =  Mat.matrix dim dim k where
+  k (i,j)
+    | i < j     = Zero
     | i == j    = ZeroOrOne
     | otherwise = Natural
 
 absEdaMatrix :: Dim -> Matrix AbsCoeff
 absEdaMatrix dim = Mat.matrix dim dim k
-  where k (i,j) = if i > j then Zero else ZeroOrOne
+  where k (i,j) = if i == j then ZeroOrOne else Natural
 
 
 -- | Generates an abstract interpretation for a given signature.
 abstractInterpretation :: Ord f => StartTerms f -> Dim -> Kind -> Signature f -> M.Map f (LinearInterpretation ArgPos AbsCoeff)
 abstractInterpretation st dim kind sig = case kind of
-  (Maximal Triangular _)           -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absTriMatrix) restricted
-  (Maximal (AlmostTriangular _) _) -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absMaxMatrix) restricted
-  (Maximal NearlyTriangular _)     -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absMaxMatrix) restricted
-  Maximal LikeJordan _             -> M.map (mk absStdMatrix) masse
-  Unrestricted                     -> M.map (mk absStdMatrix) masse
-  Automaton                        -> M.map (mk absStdMatrix) unrestricted `M.union` M.map (mk absEdaMatrix) restricted
+  MaximalMatrix (UpperTriangular _)  -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absUTriMatrix) restricted
+  MaximalMatrix (LowerTriangular _)  -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absLTriMatrix) restricted
+  MaximalMatrix (AlmostTriangular _) -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absMaxMatrix) restricted
+  MaximalMatrix LikeJordan           -> M.map (mk absStdMatrix) masse
+  MaximalMatrix MaxAutomaton         -> M.map (mk absEdaMatrix) masse
+
+  Unrestricted                       -> M.map (mk absStdMatrix) masse
+  Automaton                          -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absEdaMatrix) restricted
+
   where
     mk mat ar = LInter
       { coefficients = M.fromAscList $ (\i -> (ArgPos i, mat dim))`fmap` [1..ar]
       , constant     = absVector dim }
 
     masse                     = Sig.toMap sig
-    (restricted,unrestricted) = M.partitionWithKey (\f _ -> isRestricted f) masse
+    (restricted,notrestricted) = M.partitionWithKey (\f _ -> isRestricted f) masse
       where isRestricted f = case st of { AllTerms{} -> True; BasicTerms{constructors=cs} -> f `S.member` cs }
 
 type Formula = Smt.Formula Int
@@ -267,13 +239,13 @@ instance I.AbstractInterpretation MI where
 
 entscheide :: MI -> Trs -> T.TctM (T.Return MI)
 entscheide p@MI{miDimension=dim, miKind=kind} prob = do
-  res :: Smt.Result ((I.InterpretationProof () (), I.Interpretation F (LinearInterpretation ArgPos Int), Maybe (UREnc.UsableSymbols F)), MProof Int)
+  res :: Smt.Result ((I.InterpretationProof () (), I.Interpretation F (LinearInterpretation ArgPos Int), Maybe (UREnc.UsableSymbols F)), KindMatrices Int)
     <- Smt.smtSolveSt (Smt.smtSolveTctM prob) $ do
       encoding@(_,pint,_) <- I.orient p prob absi shift (miUArgs p == Arg.UArgs) (miURules p == Arg.URules)
       mp <- kindConstraints (Prob.startTerms prob) dim kind pint
       return $ Smt.decode (encoding, mp)
   case res of
-    Smt.Sat (a,_) -> let order = mkOrder a in
+    Smt.Sat (a,kmxs) -> let order = mkOrder a kmxs in
       T.succeedWith
         (Applicable $ Order order)
         (certification (Prob.startTerms prob) p order)
@@ -288,10 +260,11 @@ entscheide p@MI{miDimension=dim, miKind=kind} prob = do
     sig   = Prob.signature prob
     shift = maybe I.All I.Shift (miSelector p)
 
-    mkOrder (proof, inter, ufuns) = MatrixOrder
-      { kind_ = kind
-      , dim_  = dim
-      , mint_ = proof
+    mkOrder (proof, inter, ufuns) kmxs = MatrixOrder
+      { kind_         = kind
+      , kindMatrices_ = kmxs
+      , dim_          = dim
+      , mint_         = proof
         { I.inter_     = inter
         , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
         , I.strictDPs_ = sDPs
@@ -326,8 +299,8 @@ diagNonZerosConstraint dim deg inter = Smt.assert $
     signum' a = Smt.ite (a .> Smt.zero) Smt.one Smt.zero
 
 -- | restricts the trace of a matrix; if the matrix is triangular it restricts the number of the one entries
-traceConstraint :: Int -> Matrix IExpr -> Formula
-traceConstraint deg m =  Smt.num deg .>= Smt.bigAdd (Mat.getDiagonal m)
+-- traceConstraint :: Int -> Matrix IExpr -> Formula
+-- traceConstraint deg m =  Smt.num deg .>= Smt.bigAdd (Mat.getDiagonal m)
 
 -- maximalMatrix :: (Smt.AAdditive a, Smt.Order a, Smt.Ite a, Smt.Boolean (Smt.B a)) => Int -> Interpretation f (LinearInterpretation v a) -> Matrix a
 maximalMatrix :: Int -> Interpretation f (LinearInterpretation v IExpr) -> Matrix IExpr
@@ -353,65 +326,71 @@ triangularConstraint m = Smt.bigAnd
       | i == j    = v .<= Smt.one
       | otherwise = Smt.top
 
-almostTriangularConstraint :: Int -> Matrix IExpr -> SmtM ()
-almostTriangularConstraint pot m = Smt.assert $ Smt.bany triangularConstraint $ take (max 1 pot) (iterate (.*m) m)
+almostTriangularConstraint :: Int -> Matrix IExpr -> SmtM (KindMatrices IExpr)
+almostTriangularConstraint pot m = Smt.assert (Smt.bany triangularConstraint mxs) >> return (AlmostTriangularMatrices mxs)
+  where mxs = take (max 1 pot) (iterate (.*m) m)
 
-almostTriangularConstraint' :: Int -> Int -> Matrix IExpr -> SmtM ()
-almostTriangularConstraint' pot deg m = Smt.assert $ Smt.bany (\mx -> triangularConstraint mx .&& traceConstraint deg mx) $ take (max 1 pot) (iterate (.*m) m)
+-- almostTriangularConstraint' :: Int -> Int -> Matrix IExpr -> SmtM ()
+-- almostTriangularConstraint' pot deg m = Smt.assert $ Smt.bany (\mx -> triangularConstraint mx .&& traceConstraint deg mx) $ take (max 1 pot) (iterate (.*m) m)
 
 -- | For a given maximal matrix finds a similar matrix in Jordan Normal Form. That is find P,J such that M = PJP-, J
 -- in JNF and PP- = I.
-likeJordan :: Matrix IExpr -> SmtM (MProof IExpr)
-likeJordan m = do
+likeJordanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+likeJordanConstraint m = do
   p <- someMatrix
   q <- someMatrix
   j <- someJordanMatrix
   Smt.assert $ (p.*q)    .==. idm
   Smt.assert $ (p.*m.*q) .==. j
-  return $ Jordan (p,q,j,m)
+  return $ LikeJordanMatrices (p,m,q,j)
   where
-    someJordanMatrix = sequenceA $ Mat.matrix dim dim k
-    k (i,j)
-      | i == j      = Smt.snvarM'
-      | succ i == j = Smt.snvarM'
-      | otherwise   = return Smt.zero
+    someJordanMatrix  = someJordanMatrixM >>= \mx -> Smt.assert (Smt.bigAnd [ block (mx Mat.!.) i | i <- [1..pred dim] ]) >> return mx
+      where 
+        block mx i = let j = succ i in mx (i,j) .== Smt.one .=> mx (i,i) .== mx (j,j)
+        someJordanMatrixM = sequenceA $ Mat.matrix dim dim k
+        k (i,j)
+          | i == j      = Smt.snvarM'
+          | succ i == j = Smt.snvarM'
+          | otherwise   = return Smt.zero
     someMatrix = sequenceA $ Mat.fromList dim dim (repeat Smt.ivarM')
     m1 .==. m2 = Smt.bigAnd $ Mat.elementwise (.==) m1 m2
     idm = Mat.matrix dim dim $ \(i,j) -> if i == j then Smt.one else Smt.zero
     dim = Mat.nrows m
 
 
-data MProof a = Jordan (Matrix a, Matrix a, Matrix a, Matrix a) | Max (Matrix a) | NoM
+-- | Kind related matrices for proof output.
+data KindMatrices a = 
+  NoMatrix
+  | MMatrix (Matrix a)
+  | AlmostTriangularMatrices [Matrix a]
+  | LikeJordanMatrices (Matrix a, Matrix a, Matrix a, Matrix a)
   deriving (Show, Functor, Foldable, Traversable)
 
-instance (Smt.Decode m c a) => Smt.Decode m (MProof c) (MProof a) where
+instance (Smt.Decode m c a) => Smt.Decode m (KindMatrices c) (KindMatrices a) where
   decode = traverse Smt.decode
 
-nearlyTriangularConstraint :: Dim -> Interpretation f (LinearInterpretation v IExpr) -> SmtM ()
-nearlyTriangularConstraint dim mi = Smt.assert $
-  Smt.bigAnd [ mij | let m = mtwo mxm, i <- [1..dim], j <- [1..dim], i > j, let mij = m Mat.!. (i,j) ]
-  where
-    mtwo mx = Mat.matrix dim dim $ \(i,j) -> Smt.bigAnd [ isZero (mx Mat.!. (i,k)) .|| isZero (mx Mat.!. (k,j)) | k <- [1..dim] ]
-    isZero = Smt.ball (.== Smt.zero)
-    mxm = Mat.fold (Mat.zeros dim dim) $ matrices mi
+-- nearlyTriangularConstraint :: Dim -> Interpretation f (LinearInterpretation v IExpr) -> SmtM ()
+-- nearlyTriangularConstraint dim mi = Smt.assert $
+--   Smt.bigAnd [ mij | let m = mtwo mxm, i <- [1..dim], j <- [1..dim], i > j, let mij = m Mat.!. (i,j) ]
+--   where
+--     mtwo mx = Mat.matrix dim dim $ \(i,j) -> Smt.bigAnd [ isZero (mx Mat.!. (i,k)) .|| isZero (mx Mat.!. (k,j)) | k <- [1..dim] ]
+--     isZero = Smt.ball (.== Smt.zero)
+--     mxm = Mat.fold (Mat.zeros dim dim) $ matrices mi
 
 -- TODO: return JNF und AT matrix here
-kindConstraints :: Ord f => StartTerms f -> Dim -> Kind -> Interpretation f (LinearInterpretation v IExpr) -> SmtM (MProof IExpr)
+kindConstraints :: Ord f => StartTerms f -> Dim -> Kind -> Interpretation f (LinearInterpretation v IExpr) -> SmtM (KindMatrices IExpr)
 kindConstraints st dim kind inter = case kind of
-  -- the triangular property is already implied by abstract interpretation
-  Maximal Triangular (Ones (Just deg))             -> diagNonZerosConstraint dim deg inter' >> return NoM
+  MaximalMatrix (UpperTriangular (Multiplicity (Just deg))) -> diagNonZerosConstraint dim deg inter' >> return NoMatrix
+  MaximalMatrix (LowerTriangular (Multiplicity (Just deg))) -> diagNonZerosConstraint dim deg inter' >> return NoMatrix
+  MaximalMatrix (UpperTriangular _)                         -> return NoMatrix
+  MaximalMatrix (LowerTriangular _)                         -> return NoMatrix
+  
+  MaximalMatrix (AlmostTriangular pot)                      -> mm >>= almostTriangularConstraint pot
+  MaximalMatrix LikeJordan                                  -> mm >>= likeJordanConstraint
+  MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim [mx] >> return (MMatrix mx) -- TODO: provide special instances
 
-  --
-  Maximal (AlmostTriangular pot) (Ones (Just deg))
-    | dim > 1                                      -> mm >>= almostTriangularConstraint' pot deg >> return NoM
-    | otherwise                                    -> diagNonZerosConstraint dim deg inter' >> return NoM
-  Maximal (AlmostTriangular pot) _
-    | dim > 1                                      -> mm >>= almostTriangularConstraint pot >> return NoM
-    | otherwise                                    -> return NoM
-  Maximal NearlyTriangular _                       -> nearlyTriangularConstraint dim inter' >> return NoM
-  Maximal LikeJordan _                             -> mm >>= likeJordan
-  Automaton                                        -> automatonConstraints st dim inter >> return NoM
-  _                                                -> return NoM
+  Automaton                                                 -> automatonConstraints st dim (matrices inter') >> return NoMatrix
+  Unrestricted                                              -> return NoMatrix
   where
     inter' = restrictInterpretation st inter
     mm     = maximalMatrixM dim inter'
@@ -422,67 +401,77 @@ kindConstraints st dim kind inter = case kind of
 type Q    = Int
 type GOne = Q -> Q -> Formula
 type GTwo = Q -> Q -> Q -> Q -> Formula
-type DOne = Q -> Q -> Q -> Formula
-type DTwo = Q -> Q -> Q -> Formula
+type DOne = Q -> Q -> Formula
+type DTwo = Q -> Q -> Formula
 
-ggeq :: Interpretation f (LinearInterpretation v IExpr) -> Int -> Int -> Formula
-ggeq mi i j = Smt.bany k (matrices mi)
+ggeq :: [Matrix IExpr] -> Int -> Int -> Formula
+ggeq mxs i j = Smt.bany k mxs 
   where k m = Mat.entry i j m .>= Smt.one
 
-ggrt :: Interpretation f (LinearInterpretation v IExpr) -> Int -> Int -> Formula
-ggrt mi i j = Smt.bany k (matrices mi)
+ggrt :: [Matrix IExpr] -> Int -> Int -> Formula
+ggrt mxs i j = Smt.bany k mxs
   where k m = Mat.entry i j m .> Smt.one
 
-gOneConstraints :: [Q] -> Interpretation f (LinearInterpretation v IExpr) -> GOne -> SmtM ()
-gOneConstraints qs mi gOne = reflexivity >> transitivity >> compatibility >> nocycle where
+gOneConstraints :: [Q] -> [Matrix IExpr] -> GOne -> SmtM ()
+gOneConstraints qs mxs gOne = reflexivity >> transitivity >> compatibility >> nocycle where
   reflexivity   = Smt.assert $ Smt.bigAnd [ gOne x x | x <- qs ]
   transitivity  = Smt.assert $ Smt.bigAnd [ gOne x y .&& gOne y z .=> gOne x z | x <- qs, y <- qs, z <- qs ]
-  compatibility = Smt.assert $ Smt.bigAnd [ ggeq mi x y .=> gOne x y | x <- qs, y <- qs ]
-  nocycle       = Smt.assert $ Smt.bigAnd [ gOne 1 y .&& ggrt mi x y .=> Smt.bnot (gOne y x) | x <- qs, y <- qs ]
+  compatibility = Smt.assert $ Smt.bigAnd [ ggeq mxs x y .=> gOne x y | x <- qs, y <- qs ]
+  nocycle       = Smt.assert $ Smt.bigAnd [ gOne 1 y .&& ggrt mxs x y .=> Smt.bnot (gOne y x) | x <- qs, y <- qs ]
 
-gTwoConstraints :: [Q] -> Interpretation f (LinearInterpretation v IExpr) -> GTwo -> SmtM ()
-gTwoConstraints qs mi gtwo = Smt.assert $ Smt.bigAnd [ f i j k l | i <- qs, j <- qs, k <- qs, l <- qs ] where
-  mxs         = matrices mi
+gTwoConstraints :: [Q] -> [Matrix IExpr] -> GTwo -> SmtM ()
+gTwoConstraints qs mxs gtwo = Smt.assert $ Smt.bigAnd [ f i j k l | i <- qs, j <- qs, k <- qs, l <- qs ] where
   f i j k l   = gtwo i j k l .<=> Smt.bany (g i j k l) mxs
   g i j k l m = (Mat.entry i k m .>= Smt.one) .&& (Mat.entry j l m .>= Smt.one)
 
 dConstraints :: [Q] -> GOne -> GTwo -> DOne -> DTwo -> SmtM ()
 dConstraints qs gOne gTwo dOne dTwo = foreapprox >> forecompat >> backapprox >> backcompat >> exactness where
-  foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x x | x <- qs ]
-  forecompat  = Smt.assert $ Smt.bigAnd [ (dOne i x y .&& gTwo x y z u) .=> dOne i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
-  backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dTwo x x x | x <- qs ]
-  backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo i x y .&& gTwo z u x y) .=> dTwo i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
-  exactness   = Smt.assert $ Smt.bigAnd [ if x == y then Smt.top else Smt.bnot (dOne i x y) .&& dTwo i x y | i <- qs, x <- qs, y <- qs ]
+  foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x | x <- qs ]
+  forecompat  = Smt.assert $ Smt.bigAnd [ (dOne x y .&& gTwo x y z u) .=> dOne z u | x <- qs, y <- qs, z <- qs, u <- qs ]
+  backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dTwo x x | x <- qs ]
+  backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo x y .&& gTwo z u x y) .=> dTwo z u | x <- qs, y <- qs, z <- qs, u <- qs ]
+  exactness   = Smt.assert $ Smt.bigAnd [ if x == y then Smt.top else Smt.bnot (dOne x y) .&& dTwo x y | x <- qs, y <- qs ]
+  -- foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x x | x <- qs ]
+  -- forecompat  = Smt.assert $ Smt.bigAnd [ (dOne i x y .&& gTwo x y z u) .=> dOne i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
+  -- backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dTwo x x x | x <- qs ]
+  -- backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo i x y .&& gTwo z u x y) .=> dTwo i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
+  -- exactness   = Smt.assert $ Smt.bigAnd [ if x == y then Smt.top else Smt.bnot (dOne i x y) .&& dTwo i x y | i <- qs, x <- qs, y <- qs ]
 
-automatonConstraints :: Ord f => StartTerms f -> Dim -> Interpretation f (LinearInterpretation v IExpr) -> SmtM ()
-automatonConstraints st dim mi = do
+automatonConstraints :: Ord f => StartTerms f -> Dim -> [Matrix IExpr] -> SmtM ()
+automatonConstraints st dim mxs = do
   gOneV <- V.replicateM (dim*dim) Smt.bvarM'
   gTwoV <- V.replicateM (dim*dim*dim*dim) Smt.bvarM'
-  dOneV <- V.replicateM (dim*dim*dim) Smt.bvarM'
-  dTwoV <- V.replicateM (dim*dim*dim) Smt.bvarM'
+  dOneV <- V.replicateM (dim*dim) Smt.bvarM'
+  dTwoV <- V.replicateM (dim*dim) Smt.bvarM'
   let
     gOne i j     = gOneV V.! ix2 (i,j)
     gTwo i j k l = gTwoV V.! ix4 (i,j,k,l)
-    dOne i j k   = dOneV V.! ix3 (i,j,k)
-    dTwo i j k   = dTwoV V.! ix3 (i,j,k)
-  edaConstraints qs mi' gOne gTwo dOne dTwo
+    dOne i j     = dOneV V.! ix2 (i,j)
+    dTwo i j     = dTwoV V.! ix2 (i,j)
+  case st of 
+    BasicTerms{} -> rcConstraints qs mxs gOne
+    _            -> return ()
+  edaConstraints qs mxs gOne gTwo dOne dTwo
   where
     qs = [1..dim]
-    mi' = restrictInterpretation st mi
     ix2 = Ix.index ((1,1),(dim,dim))
-    ix3 = Ix.index ((1,1,1),(dim,dim,dim))
     ix4 = Ix.index ((1,1,1,1),(dim,dim,dim,dim))
 
-edaConstraints :: [Q] -> Interpretation f (LinearInterpretation v IExpr) -> GOne -> GTwo -> DOne -> DTwo -> SmtM ()
-edaConstraints qs mi gOne gTwo dOne dTwo = gOneConstraints qs mi gOne >> gTwoConstraints qs mi gTwo >> dConstraints qs gOne gTwo dOne dTwo
+
+rcConstraints :: [Q] -> [Matrix IExpr] -> GOne -> SmtM ()
+rcConstraints qs mxs gOne = Smt.assert $ Smt.bigAnd [ ggeq mxs 1 x .=> gOne 1 x | x <- qs ]
+
+edaConstraints :: [Q] -> [Matrix IExpr] -> GOne -> GTwo -> DOne -> DTwo -> SmtM ()
+edaConstraints qs mxs gOne gTwo dOne dTwo = gOneConstraints qs mxs gOne >> gTwoConstraints qs mxs gTwo >> dConstraints qs gOne gTwo dOne dTwo
 
 
 --- * processors -----------------------------------------------------------------------------------------------------
 
 data MatrixOrder c = MatrixOrder
-  { kind_ :: Kind
-  , dim_  :: Dim
-  , mint_ :: I.InterpretationProof (LinearInterpretation ArgPos c) (LinearInterpretation V c)
+  { kind_         :: Kind
+  , kindMatrices_ :: KindMatrices c
+  , dim_          :: Dim
+  , mint_         :: I.InterpretationProof (LinearInterpretation ArgPos c) (LinearInterpretation V c)
   } deriving (Show)
 
 type NaturalMIProof = OrientationProof (MatrixOrder Int)
@@ -501,7 +490,10 @@ instance PP.Pretty Kind where
   pretty = PP.text . show
 
 instance Show a => PP.Pretty (Matrix a) where
-  pretty = PP.text . show
+  pretty = PP.hcat . fmap PP.text . lines . Mat.prettyMatrix
+
+ppMatrices :: Show a => [Matrix a] -> PP.Doc
+ppMatrices = PP.vcat . fmap PP.hcat . L.transpose . fmap (fmap (PP.text . (' ':)) . lines . Mat.prettyMatrix)
 
 instance (Eq a, Show a, PP.Pretty a, PP.Pretty var, Num a) => PP.Pretty (LinearInterpretation var a) where
   pretty = pprintLInter "" 0 PP.pretty
@@ -569,10 +561,17 @@ instance Xml.Xml (LinearInterpretation ArgPos Int) where
       xvar (ArgPos i) = xpol $ Xml.elt "variable" [Xml.int i]
   toCeTA = Xml.toXml
 
+instance PP.Pretty (KindMatrices Int) where
+  pretty NoMatrix                       = PP.empty
+  pretty (MMatrix m)                    = ppMatrices [m]
+  pretty (AlmostTriangularMatrices mxs) = ppMatrices mxs
+  pretty (LikeJordanMatrices (p,m,q,j)) = ppMatrices [p,m,q,j]
+
 instance PP.Pretty (MatrixOrder Int) where
   pretty order = PP.vcat
     [ PP.text "We apply a matrix interpretation of kind " PP.<> PP.pretty (kind_ order) PP.<> PP.char ':'
-    , PP.pretty $ PP.pretty (mint_ order) ]
+    , PP.pretty (kindMatrices_ order)
+    , PP.pretty (mint_ order) ]
 
 instance Xml.Xml (MatrixOrder Int) where
   toXml order =
@@ -603,36 +602,41 @@ countNonZeros = sum . fmap signum . F.toList . Mat.getDiagonal
 
 upperbound :: StartTerms F -> Dim -> Kind -> I.Interpretation F (LinearInterpretation ArgPos Int) -> T.Complexity
 upperbound st dim kind li = case kind of
-  Maximal Triangular Implicit                -> T.Poly (Just dim)
-  Maximal Triangular (Ones _)                -> T.Poly (Just $ countNonZeros mm)
-  Maximal AlmostTriangular{} Implicit        -> T.Poly (Just dim)
-  Maximal AlmostTriangular{} (Ones Nothing)  -> T.Poly (Just dim) -- FIXME: compute max matrix...
-  Maximal AlmostTriangular{} (Ones (Just d)) -> T.Poly (Just $ d) -- FIXME: compute max matrix...
-  Maximal NearlyTriangular _                 -> T.Poly (Just dim) -- FIXME: better bound
-  Maximal LikeJordan _                       -> T.Poly (Just dim) -- FIXME: copute largest jordan block
-  Unrestricted                               -> T.Exp  (Just 1)
-  Automaton                                  -> T.Poly (Just dim)
+  MaximalMatrix (UpperTriangular Implicit)       -> T.Poly (Just dim)
+  MaximalMatrix (UpperTriangular Multiplicity{}) -> T.Poly (Just $ countNonZeros mm)
+  MaximalMatrix (LowerTriangular Implicit)       -> T.Poly (Just dim)
+  MaximalMatrix (LowerTriangular Multiplicity{}) -> T.Poly (Just $ countNonZeros mm)
+  MaximalMatrix AlmostTriangular{}               -> T.Poly (Just dim) -- TODO: improve bound - take minimal multiplicty wrt. given triangular matrix
+  MaximalMatrix LikeJordan                       -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
+  MaximalMatrix MaxAutomaton                     -> T.Poly (Just dim)
+
+  Automaton                                      -> T.Poly (Just dim)
+  Unrestricted                                   -> T.Exp  (Just 1)
   where
     li' = restrictInterpretation st li
     mm  = maxmimalNonIdMatrix dim li'
 
-dimArg :: T.Argument 'T.Required Int
-dimArg = T.nat "dimension" ["Specifies the dimension of the matrices used in the interpretation."]
+-- dimArg :: T.Argument 'T.Required Int
+-- dimArg = T.nat "dimension" ["Specifies the dimension of the matrices used in the interpretation."]
 
-degArg :: T.Argument 'T.Required Int
-degArg = T.nat "degree" ["Specifies the maximal degree of the matrices used in the interpretation."]
+-- degArg :: T.Argument 'T.Required Int
+-- degArg = T.nat "degree" ["Specifies the maximal degree of the matrices used in the interpretation."]
 
 -- mis :: String -> (Maybe Int -> Kind) -> T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
 -- mis s k = T.strategy s (dimArg `T.optional` 1, T.some degArg `T.optional` Nothing) $ \dim degM ->
 --   T.processor $ MI{miKind=k degM, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=Just (RS.selAnyOf RS.selStricts)}
 
+mis :: Maybe (ExpressionSelector F V) -> Int -> Kind -> MI
 mis sel dim kind = MI{miKind=kind, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=sel}
 
--- tmi, ami, jmi, umi :: T.Declaration ('[T.Argument 'T.Optional Int, T.Argument 'T.Optional (Maybe Int)] T.:-> T.Strategy Trs Trs)
-rmi sel dim deg = T.processor $ mis sel dim (Maximal Triangular          (Ones Nothing))
-tmi sel dim deg = T.processor $ mis sel dim (Maximal Triangular          (Ones $ Just deg)) 
-ami sel dim deg = T.processor $ mis sel dim (Maximal (AlmostTriangular 2)(Ones $ Just deg))
-jmi sel dim deg = T.processor $ mis sel dim (Maximal LikeJordan Implicit)
-umi sel dim deg = T.processor $ mis sel dim Unrestricted
-emi sel dim deg = T.processor $ mis sel dim Automaton
+upperTriangular, lowerTriangular :: Maybe (ExpressionSelector F V) -> Int -> Int -> T.Strategy Trs Trs
+upperTriangular sel dim deg  = T.processor . mis sel dim . MaximalMatrix . UpperTriangular . Multiplicity $ if deg < dim then (Just deg) else Nothing
+lowerTriangular sel dim deg  = T.processor . mis sel dim . MaximalMatrix . LowerTriangular . Multiplicity $ if deg < dim then (Just deg) else Nothing
+
+almostTriangular, likeJordan, maxAutomaton, automaton, unrestricted :: Maybe (ExpressionSelector F V) -> Int -> T.Strategy Trs Trs
+almostTriangular sel dim  = T.processor . mis sel dim . MaximalMatrix $ (AlmostTriangular 2)
+likeJordan sel dim        = T.processor . mis sel dim . MaximalMatrix $ LikeJordan
+maxAutomaton sel dim      = T.processor . mis sel dim . MaximalMatrix $ MaxAutomaton
+automaton sel dim         = T.processor . mis sel dim $ Automaton
+unrestricted sel dim      = T.processor . mis sel dim $ Unrestricted
 
