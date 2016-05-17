@@ -387,9 +387,9 @@ kindConstraints st dim kind inter = case kind of
   
   MaximalMatrix (AlmostTriangular pot)                      -> mm >>= almostTriangularConstraint pot
   MaximalMatrix LikeJordan                                  -> mm >>= likeJordanConstraint
-  MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim [mx] >> return (MMatrix mx) -- TODO: provide special instances
+  MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
 
-  Automaton                                                 -> automatonConstraints st dim (matrices inter') >> return NoMatrix
+  Automaton                                                 -> automatonConstraints st dim inter Nothing >> return NoMatrix
   Unrestricted                                              -> return NoMatrix
   where
     inter' = restrictInterpretation st inter
@@ -437,8 +437,8 @@ dConstraints qs gOne gTwo dOne dTwo = foreapprox >> forecompat >> backapprox >> 
   -- backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo i x y .&& gTwo z u x y) .=> dTwo i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
   -- exactness   = Smt.assert $ Smt.bigAnd [ if x == y then Smt.top else Smt.bnot (dOne i x y) .&& dTwo i x y | i <- qs, x <- qs, y <- qs ]
 
-automatonConstraints :: Ord f => StartTerms f -> Dim -> [Matrix IExpr] -> SmtM ()
-automatonConstraints st dim mxs = do
+automatonConstraints :: Ord f => StartTerms f -> Dim -> Interpretation f (LinearInterpretation v IExpr) -> Maybe (Matrix IExpr) -> SmtM ()
+automatonConstraints st dim mi@(I.Interpretation m) mM = do
   gOneV <- V.replicateM (dim*dim) Smt.bvarM'
   gTwoV <- V.replicateM (dim*dim*dim*dim) Smt.bvarM'
   dOneV <- V.replicateM (dim*dim) Smt.bvarM'
@@ -448,16 +448,24 @@ automatonConstraints st dim mxs = do
     gTwo i j k l = gTwoV V.! ix4 (i,j,k,l)
     dOne i j     = dOneV V.! ix2 (i,j)
     dTwo i j     = dTwoV V.! ix2 (i,j)
-  case st of 
-    BasicTerms{} -> rcConstraints qs mxs gOne
-    _            -> return ()
-  edaConstraints qs mxs gOne gTwo dOne dTwo
+  mi' <- case st of 
+    BasicTerms{defineds=ds, constructors=cs} -> rcConstraints qs (matrices mids) gOne >> return mics
+      where (mids, mics) = (I.Interpretation $ M.filterWithKey (restrict ds) m, I.Interpretation $ M.filterWithKey (restrict cs) m)
+    _            -> return mi
+  case mM of
+    Just mx -> edaConstraints qs [mx] gOne gTwo dOne dTwo
+    Nothing -> edaConstraints qs (matrices mi') gOne gTwo dOne dTwo
   where
+
+    restrict fs f _ = f `S.member` fs
+
     qs = [1..dim]
     ix2 = Ix.index ((1,1),(dim,dim))
     ix4 = Ix.index ((1,1,1,1),(dim,dim,dim,dim))
 
 
+-- G(S)    - max (weighted) adjacency Matrix 
+-- G^2(S)  - (i,i') -> (j,j') if Ai,j and Ai',j' are positive
 rcConstraints :: [Q] -> [Matrix IExpr] -> GOne -> SmtM ()
 rcConstraints qs mxs gOne = Smt.assert $ Smt.bigAnd [ ggeq mxs 1 x .=> gOne 1 x | x <- qs ]
 
