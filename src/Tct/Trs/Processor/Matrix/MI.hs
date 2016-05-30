@@ -17,10 +17,10 @@ import qualified Data.Map                        as M
 import qualified Data.Set                        as S
 import qualified Data.Vector                     as V
 
-import           SLogic.Smt                      ((.&&), (.+), (.*), (.<=>), (.<=), (.==), (.=>), (.>), (.>=))
-import qualified SLogic.Smt                      as Smt
 import           SLogic.Logic.Matrix             (Matrix)
 import qualified SLogic.Logic.Matrix             as Mat
+import           SLogic.Smt                      ((.&&), (.*), (.+), (.<=), (.<=>), (.==), (.=>), (.>), (.>=))
+import qualified SLogic.Smt                      as Smt
 
 import           Tct.Core.Common.Error           (throwError)
 import qualified Tct.Core.Common.Pretty          as PP
@@ -57,7 +57,7 @@ data MI = MI
 -- |
 data Kind
   = MaximalMatrix MaximalMatrix -- ^ use maximal matrices
-  | Automaton                   -- ^ use automaton
+  | Automaton (Maybe Int)       -- ^ use automaton
   | Unrestricted                -- ^ no restriction
   deriving (Show)
 
@@ -84,6 +84,8 @@ type Vector c = Matrix c
 -- | A type synonym for the dimension of a (square) Matrix.
 type Dim = Int
 
+type Deg = Int
+
 -- | Canonical variable for the (abstract) interpretation.
 newtype ArgPos = ArgPos Int deriving (Eq, Ord, Show, Enum)
 instance PP.Pretty ArgPos where pretty (ArgPos i) = PP.text "x_" PP.<> PP.int i
@@ -101,7 +103,7 @@ instance (Smt.Decode m c a) => Smt.Decode m (LinearInterpretation var c) (Linear
 liProduct :: Smt.SSemiRing c => Matrix c -> LinearInterpretation v c -> LinearInterpretation v c
 liProduct m li = LInter
   { coefficients = M.map (m .*) (coefficients li)
-  , constant     = m .* (constant li) }
+  , constant     = m .* constant li }
 
 -- | Adds up the coefficients and the constants (+ given Vector) of a linear interpretation.
 liBigAdd :: (Smt.AAdditive c, Ord v) => Vector c -> [LinearInterpretation v c] -> LinearInterpretation v c
@@ -127,7 +129,7 @@ maxmimalNonIdMatrix dim mi =
   if mmx == zem && elem idm mxs
     then Mat.setEntry 1 (1,1) zem
     else mmx
-  where 
+  where
     mxs = matrices mi
     mmx = foldr (Mat.elementwise max) zem $ filter (/= idm) (matrices mi)
     idm = Mat.eye dim
@@ -185,7 +187,7 @@ abstractInterpretation st dim kind sig = case kind of
   MaximalMatrix MaxAutomaton         -> M.map (mk absEdaMatrix) masse
 
   Unrestricted                       -> M.map (mk absStdMatrix) masse
-  Automaton                          -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absEdaMatrix) restricted
+  Automaton _                        -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absEdaMatrix) restricted
 
   where
     mk mat ar = LInter
@@ -210,7 +212,7 @@ encode' = traverse k where
 
 setMonotone' :: LinearInterpretation ArgPos IExpr ->  [Int] -> Formula
 setMonotone' LInter{coefficients=cs} poss = Smt.bigAnd $ k `fmap` poss
-  where k i = let m = cs M.! (ArgPos i) in m Mat.!. (1,1) .> Smt.zero
+  where k i = let m = cs M.! ArgPos i in m Mat.!. (1,1) .> Smt.zero
 
 setInFilter' :: LinearInterpretation ArgPos IExpr -> (Int -> Formula) -> Formula
 setInFilter' LInter{coefficients=cs} inFilter = Smt.bigAnd (M.mapWithKey k cs)
@@ -251,7 +253,8 @@ entscheide p@MI{miDimension=dim, miKind=kind} prob = do
         (certification (Prob.startTerms prob) p order)
         (I.newProblem prob (mint_ order))
 
-    Smt.Error s -> throwError (userError $ "Tct.Trs.Processor.Matrix.MI.entscheide: " ++ s)
+    Smt.Error s -> error ("Tct.Trs.Processor.Matrix.MI.entscheide: " ++ s) -- throwError (userError $ "Tct.Trs.Processor.Matrix.MI.entscheide: " ++ s)
+    Smt.Unsat   -> error "Tct.Trs.Processor.Matrix.MI.entscheide: unsat"
     _           -> T.abortWith "Incompatible"
 
   where
@@ -292,7 +295,7 @@ entscheide p@MI{miDimension=dim, miKind=kind} prob = do
 diagNonZerosConstraint :: Dim -> Int -> Interpretation f (LinearInterpretation v IExpr) -> SmtM ()
 diagNonZerosConstraint dim deg inter = Smt.assert $
   if deg < dim
-    then Smt.num deg .>= Smt.bigAdd nonZeros 
+    then Smt.num deg .>= Smt.bigAdd nonZeros
     else Smt.top
   where
     nonZeros  = fmap (signum' . Smt.bigAdd) . Mat.getDiagonal . Mat.fold (Mat.zeros dim dim) $ matrices inter
@@ -345,7 +348,7 @@ likeJordanConstraint m = do
   return $ LikeJordanMatrices (p,m,q,j)
   where
     someJordanMatrix  = someJordanMatrixM >>= \mx -> Smt.assert (Smt.bigAnd [ block (mx Mat.!.) i | i <- [1..pred dim] ]) >> return mx
-      where 
+      where
         block mx i = let j = succ i in mx (i,j) .== Smt.one .=> mx (i,i) .== mx (j,j)
         someJordanMatrixM = sequenceA $ Mat.matrix dim dim k
         k (i,j)
@@ -359,7 +362,7 @@ likeJordanConstraint m = do
 
 
 -- | Kind related matrices for proof output.
-data KindMatrices a = 
+data KindMatrices a =
   NoMatrix
   | MMatrix (Matrix a)
   | AlmostTriangularMatrices [Matrix a]
@@ -384,12 +387,12 @@ kindConstraints st dim kind inter = case kind of
   MaximalMatrix (LowerTriangular (Multiplicity (Just deg))) -> diagNonZerosConstraint dim deg inter' >> return NoMatrix
   MaximalMatrix (UpperTriangular _)                         -> return NoMatrix
   MaximalMatrix (LowerTriangular _)                         -> return NoMatrix
-  
+
   MaximalMatrix (AlmostTriangular pot)                      -> mm >>= almostTriangularConstraint pot
   MaximalMatrix LikeJordan                                  -> mm >>= likeJordanConstraint
-  MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
+  MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim Nothing inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
 
-  Automaton                                                 -> automatonConstraints st dim inter Nothing >> return NoMatrix
+  Automaton mDeg                                            -> automatonConstraints st dim mDeg inter Nothing >> return NoMatrix
   Unrestricted                                              -> return NoMatrix
   where
     inter' = restrictInterpretation st inter
@@ -401,12 +404,12 @@ kindConstraints st dim kind inter = case kind of
 type Q    = Int
 type GOne = Q -> Q -> Formula
 type GTwo = Q -> Q -> Q -> Q -> Formula
-type DOne = Q -> Q -> Formula
-type DTwo = Q -> Q -> Formula
+type DOne = Q -> Q -> Q -> Formula
+type DTwo = Q -> Q -> Q -> Formula
 
 ggeq :: [Matrix IExpr] -> Int -> Int -> Formula
-ggeq mxs i j = Smt.bany k mxs 
-  where k m = Mat.entry i j m .>= Smt.one
+ggeq mxs i j = Smt.bany k mxs
+  where k m = Mat.entry i j m .> Smt.zero
 
 ggrt :: [Matrix IExpr] -> Int -> Int -> Formula
 ggrt mxs i j = Smt.bany k mxs
@@ -415,62 +418,127 @@ ggrt mxs i j = Smt.bany k mxs
 gOneConstraints :: [Q] -> [Matrix IExpr] -> GOne -> SmtM ()
 gOneConstraints qs mxs gOne = reflexivity >> transitivity >> compatibility >> nocycle where
   reflexivity   = Smt.assert $ Smt.bigAnd [ gOne x x | x <- qs ]
-  transitivity  = Smt.assert $ Smt.bigAnd [ gOne x y .&& gOne y z .=> gOne x z | x <- qs, y <- qs, z <- qs ]
+  transitivity  = Smt.assert $ Smt.bigAnd [ (gOne x y .&& gOne y z) .=> gOne x z | x <- qs, y <- qs, z <- qs ]
   compatibility = Smt.assert $ Smt.bigAnd [ ggeq mxs x y .=> gOne x y | x <- qs, y <- qs ]
-  nocycle       = Smt.assert $ Smt.bigAnd [ gOne 1 y .&& ggrt mxs x y .=> Smt.bnot (gOne y x) | x <- qs, y <- qs ]
+  nocycle       = Smt.assert $ Smt.bigAnd [ (gOne 1 y .&& ggrt mxs x y) .=> Smt.bnot (gOne y x) | x <- qs, y <- qs ]
 
+-- (i,i') -> (j,j') iff there exists an A st A(i,j) > 0 and A(i',j') > 0
 gTwoConstraints :: [Q] -> [Matrix IExpr] -> GTwo -> SmtM ()
-gTwoConstraints qs mxs gtwo = Smt.assert $ Smt.bigAnd [ f i j k l | i <- qs, j <- qs, k <- qs, l <- qs ] where
-  f i j k l   = gtwo i j k l .<=> Smt.bany (g i j k l) mxs
-  g i j k l m = (Mat.entry i k m .>= Smt.one) .&& (Mat.entry j l m .>= Smt.one)
+gTwoConstraints qs mxs gtwo = Smt.assert $ Smt.bigAnd [ f i i' j j' | i <- qs, i' <- qs, j <- qs, j' <- qs ] where
+  f i i' j j'   = gtwo i i' j j' .<=> Smt.bany (g i i' j j') mxs
+  g i i' j j' m = (Mat.entry i j m .> Smt.zero) .&& (Mat.entry i' j' m .> Smt.zero)
 
+-- difference to CAI paper
+-- * restrict to reachable states
+-- * for RC
 dConstraints :: [Q] -> GOne -> GTwo -> DOne -> DTwo -> SmtM ()
 dConstraints qs gOne gTwo dOne dTwo = foreapprox >> forecompat >> backapprox >> backcompat >> exactness where
-  foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x | x <- qs ]
-  forecompat  = Smt.assert $ Smt.bigAnd [ (dOne x y .&& gTwo x y z u) .=> dOne z u | x <- qs, y <- qs, z <- qs, u <- qs ]
-  backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dTwo x x | x <- qs ]
-  backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo x y .&& gTwo z u x y) .=> dTwo z u | x <- qs, y <- qs, z <- qs, u <- qs ]
-  exactness   = Smt.assert $ Smt.bigAnd [ if x == y then Smt.top else Smt.bnot (dOne x y) .&& dTwo x y | x <- qs, y <- qs ]
-  -- foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x x | x <- qs ]
-  -- forecompat  = Smt.assert $ Smt.bigAnd [ (dOne i x y .&& gTwo x y z u) .=> dOne i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
-  -- backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dTwo x x x | x <- qs ]
-  -- backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo i x y .&& gTwo z u x y) .=> dTwo i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
-  -- exactness   = Smt.assert $ Smt.bigAnd [ if x == y then Smt.top else Smt.bnot (dOne i x y) .&& dTwo i x y | i <- qs, x <- qs, y <- qs ]
+  foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x x | x <- qs ]
+  forecompat  = Smt.assert $ Smt.bigAnd [ (dOne i x y .&&  gTwo x y z u) .=>  dOne i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
+  backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=>  dTwo x x x | x <- qs ]
+  backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo i x y .&&  gTwo z u x y) .=> dTwo i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
+  exactness   = Smt.assert $ Smt.bigAnd [ Smt.bnot (dOne i x y .&&  dTwo i x y) | i <- qs, x <- qs, y <- qs, x /= y ]
 
-automatonConstraints :: Ord f => StartTerms f -> Dim -> Interpretation f (LinearInterpretation v IExpr) -> Maybe (Matrix IExpr) -> SmtM ()
-automatonConstraints st dim mi@(I.Interpretation m) mM = do
+automatonConstraints :: Ord f => StartTerms f -> Dim -> Maybe Deg -> Interpretation f (LinearInterpretation v IExpr) -> Maybe (Matrix IExpr) -> SmtM ()
+automatonConstraints st dim mDeg mi@(I.Interpretation m) mM = do
   gOneV <- V.replicateM (dim*dim) Smt.bvarM'
-  gTwoV <- V.replicateM (dim*dim*dim*dim) Smt.bvarM'
-  dOneV <- V.replicateM (dim*dim) Smt.bvarM'
-  dTwoV <- V.replicateM (dim*dim) Smt.bvarM'
   let
     gOne i j     = gOneV V.! ix2 (i,j)
-    gTwo i j k l = gTwoV V.! ix4 (i,j,k,l)
-    dOne i j     = dOneV V.! ix2 (i,j)
-    dTwo i j     = dTwoV V.! ix2 (i,j)
-  mi' <- case st of 
+  mi' <- case st of
     BasicTerms{defineds=ds, constructors=cs} -> rcConstraints qs (matrices mids) gOne >> return mics
       where (mids, mics) = (I.Interpretation $ M.filterWithKey (restrict ds) m, I.Interpretation $ M.filterWithKey (restrict cs) m)
     _            -> return mi
-  case mM of
-    Just mx -> edaConstraints qs [mx] gOne gTwo dOne dTwo
-    Nothing -> edaConstraints qs (matrices mi') gOne gTwo dOne dTwo
+  let
+    mxs = case mM of
+     Just mx -> [mx]
+     Nothing -> matrices mi'
+  case mDeg of
+    Nothing    -> do
+      gTwoV <- V.replicateM (dim*dim*dim*dim) Smt.bvarM'
+      dOneV <- V.replicateM (dim*dim*dim) Smt.bvarM'
+      dTwoV <- V.replicateM (dim*dim*dim) Smt.bvarM'
+      let
+        gTwo i j k l = gTwoV V.! ix4 (i,j,k,l)
+        dOne i j k   = dOneV V.! ix3 (i,j,k)
+        dTwo i j k   = dTwoV V.! ix3 (i,j,k)
+      edaConstraints qs mxs gOne gTwo dOne dTwo
+
+    (Just deg) -> do
+      gThreeV <- V.replicateM (dim*dim*dim*dim*dim*dim) Smt.bvarM'
+      trelV <- V.replicateM (dim*dim*dim) Smt.bvarM'
+      irelV <- V.replicateM (dim*dim) Smt.bvarM'
+      jrelV <- V.replicateM (dim*dim) Smt.bvarM'
+      hrelV <- V.replicateM (dim*dim) Smt.bvarM'
+      let
+        gThree i j k x y z = gThreeV V.! ix6 ((i,j,k),(x,y,z))
+        trel i j k   = trelV V.! ix3 (i,j,k)
+        irel i j     = irelV V.! ix2 (i,j)
+        jrel i j     = jrelV V.! ix2 (i,j)
+        hrel i j     = hrelV V.! ix2 (i,j)
+
+      idaConstraints qs mxs (max deg 1) gOne gThree trel irel jrel hrel
+
   where
 
     restrict fs f _ = f `S.member` fs
 
     qs = [1..dim]
     ix2 = Ix.index ((1,1),(dim,dim))
+    ix3 = Ix.index ((1,1,1),(dim,dim,dim))
     ix4 = Ix.index ((1,1,1,1),(dim,dim,dim,dim))
+    ix6 = Ix.index (((1,1,1),(1,1,1)),((dim,dim,dim),(dim,dim,dim)))
 
 
--- G(S)    - max (weighted) adjacency Matrix 
+-- G(S)    - max (weighted) adjacency Matrix
 -- G^2(S)  - (i,i') -> (j,j') if Ai,j and Ai',j' are positive
 rcConstraints :: [Q] -> [Matrix IExpr] -> GOne -> SmtM ()
 rcConstraints qs mxs gOne = Smt.assert $ Smt.bigAnd [ ggeq mxs 1 x .=> gOne 1 x | x <- qs ]
 
 edaConstraints :: [Q] -> [Matrix IExpr] -> GOne -> GTwo -> DOne -> DTwo -> SmtM ()
 edaConstraints qs mxs gOne gTwo dOne dTwo = gOneConstraints qs mxs gOne >> gTwoConstraints qs mxs gTwo >> dConstraints qs gOne gTwo dOne dTwo
+
+type GThree = Q -> Q -> Q -> Q -> Q -> Q -> Formula
+type T = Q -> Q -> Q -> Formula
+type I = Q -> Q -> Formula
+type J = Q -> Q -> Formula
+type H = Q -> Q -> Formula
+
+
+idaConstraints :: [Q] -> [Matrix IExpr] -> Deg -> GOne -> GThree -> T -> I -> J -> H -> SmtM ()
+idaConstraints qs mxs deg gOne gThree trel irel jrel hrel = do
+  gOneConstraints qs mxs gOne
+  gThreeConstraints qs mxs gThree
+  tConstraints qs gOne gThree trel
+  iConstraints qs trel irel
+  jConstraints qs gOne irel jrel
+  hConstraints qs deg jrel hrel
+
+gThreeConstraints :: [Q] -> [Matrix IExpr] -> GThree -> SmtM ()
+gThreeConstraints qs mxs gThree = Smt.assert $ Smt.bigAnd
+  [ f i j k x y z | i <- qs, j <- qs, k <- qs, x <- qs, y <- qs, z <- qs ]
+  where
+    f i j k x y z   = gThree i j k x y z .<=> Smt.bany (g i j k x z z) mxs
+    g i j k x y z m = (Mat.entry i x m .> Smt.zero) .&& (Mat.entry j y m .> Smt.zero) .&& (Mat.entry k z m .> Smt.zero)
+
+tConstraints :: [Q] -> GOne -> GThree -> T -> SmtM ()
+tConstraints qs gOne gThree trel = Smt.assert $ initial .&& gThreeStep
+  where
+    initial    = Smt.bigAnd [ (gOne 1 x .&& gOne 1 y) .=> trel x x y | x <- qs, y <- qs ]
+    gThreeStep = Smt.bigAnd [ (trel x y z .&& gThree x y z u v w) .=> trel u v w | x <- qs, y <- qs, z <- qs, u <- qs, v <- qs, w <- qs ]
+
+iConstraints :: [Q] -> T -> I -> SmtM ()
+iConstraints qs trel irel = Smt.assert $ Smt.bigAnd [ trel x y y .=> irel x y | x <- qs, y <- qs, x /= y ]
+
+jConstraints :: [Q] -> GOne -> I -> J -> SmtM ()
+jConstraints qs gOne irel jrel = Smt.assert $ Smt.bigAnd [ f i j | i <- qs, j <- qs ]
+  where f i j = jrel i j .<=> Smt.bany (\k -> irel i k .&& gOne k j) qs
+
+hConstraints :: [Q] -> Int -> J -> H -> SmtM ()
+hConstraints qs deg jrel hrel = Smt.assert $ unaryNotation .&& jDecrease
+  where
+    unaryNotation = Smt.bigAnd [ hrel x h .=> hrel x (h-1) | x <- qs, h <- [2..deg-1] ]
+    jDecrease     = Smt.bigAnd [ f i j | i <- qs, j <- qs ]
+    f i j = jrel i j .=> Smt.bany (\h -> hrel i h .&& hrel j h) [1..deg-1]
 
 
 --- * processors -----------------------------------------------------------------------------------------------------
@@ -618,11 +686,13 @@ upperbound st dim kind li = case kind of
   MaximalMatrix LikeJordan                       -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
   MaximalMatrix MaxAutomaton                     -> T.Poly (Just dim)
 
-  Automaton                                      -> T.Poly (Just dim)
+  Automaton Nothing                              -> T.Poly (Just dim)
+  Automaton (Just deg)                           -> T.Poly (Just deg)
   Unrestricted                                   -> T.Exp  (Just 1)
   where
     li' = restrictInterpretation st li
     mm  = maxmimalNonIdMatrix dim li'
+-- TODO: change maximalNonIdMatrix; if M = eye then linear; otherwise count M', where M' = filter eye M
 
 -- dimArg :: T.Argument 'T.Required Int
 -- dimArg = T.nat "dimension" ["Specifies the dimension of the matrices used in the interpretation."]
@@ -637,14 +707,14 @@ upperbound st dim kind li = case kind of
 mis :: Maybe (ExpressionSelector F V) -> Int -> Kind -> MI
 mis sel dim kind = MI{miKind=kind, miDimension=dim,miUArgs=UArgs,miURules=URules,miSelector=sel}
 
-upperTriangular, lowerTriangular :: Maybe (ExpressionSelector F V) -> Int -> Int -> T.Strategy Trs Trs
-upperTriangular sel dim deg  = T.processor . mis sel dim . MaximalMatrix . UpperTriangular . Multiplicity $ if deg < dim then (Just deg) else Nothing
-lowerTriangular sel dim deg  = T.processor . mis sel dim . MaximalMatrix . LowerTriangular . Multiplicity $ if deg < dim then (Just deg) else Nothing
+upperTriangular, lowerTriangular, automaton :: Maybe (ExpressionSelector F V) -> Int -> Int -> T.Strategy Trs Trs
+upperTriangular sel dim deg  = T.processor . mis sel dim . MaximalMatrix . UpperTriangular . Multiplicity $ if deg < dim then Just deg else Nothing
+lowerTriangular sel dim deg  = T.processor . mis sel dim . MaximalMatrix . LowerTriangular . Multiplicity $ if deg < dim then Just deg else Nothing
+automaton sel dim deg  = T.processor . mis sel dim . Automaton $ if deg < dim && deg > 0 then Just deg else Nothing
 
-almostTriangular, likeJordan, maxAutomaton, automaton, unrestricted :: Maybe (ExpressionSelector F V) -> Int -> T.Strategy Trs Trs
-almostTriangular sel dim  = T.processor . mis sel dim . MaximalMatrix $ (AlmostTriangular 2)
+almostTriangular, likeJordan, maxAutomaton, unrestricted :: Maybe (ExpressionSelector F V) -> Int -> T.Strategy Trs Trs
+almostTriangular sel dim  = T.processor . mis sel dim . MaximalMatrix $ AlmostTriangular 2
 likeJordan sel dim        = T.processor . mis sel dim . MaximalMatrix $ LikeJordan
 maxAutomaton sel dim      = T.processor . mis sel dim . MaximalMatrix $ MaxAutomaton
-automaton sel dim         = T.processor . mis sel dim $ Automaton
 unrestricted sel dim      = T.processor . mis sel dim $ Unrestricted
 
