@@ -523,7 +523,7 @@ gThreeConstraints qs mxs gThree = Smt.assert $ Smt.bigAnd
 tConstraints :: [Q] -> GOne -> GThree -> T -> SmtM ()
 tConstraints qs gOne gThree trel = Smt.assert $ initial .&& gThreeStep
   where
-    initial    = Smt.bigAnd [ (gOne 1 x .&& gOne 1 y) .=> trel x x y | x <- qs, y <- qs ]
+    initial    = Smt.bigAnd [ (gOne 1 x .&& gOne 1 y) .=> trel x x y | x <- qs, y <- qs, x /= y ]
     gThreeStep = Smt.bigAnd [ (trel x y z .&& gThree x y z u v w) .=> trel u v w | x <- qs, y <- qs, z <- qs, u <- qs, v <- qs, w <- qs ]
 
 iConstraints :: [Q] -> T -> I -> SmtM ()
