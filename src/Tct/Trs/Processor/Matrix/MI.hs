@@ -546,7 +546,7 @@ gThreeConstraints :: [Q] -> [Matrix IExpr] -> GThree -> SmtM ()
 gThreeConstraints qs mxs gThree = Smt.assert $ Smt.bigAnd
   [ f i j k x y z | i <- qs, j <- qs, k <- qs, x <- qs, y <- qs, z <- qs ]
   where
-    f i j k x y z   = gThree i j k x y z .<=> Smt.bany (g i j k x z z) mxs
+    f i j k x y z   = gThree i j k x y z .<=> Smt.bany (g i j k x y z) mxs
     g i j k x y z m = (Mat.entry i x m .> Smt.zero) .&& (Mat.entry j y m .> Smt.zero) .&& (Mat.entry k z m .> Smt.zero)
 
 -- p /= q => T(p,p,q) /\ G3(T) => T
@@ -776,12 +776,12 @@ ida' = bounded   $ \dim deg -> mkmi dim (Automaton (Just deg))
 
 unbounded mx =
          T.best T.cmpTimeUB [ mx 1, mx 2, mx 3, mx 4 ]
-  T..>>> T.best T.cmpTimeUB [ mx 5, mx 6, mx 7, mx 8 ]
+  T..<|> T.best T.cmpTimeUB [ mx 5, mx 6, mx 7, mx 8 ]
 
 bounded mx =
          T.fastest [ mx 1 1, mx 2 1, mx 3 1]
-  T..>>> T.fastest [ mx 2 2, mx 3 2, mx 4 2]
-  T..>>> T.fastest [ mx 3 3, mx 4 3]
-  T..>>> T.fastest [ mx 4 4, mx 5 5]
-  T..>>> T.fastest [ mx 6 6, mx 7 7]
+  T..<|> T.fastest [ mx 2 2, mx 3 2, mx 4 2]
+  T..<|> T.fastest [ mx 3 3, mx 4 3]
+  T..<|> T.fastest [ mx 4 4, mx 5 5]
+  T..<|> T.fastest [ mx 6 6, mx 7 7]
 
