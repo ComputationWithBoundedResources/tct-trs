@@ -772,10 +772,10 @@ eda' = unbounded $ \dim     -> mkmi dim (Automaton Nothing)
 ida' = bounded   $ \dim deg -> mkmi dim (Automaton (Just deg))
 
 unbounded mx =
-         -- T.best T.cmpTimeUB [ mx 1, mx 2, mx 3, mx 4 ]
-  -- T..<|> T.best T.cmpTimeUB [ mx 5, mx 6, mx 7, mx 8 ]
-         T.fastest [ mx 1, mx 2, mx 3, mx 4 ]
-  T..<|> T.fastest [ mx 5, mx 6, mx 7, mx 8 ]
+         T.best T.cmpTimeUB [ mx 1, mx 2, mx 3, mx 4 ]
+  T..<|> T.best T.cmpTimeUB [ mx 5, mx 6, mx 7, mx 8 ]
+         -- T.fastest [ mx 1, mx 2, mx 3, mx 4 ]
+  -- T..<|> T.fastest [ mx 5, mx 6, mx 7, mx 8 ]
 
 bounded mx =
          T.fastest [ mx 1 1, mx 2 1, mx 3 1]
