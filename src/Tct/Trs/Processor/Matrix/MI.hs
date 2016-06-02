@@ -541,20 +541,18 @@ idaConstraints qs mxs deg gOne gThree trel irel jrel hrel = do
   jConstraints qs gOne irel jrel
   hConstraints qs deg jrel hrel
 
+
 -- G3
 gThreeConstraints :: [Q] -> [Matrix IExpr] -> GThree -> SmtM ()
-gThreeConstraints qs mxs gThree = Smt.assert $ Smt.bigAnd
-  [ f i j k x y z | i <- qs, j <- qs, k <- qs, x <- qs, y <- qs, z <- qs ]
-  where
-    f i j k x y z   = gThree i j k x y z .<=> Smt.bany (g i j k x y z) mxs
-    g i j k x y z m = (Mat.entry i x m .> Smt.zero) .&& (Mat.entry j y m .> Smt.zero) .&& (Mat.entry k z m .> Smt.zero)
+gThreeConstraints qs mxs gThree = Smt.assert $ Smt.bigAnd [ f i j k x y z | i <- qs, j <- qs, k <- qs, x <- qs, y <- qs, z <- qs ] where
+  f i j k x y z   = gThree i j k x y z .<=> Smt.bany (g i j k x y z) mxs
+  g i j k x y z m = (Mat.entry i x m .>= SR.one) .&& (Mat.entry j y m .>= SR.one) .&& (Mat.entry k z m .>= SR.one)
 
 -- p /= q => T(p,p,q) /\ G3(T) => T
 tConstraints :: [Q] -> GOne -> GThree -> T -> SmtM ()
-tConstraints qs gOne gThree trel = Smt.assert $ initial .&& gThreeStep
-  where
-    initial    = Smt.bigAnd [ (gOne 1 x .&& gOne 1 y) .=> trel x x y | x <- qs, y <- qs, x /= y ]
-    gThreeStep = Smt.bigAnd [ (trel x y z .&& gThree x y z u v w) .=> trel u v w | x <- qs, y <- qs, z <- qs, u <- qs, v <- qs, w <- qs ]
+tConstraints qs gOne gThree trel = Smt.assert $ initial .&& gThreeStep where
+  initial    = Smt.bigAnd [ (gOne 1 x .&& gOne 1 y) .=> trel x x y | x <- qs, y <- qs, x /= y ]
+  gThreeStep = Smt.bigAnd [ (trel x y z .&& gThree x y z u v w) .=> trel u v w | x <- qs, y <- qs, z <- qs, u <- qs, v <- qs, w <- qs ]
 
 -- T(p,q,q) => I(p,q)
 iConstraints :: [Q] -> T -> I -> SmtM ()
@@ -563,15 +561,14 @@ iConstraints qs trel irel = Smt.assert $ Smt.bigAnd [ trel x y y .=> irel x y | 
 -- J = I . R
 jConstraints :: [Q] -> GOne -> I -> J -> SmtM ()
 jConstraints qs gOne irel jrel = Smt.assert $ Smt.bigAnd [ f i j | i <- qs, j <- qs ]
-  where f i j = jrel i j .<=> Smt.bany (\k -> irel i k .&& gOne k j) qs
+  where f i j = jrel i j .<=> Smt.bany (\ k -> irel i k .&& gOne k j) qs
 
 -- J(p,q) => h(p) > h(q)
 hConstraints :: [Q] -> Int -> J -> H -> SmtM ()
-hConstraints qs deg jrel hrel = Smt.assert $ unaryNotation .&& jDecrease
-  where
-    unaryNotation = Smt.bigAnd [ hrel x h .=> hrel x (h-1) | x <- qs, h <- [2..deg-1] ]
-    jDecrease     = Smt.bigAnd [ f i j | i <- qs, j <- qs ]
-    f i j = jrel i j .=> Smt.bany (\h -> hrel i h .&& hrel j h) [1..deg-1]
+hConstraints qs deg jrel hrel = Smt.assert $ unaryNotation .&& jDecrease where
+  unaryNotation = Smt.bigAnd [ hrel x h .=> hrel x (h - 1) | x <- qs, h <- [2..deg - 1] ]
+  jDecrease     = Smt.bigAnd [ f i j | i <- qs, j <- qs ]
+  f i j         = jrel i j .=> Smt.bany (\ h -> hrel i h .&& Smt.bnot (hrel j h)) [1..deg - 1]
 
 
 --- * processors -----------------------------------------------------------------------------------------------------
@@ -775,8 +772,10 @@ eda' = unbounded $ \dim     -> mkmi dim (Automaton Nothing)
 ida' = bounded   $ \dim deg -> mkmi dim (Automaton (Just deg))
 
 unbounded mx =
-         T.best T.cmpTimeUB [ mx 1, mx 2, mx 3, mx 4 ]
-  T..<|> T.best T.cmpTimeUB [ mx 5, mx 6, mx 7, mx 8 ]
+         -- T.best T.cmpTimeUB [ mx 1, mx 2, mx 3, mx 4 ]
+  -- T..<|> T.best T.cmpTimeUB [ mx 5, mx 6, mx 7, mx 8 ]
+         T.fastest [ mx 1, mx 2, mx 3, mx 4 ]
+  T..<|> T.fastest [ mx 5, mx 6, mx 7, mx 8 ]
 
 bounded mx =
          T.fastest [ mx 1 1, mx 2 1, mx 3 1]
