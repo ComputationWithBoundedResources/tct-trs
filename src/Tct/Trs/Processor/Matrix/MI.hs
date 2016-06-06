@@ -1,13 +1,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Tct.Trs.Processor.Matrix.MI
   (
-  jordan
-  , binaryJordan
-  , triangular
-  , almostTriangular
-  , algebraic
-  , eda
-  , ida
+  jordan'
+  , binaryJordan'
+  , triangular'
+  , almostTriangular'
+  , algebraic'
+  , eda'
+  , ida'
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -752,35 +752,15 @@ upperbound st dim kind li = case kind of
 -- 11cai setup
 
 mkmi :: Int -> Kind -> TrsStrategy
-mkmi dim kind = T.processor $ MI{miKind=kind, miDimension=dim,miUArgs=NoUArgs,miURules=NoURules,miSelector=Nothing}
+mkmi dim kind = T.processor MI{miKind=kind, miDimension=dim,miUArgs=NoUArgs,miURules=NoURules,miSelector=Nothing}
 
-jordan     = T.strategy "jordan"     () jordan'
-binaryJordan     = T.strategy "binaryJordan"     () binaryJordan'
-triangular = T.strategy "triangular" () triangular'
-almostTriangular = T.strategy "almostTriangular" () almostTriangular'
-algebraic  = T.strategy "algebraic"  () algebraic'
-eda        = T.strategy "eda"        () eda'
-ida        = T.strategy "ida"        () ida'
 
-jordan'           = unbounded $ \dim     -> mkmi dim (MaximalMatrix LikeJordan)
-binaryJordan'           = unbounded $ \dim     -> mkmi dim (MaximalMatrix LikeBinaryJordan)
-almostTriangular' = unbounded $ \dim     -> mkmi dim (MaximalMatrix $ AlmostTriangular 2)
-triangular'       = unbounded $ \dim     -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity Nothing))
-algebraic'        = bounded   $ \dim deg -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity (Just deg)))
+jordan'           = \dim     -> mkmi dim (MaximalMatrix LikeJordan)
+binaryJordan'     = \dim     -> mkmi dim (MaximalMatrix LikeBinaryJordan)
+almostTriangular' = \dim     -> mkmi dim (MaximalMatrix $ AlmostTriangular 1)
+triangular'       = \dim     -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity Nothing))
+algebraic'        = \dim deg -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity (Just deg)))
 
-eda' = unbounded $ \dim     -> mkmi dim (Automaton Nothing)
-ida' = bounded   $ \dim deg -> mkmi dim (Automaton (Just deg))
-
-unbounded mx =
-         T.best T.cmpTimeUB [ mx 1, mx 2, mx 3, mx 4 ]
-  T..<|> T.best T.cmpTimeUB [ mx 5, mx 6, mx 7, mx 8 ]
-         -- T.fastest [ mx 1, mx 2, mx 3, mx 4 ]
-  -- T..<|> T.fastest [ mx 5, mx 6, mx 7, mx 8 ]
-
-bounded mx =
-         T.fastest [ mx 1 1, mx 2 1, mx 3 1]
-  T..<|> T.fastest [ mx 2 2, mx 3 2, mx 4 2]
-  T..<|> T.fastest [ mx 3 3, mx 4 3]
-  T..<|> T.fastest [ mx 4 4, mx 5 5]
-  T..<|> T.fastest [ mx 6 6, mx 7 7]
+eda' = \dim     -> mkmi dim (Automaton Nothing)
+ida' = \dim deg -> mkmi dim (Automaton (Just deg))
 
