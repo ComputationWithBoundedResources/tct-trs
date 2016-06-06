@@ -8,8 +8,6 @@ module Tct.Trs.Processor.Matrix.MI
   , algebraic
   , eda
   , ida
-
-  , edabest8
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -434,12 +432,8 @@ kindConstraints st dim kind inter = case kind of
 type Q    = Int
 type GOne = Q -> Q -> Formula
 type GTwo = Q -> Q -> Q -> Q -> Formula
--- type DOne = Q -> Q -> Q -> Formula
--- type DTwo = Q -> Q -> Q -> Formula
-
--- for DC only
-type DOne = Q -> Q -> Formula
-type DTwo = Q -> Q -> Formula
+type DOne = Q -> Q -> Q -> Formula
+type DTwo = Q -> Q -> Q -> Formula
 
 ggeq :: [Matrix IExpr] -> Int -> Int -> Formula
 ggeq mxs i j = Smt.bany k mxs
@@ -467,16 +461,11 @@ gTwoConstraints qs mxs gtwo = Smt.assert $ Smt.bigAnd [ f i i' j j' | i <- qs, i
 -- * for RC
 dConstraints :: [Q] -> GOne -> GTwo -> DOne -> DTwo -> SmtM ()
 dConstraints qs gOne gTwo dOne dTwo = foreapprox >> forecompat >> backapprox >> backcompat >> exactness where
-  -- foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x x | x <- qs ]
-  -- forecompat  = Smt.assert $ Smt.bigAnd [ (dOne i x y .&&  gTwo x y z u) .=>  dOne i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
-  -- backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=>  dTwo x x x | x <- qs ]
-  -- backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo i x y .&&  gTwo z u x y) .=> dTwo i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
-  -- exactness   = Smt.assert $ Smt.bigAnd [ Smt.bnot (dOne i x y .&&  dTwo i x y) | i <- qs, x <- qs, y <- qs, x /= y ]
-  foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x | x <- qs ]
-  forecompat  = Smt.assert $ Smt.bigAnd [ (dOne x y .&&  gTwo x y z u) .=>  dOne z u | x <- qs, y <- qs, z <- qs, u <- qs ]
-  backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=>  dTwo x x | x <- qs ]
-  backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo x y .&&  gTwo z u x y) .=> dTwo z u | x <- qs, y <- qs, z <- qs, u <- qs ]
-  exactness   = Smt.assert $ Smt.bigAnd [ Smt.bnot (dOne x y .&&  dTwo x y) | x <- qs, y <- qs, x /= y ]
+  foreapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=> dOne x x x | x <- qs ]
+  forecompat  = Smt.assert $ Smt.bigAnd [ (dOne i x y .&&  gTwo x y z u) .=>  dOne i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
+  backapprox  = Smt.assert $ Smt.bigAnd [ gOne 1 x .=>  dTwo x x x | x <- qs ]
+  backcompat  = Smt.assert $ Smt.bigAnd [ (dTwo i x y .&&  gTwo z u x y) .=> dTwo i z u | i <- qs, x <- qs, y <- qs, z <- qs, u <- qs ]
+  exactness   = Smt.assert $ Smt.bigAnd [ Smt.bnot (dOne i x y .&&  dTwo i x y) | i <- qs, x <- qs, y <- qs, x /= y ]
 
 automatonConstraints :: Ord f => StartTerms f -> Dim -> Maybe Deg -> Interpretation f (LinearInterpretation v IExpr) -> Maybe (Matrix IExpr) -> SmtM ()
 automatonConstraints st dim mDeg mi@(I.Interpretation m) mM = do
@@ -498,10 +487,8 @@ automatonConstraints st dim mDeg mi@(I.Interpretation m) mM = do
       dTwoV <- V.replicateM (dim*dim*dim) Smt.bvarM'
       let
         gTwo i j k l = gTwoV V.! ix4 (i,j,k,l)
-        -- dOne i j k   = dOneV V.! ix3 (i,j,k)
-        -- dTwo i j k   = dTwoV V.! ix3 (i,j,k)
-        dOne i j     = dOneV V.! ix2 (i,j)
-        dTwo i j     = dTwoV V.! ix2 (i,j)
+        dOne i j k   = dOneV V.! ix3 (i,j,k)
+        dTwo i j k   = dTwoV V.! ix3 (i,j,k)
       edaConstraints qs mxs gOne gTwo dOne dTwo
 
     (Just deg) -> do
@@ -783,8 +770,6 @@ algebraic'        = bounded   $ \dim deg -> mkmi dim (MaximalMatrix $ UpperTrian
 
 eda' = unbounded $ \dim     -> mkmi dim (Automaton Nothing)
 ida' = bounded   $ \dim deg -> mkmi dim (Automaton (Just deg))
-
-edabest8 = T.strategy "eda8" () $ T.best T.cmpTimeUB $ (\dim -> mkmi dim (Automaton Nothing)) `fmap` [1..8]
 
 unbounded mx =
          T.best T.cmpTimeUB [ mx 1, mx 2, mx 3, mx 4 ]
