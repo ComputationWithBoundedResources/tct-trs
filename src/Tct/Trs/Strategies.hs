@@ -6,6 +6,8 @@ module Tct.Trs.Strategies (
 
 
 import Tct.Core
+import Tct.Core.Data                 (declare)
+import Tct.Core.Processor.MSum       (madd)
 
 import Tct.Trs.Data
 import Tct.Trs.Processors            as M
@@ -20,7 +22,16 @@ trsDeclarations :: Declared Trs Trs => [TrsDeclaration]
 trsDeclarations =
   [ SD emptyDeclaration
   , SD withCertificationDeclaration
+  , SD $ declare
+          "tight"
+          ["Run lower and upper bounds analysis in parallel."]
+          (strat "lower" ["The lower bound strategy to apply."], strat "upper" ["The upper bound strategy to apply."])
+          (madd :: TrsStrategy -> TrsStrategy -> TrsStrategy)
+  --
+  -- * Lower Bound
+  , SD decreasingLoopsDeclaration
 
+  -- * Upper Bound
   , SD decomposeDeclaration
   , SD decomposeCPDeclaration
 
@@ -29,19 +40,19 @@ trsDeclarations =
   , SD innermostRuleRemovalDeclaration
   , SD toInnermostDeclaration
 
-  -- Path Orders
+  -- ** Path Orders
   , SD epoStarDeclaration
 
-  -- Semantic
+  -- ** Semantic
   , SD polyDeclaration
   , SD matrixDeclaration
   , SD weightGapDeclaration
 
-  -- DP
+  -- ** DP
   , SD dependencyPairsDeclaration
   , SD usableRulesDeclaration
 
-  -- DP graph
+  -- ** DP graph
   , SD decomposeDGDeclaration
   , SD pathAnalysisDeclaration
   , SD predecessorEstimationDeclaration
@@ -51,12 +62,12 @@ trsDeclarations =
   , SD simplifyRHSDeclaration
   , SD trivialDeclaration
 
-  -- Interpretations
+  -- ** Interpretations
   , SD $ strategy "matrices"               boundedArgs matrices
   , SD $ strategy "polys"                  boundedArgs polys
   , SD $ strategy "ints"                   boundedArgs ints
 
-  -- Simplifications
+  -- ** Simplifications
   , SD $ strategy "dpsimps"                () dpsimps
   , SD $ strategy "cleanSuffix"            () cleanSuffix
   , SD $ strategy "decomposeIndependent"   () decomposeIndependent
@@ -64,7 +75,7 @@ trsDeclarations =
   , SD $ strategy "toDP"                   () toDP
   , SD $ strategy "removeLeaf"             (OneTuple complexityPairArg) removeLeaf
 
-  -- Strategies
+  -- ** Strategies
   , SD $ strategy "matchbounds"           () matchbounds
 
   , SD certifyDeclaration

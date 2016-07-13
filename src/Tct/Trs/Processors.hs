@@ -43,9 +43,13 @@ import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.Rules as RS
 
+-- MS: FIXME:
+-- naming of arguments/methods gets increasingly more difficult
+-- should they be imported qualified?
 import           Tct.Trs.Processor.Bounds                           as M
 import           Tct.Trs.Processor.Decompose                        as M
 import           Tct.Trs.Processor.ComplexityPair                   as M
+import           Tct.Trs.Processor.DecreasingLoops                  as M
 import           Tct.Trs.Processor.DP.DependencyPairs               as M
 import           Tct.Trs.Processor.DP.DPGraph.DecomposeDG           as M
 import           Tct.Trs.Processor.DP.DPGraph.PathAnalysis          as M

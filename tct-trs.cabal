@@ -100,6 +100,7 @@ library
     Tct.Trs.Processor.Bounds
     Tct.Trs.Processor.ComplexityPair
     Tct.Trs.Processor.Decompose
+    Tct.Trs.Processor.DecreasingLoops
     Tct.Trs.Processor.DP.DependencyPairs
     Tct.Trs.Processor.DP.DPGraph.DecomposeDG
     Tct.Trs.Processor.DP.DPGraph.PathAnalysis
