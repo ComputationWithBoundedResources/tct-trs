@@ -12,6 +12,7 @@ module Tct.Trs.Processor.DecreasingLoops
 
 import           Control.Applicative      ((<|>))
 import           Control.Monad            (guard)
+import           Data.Function            ((&))
 import           Data.List                ((\\))
 import qualified Data.Map                 as M
 import           Data.Maybe               (fromMaybe)
@@ -29,7 +30,7 @@ import qualified Tct.Core.Common.Xml      as Xml
 import qualified Tct.Core.Data            as T
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem     as Prob (isInnermostProblem, isRCProblem, isRCProblem', startTerms,
-                                                   strictComponents)
+                                                   allComponents, strictComponents)
 import qualified Tct.Trs.Data.ProblemKind as Prob (isStartTerm)
 import qualified Tct.Trs.Data.Rewriting   as R (narrow, narrowing, narrowings)
 import qualified Tct.Trs.Data.Rules       as RS (toList)
@@ -178,9 +179,15 @@ find :: Eq a => a -> [(a,b)] -> b
 find a = fromMaybe err . lookup a
   where err = error "Tct.Processor.DecreasingLoops.find: not found"
 
--- MS: extensions:
--- * rci: for the rci setting we do not perform narrowing; non-overlapping narrowing could be used for (under-approximating) innermost rewriting
--- * relative: we restrict to the strict components; for a given rewrite sequence only on rule has to be strict
+-- MS: extensions (not implemented):
+-- * runtime innermost:
+--   variants of narrowing that (under-approximattes) innermost rewriting (eg non-overlapping narrowing)
+-- * relative setting:
+--   in principle only one rewrite step has to be strict, ie l ->=* . ->+ . ->=* C[r]
+-- * non-left linear start term:
+--   ok when corresponding variables only appear in the context, eg Various04_18.xml : +(*(x,y),*(x,z)) -> *(x,+(y,z))
+-- * reachable term:
+--   generalise to l' ->+ l ->+ C[r]
 entscheide :: (Ord f, Ord v, Show f, Show v) => DecreasingLoops -> Problem f v -> Maybe (Omega' f V')
 entscheide _ prob | not (Prob.isRCProblem prob)       = Nothing
 entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob = search bnd nrwsteps where
@@ -190,8 +197,9 @@ entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob = search bnd nrwsteps wher
     | otherwise                                                                    = 0
 
   normalise r = R.rename (flip find $ zip (R.vars r) [V' 0..]) r
-  allrules   = normalise `fmap` RS.toList (Prob.strictComponents prob)
-  startrules = (\Rule{lhs=l} -> R.isLinear l && Prob.isStartTerm (Prob.startTerms prob) l) `filter` allrules
+  allrules    = normalise `fmap` RS.toList (Prob.allComponents prob)
+  startrules  = normalise `fmap` RS.toList (Prob.strictComponents prob) & filter f
+    where f Rule{lhs=l} = R.isLinear l && Prob.isStartTerm (Prob.startTerms prob) l
 
   rename      = R.rename (either (succ . (*2)) (*2))
   narrowings r = (rename . R.narrowing) `fmap` (R.narrowings `concatMap`  R.narrow r allrules)
