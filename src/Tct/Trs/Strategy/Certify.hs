@@ -63,7 +63,8 @@ intes n = mx n
 
 px,mx :: (?ua :: UsableArgs) => Degree -> TrsStrategy
 px d = poly' (Mixed d) Restrict ?ua URules (Just selAny)
-mx d = triangular' d d ?ua URules (Just selAny)
+mx d = matrix' d d Algebraic ?ua URules (Just selAny)
+-- mx d = triangular' d d ?ua URules (Just selAny)
 
 top :: [TrsStrategy] -> TrsStrategy
 top = best cmpTimeUB

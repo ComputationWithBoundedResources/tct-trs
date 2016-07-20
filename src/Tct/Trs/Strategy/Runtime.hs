@@ -16,7 +16,7 @@ import qualified Tct.Trs.Data.DependencyGraph as DG
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Rules as RS
 import           Tct.Trs.Processors
-import           Tct.Trs.Processor.Matrix.MI  (triangular')
+-- import           Tct.Trs.Processor.Matrix.MI  (triangular')
 
 
 -- | Declaration for "derivational" strategy.
@@ -34,7 +34,8 @@ runtime' = T.declFun runtimeDeclaration
 
 --- * direct ---------------------------------------------------------------------------------------------------------
 
-mx dim deg   = triangular' dim deg ?ua ?ur ?sel
+mx dim deg   = matrix' dim deg Algebraic ?ua ?ur ?sel
+-- mx dim deg   = triangular' dim deg ?ua ?ur ?sel
 mxCP dim deg = matrixCP' dim deg Algebraic ?ua ?ur
 
 px 1 = poly' Linear Restrict ?ua ?ur ?sel
