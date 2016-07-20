@@ -61,8 +61,8 @@ intes 3 = mx 3 .<||> px 3
 intes n = mx n
 
 px,mx :: (?ua :: UsableArgs) => Degree -> TrsStrategy
-px d = poly' (Mixed d) Restrict ?ua URules (Just selAny) NoGreedy
-mx d = matrix' d d Triangular ?ua URules (Just selAny) NoGreedy
+px d = poly' (Mixed d) Restrict ?ua URules (Just selAny)
+mx d = matrix' d d Triangular ?ua URules (Just selAny)
 
 top :: [TrsStrategy] -> TrsStrategy
 top = best cmpTimeUB
@@ -124,6 +124,6 @@ certifyDC deg =
   .>>! (matchbounds .<||> interpretations 1 deg)
   where
     interpretations l u = chain [ tew (mxAny d) | d <- [(max 0 l) .. (min u deg)] ]
-    mxAny d = matrix' d d Triangular NoUArgs NoURules (Just selAny) NoGreedy
+    mxAny d = matrix' d d Triangular NoUArgs NoURules (Just selAny)
     -- mxAll d = matrix' d d Triangular NoUArgs NoURules (Just sel) NoGreedy
 

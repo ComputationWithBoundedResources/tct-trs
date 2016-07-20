@@ -2,12 +2,6 @@
 module Tct.Trs.Encoding.Interpretation
   where
 
--- TODO: MS remove Greedy Components
--- we do not really gain anything from the greedy algorithm of the interpretations;
--- a) they do not work well together with parallel invocations
--- b) experiments (rc and certify) do not show really any improvement over NoGreedy (even when applied sequentially)
--- c) there is a (rare case) where there encoding of Greedy would change; namely if all strict trs rules are shifted to the weak; we get besser uargs
-
 import Data.Maybe (fromMaybe)
 import           Control.Monad                      (liftM)
 import qualified Data.Foldable                      as F
@@ -75,6 +69,9 @@ data InterpretationProof a b = InterpretationProof
   , weakTrs_   :: [(R.Rule F V, (b, b))]
   } deriving Show
 
+instance Monad m => SMT.Decode m (InterpretationProof a b) (InterpretationProof a b) where
+  decode = return
+
 -- MS: formally this is not so nice as in tct2; some extra work would be necessary
 -- on the other hand we now have an abstract orient function for interpretations
 -- see Tct.RS.Method.Poly.NaturalPI for an example
@@ -102,7 +99,7 @@ orient :: AbstractInterpretation i => i
   -> Shift
   -> Bool -- TODO: MS: Use Types
   -> Bool
-  -> SMT.SmtSolverSt Int (InterpretationProof a b , (Interpretation F (B i), Maybe (UREnc.UsableEncoder F Int)), ForceAny)
+  -> SMT.SmtSolverSt Int (InterpretationProof () (), Interpretation F (B i), Maybe (UREnc.UsableEncoder F Int))
 orient inter prob absi mselector useUP useUR = do
   SMT.setLogic SMT.QF_NIA
 
@@ -152,7 +149,6 @@ orient inter prob absi mselector useUP useUR = do
     sOrderConstraints = SMT.bigAnd [ usable r .=> sOrder r | r <- srules ]
       where sOrder r = interpretf (R.lhs r) .>=. (interpretf (R.rhs r) .+. strict r)
 
-    -- MS: TODO: the greedy component should work on the expression selector; so we could express eg selAnyOf $ selRules `inter` selStricts
     forceAny rs
       | null rs   = SMT.bot
       | otherwise = SMT.bigOr [ usable r .&& strict r .> zero | r <- rs ]
@@ -174,7 +170,7 @@ orient inter prob absi mselector useUP useUR = do
   SMT.assert usableRulesConstraints
   SMT.assert filteringConstraints
 
-  return (proof usablePositions, (ebsi, usenc), forceAny)
+  return (proof usablePositions, ebsi, usenc)
 
   where
     trs    = Prob.allComponents prob

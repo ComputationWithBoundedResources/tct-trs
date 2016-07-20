@@ -87,8 +87,8 @@ custom
     ua b = if b then UArgs else NoUArgs
     ur b = if b then URules else NoURules
 
-    mx dm dg = matrix' dm dg    Algebraic  (ua useMatricesUArgs) (ur useMatricesURules) sel NoGreedy
-    px dg    = poly' (Mixed dg) Restrict   (ua usePolysUArgs) (ur usePolysURules) sel NoGreedy
+    mx dm dg = matrix' dm dg    Algebraic  (ua useMatricesUArgs) (ur useMatricesURules) sel
+    px dg    = poly' (Mixed dg) Restrict   (ua usePolysUArgs) (ur usePolysURules) sel
     sel      = if useDecompose then Just selAny else Nothing
 
     mxs 0 = mx 1 0

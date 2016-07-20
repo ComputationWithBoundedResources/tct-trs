@@ -148,7 +148,7 @@ mxs 4 = mxs4
 mxs n = mx n n
 
 px :: Shape -> Restrict -> TrsStrategy
-px sh res = poly' sh res UArgs URules (Just selAny) NoGreedy
+px sh res = poly' sh res UArgs URules (Just selAny)
 
 pxs0, pxs1, pxs2 :: TrsStrategy
 pxs0 = px (Mixed 0) NoRestrict
@@ -172,7 +172,7 @@ shift :: (Degree -> TrsStrategy) -> Degree -> Degree -> TrsStrategy
 shift s l u = chain [ tew (s n) | n <- [max 0 (min l u)..max 0 u] ]
 
 mx,wg :: Degree -> Degree -> TrsStrategy
-mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny) NoGreedy
+mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny)
 wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
 
 -- | Like 'ints' but applies only matrix interpretations.
@@ -254,7 +254,7 @@ toDP =
       | Prob.isInnermostProblem prob = decomposeIndependentSG
       | otherwise                    = linearPathAnalysis
 
-    shiftt = matrix' 2 1 Algebraic UArgs URules (Just $ RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules) NoGreedy
+    shiftt = matrix' 2 1 Algebraic UArgs URules (Just $ RS.selAllOf $ RS.selStricts `RS.selInter` RS.selRules)
     wgOnUsable = abort
 
 -- | Tries to remove leafs in the congruence graph,

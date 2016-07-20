@@ -31,7 +31,6 @@ module Tct.Trs.Processor.Matrix.NaturalMI
   , NaturalMIKind (..)
   , UsableArgs (..)
   , UsableRules (..)
-  , Greedy (..)
 
   -- * Complexity Pair
   , matrixCPDeclaration
@@ -64,7 +63,7 @@ import qualified Tct.Trs.Data                               as TD
 
 -- imports tct-common
 import qualified Tct.Common.ProofCombinators                as PC
-import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.=>), (.>), (.>=), (.&&))
+import           Tct.Common.SMT                             (one, zero, (.<=>), (.==), (.=>), (.>), (.>=), (.&&), (.+))
 import qualified Tct.Common.SMT                             as SMT
 
 
@@ -79,7 +78,7 @@ import           Tct.Core.Parse            ()
 -- imports tct-trs
 import Tct.Trs.Data
 import qualified Tct.Trs.Data.Arguments                     as Arg
-import           Tct.Trs.Data.Arguments                     (UsableArgs (..), UsableRules (..), Greedy (..))
+import           Tct.Trs.Data.Arguments                     (UsableArgs (..), UsableRules (..))
 
 import qualified Tct.Trs.Data.ComplexityPair as CP
 import qualified Tct.Trs.Data.Problem                       as Prob
@@ -165,7 +164,6 @@ data NaturalMI = NaturalMI
                  , uargs       :: Arg.UsableArgs -- ^ usable arguments
                  , urules      :: Arg.UsableRules -- ^ usable rules
                  , selector    :: Maybe (TD.ExpressionSelector F V)
-                 , greedy      :: Arg.Greedy
                  } deriving (Show)
 
 -- | Proof type of matrix interpretations
@@ -339,14 +337,14 @@ dConstraints :: Int
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
 dConstraints dim rel done dtwo gtwo _ =
-  return $ foreapprox `SMT.band` forecompat `SMT.band` backapprox `SMT.band` backcompat `SMT.band` exactness
+  return $ foreapprox .&& forecompat .&& backapprox .&& backcompat .&& exactness
   where
     toD         = [1..dim]
     foreapprox  = SMT.bigAnd [ rel 1 x .=>  done x x x | x <- toD ]
-    forecompat  = SMT.bigAnd [ (done i x y `SMT.band` gtwo x y z u) .=> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    forecompat  = SMT.bigAnd [ (done i x y .&& gtwo x y z u) .=> done i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
     backapprox  = SMT.bigAnd [ rel 1 x .=> dtwo x x x | x <- toD ]
-    backcompat  = SMT.bigAnd [ (dtwo i x y `SMT.band` gtwo z u x y) .=> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
-    exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y `SMT.band` dtwo i x y) | i <- toD, x <- toD, y <- toD ]
+    backcompat  = SMT.bigAnd [ (dtwo i x y .&& gtwo z u x y) .=> dtwo i z u | i <- toD, x <- toD, y <- toD, z <- toD, u <- toD ]
+    exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y .&& dtwo i x y) | i <- toD, x <- toD, y <- toD ]
 
 
 
@@ -356,12 +354,12 @@ hConstraints :: Int
              -> (Int -> Int -> SMT.Formula w)
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
-hConstraints dim deg jrel hrel _ = return $ unaryNotation `SMT.band` jDecrease
+hConstraints dim deg jrel hrel _ = return $ unaryNotation .&& jDecrease
   where
     toD = [1..dim]
     unaryNotation = SMT.bigAnd [ hrel x h .=> hrel x (h - 1) | x <- toD, h <- [2..deg - 1] ]
     jDecrease = SMT.bigAnd [ f i j | i <- toD, j <- toD ]
-    f i j = jrel i j .=> SMT.bigOr (map (\ h -> hrel i h `SMT.band` SMT.bnot (hrel j h)) [1..deg - 1])
+    f i j = jrel i j .=> SMT.bigOr (map (\ h -> hrel i h .&& SMT.bnot (hrel j h)) [1..deg - 1])
 
 
 iConstraints :: Int
@@ -384,7 +382,7 @@ jConstraints dim rel irel jrel _ =
   return $ SMT.bigAnd [ f i j | i <- toD, j <- toD ]
   where
     toD = [1..dim]
-    f i j = jrel i j .<=> SMT.bigOr (map (\ k -> irel i k `SMT.band` rel k j) toD)
+    f i j = jrel i j .<=> SMT.bigOr (map (\ k -> irel i k .&& rel k j) toD)
 
 
 rConstraints :: Int
@@ -392,13 +390,13 @@ rConstraints :: Int
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
 rConstraints dim rel mi =
-  return $ reflexivity `SMT.band` transitivity `SMT.band` compatibility `SMT.band` nocycle
+  return $ reflexivity .&& transitivity .&& compatibility .&& nocycle
   where
     toD = [1..dim]
     reflexivity   = SMT.bigAnd $ map (\ x -> rel x x) toD
-    transitivity  = SMT.bigAnd [ (rel x y `SMT.band` rel y z) .=> rel x z | x <- toD, y <- toD, z <- toD ]
+    transitivity  = SMT.bigAnd [ (rel x y .&& rel y z) .=> rel x z | x <- toD, y <- toD, z <- toD ]
     compatibility = SMT.bigAnd [ ggeqConstraint mi x y .=> rel x y | x <- toD, y <- toD ]
-    nocycle       = SMT.bigAnd [ (rel 1 y `SMT.band` ggrtConstraint mi x y) .=> SMT.bnot (rel y x) | x <- toD, y <- toD ]
+    nocycle       = SMT.bigAnd [ (rel 1 y .&& ggrtConstraint mi x y) .=> SMT.bnot (rel y x) | x <- toD, y <- toD ]
 
 rcConstraints :: Int
               -> (Int -> Int -> SMT.Formula w)
@@ -415,11 +413,11 @@ tConstraints :: Int
              -> I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w))
              -> SMT.SmtSolverSt w (SMT.Formula w)
 tConstraints dim rel trel gthree _ =
-  return $ initial `SMT.band` gThreeStep
+  return $ initial .&& gThreeStep
   where
     toD = [1..dim]
-    initial = SMT.bigAnd [ if x == y then SMT.top else (rel 1 x `SMT.band` rel 1 y) .=> trel x x y | x <- toD, y <- toD ]
-    gThreeStep = SMT.bigAnd [ (trel x y z `SMT.band` gthree x y z u v w) .=> trel u v w | x <- toD, y <- toD, z <- toD, u <- toD, v <- toD, w <- toD ]
+    initial = SMT.bigAnd [ if x == y then SMT.top else (rel 1 x .&& rel 1 y) .=> trel x x y | x <- toD, y <- toD ]
+    gThreeStep = SMT.bigAnd [ (trel x y z .&& gthree x y z u v w) .=> trel u v w | x <- toD, y <- toD, z <- toD, u <- toD, v <- toD, w <- toD ]
 
 
 gThreeConstraints :: Int
@@ -431,7 +429,7 @@ gThreeConstraints dim gthree mi = return $
   where
     toD       = [1..dim]
     f i j k x y z = (gthree i j k x y z) .<=> SMT.bigOr (map (SMT.bigOr . map (g i j k x y z) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
-    g i j k x y z m = (EncM.mEntry i x m .>= one) `SMT.band` (EncM.mEntry j y m .>= one) `SMT.band` (EncM.mEntry k z m .>= one)
+    g i j k x y z m = (EncM.mEntry i x m .>= one) .&& (EncM.mEntry j y m .>= one) .&& (EncM.mEntry k z m .>= one)
 
 
 gtwoConstraints :: Int
@@ -443,7 +441,7 @@ gtwoConstraints dim gtwo mi =
   where
     toD = [1..dim]
     f i j k l   = (gtwo i j k l) .<=> SMT.bigOr (map (SMT.bigOr . map (g i j k l) . Map.elems . MI.coefficients) $ Map.elems $ I.interpretations mi)
-    g i j k l m = (EncM.mEntry i k m .>= one) `SMT.band` (EncM.mEntry j l m .>= one)
+    g i j k l m = (EncM.mEntry i k m .>= one) .&& (EncM.mEntry j l m .>= one)
 
 
 ggeqConstraint :: I.Interpretation fun (MI.LinearInterpretation a (SMT.IExpr w)) -> Int -> Int
@@ -557,71 +555,46 @@ kindConstraints (MI.ConstructorEda cs mdeg) absmi = do
     filterFs fs = Map.filterWithKey (\f _ -> f `Set.member` fs)
 
 
-entscheide :: NaturalMI -> Prob.Trs -> CD.TctM (CD.Return NaturalMI)
-entscheide p prob = do
-  let
-    orientM = do
-      res@(_, (pint,_), _) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
-      SMT.assertM $ (kindConstraints kind pint)
-      return $ res
-    (ret, encoding)           = SMT.runSolverSt orientM SMT.initialState
-    (apint,decoding,forceAny) = ret
-    aorder = MatrixOrder
-      { kind_ = kind
-      , dim_  = miDimension p
-      , mint_ = apint }
+entscheide :: NaturalMI -> Trs -> CD.TctM (CD.Return NaturalMI)
+entscheide p@NaturalMI{miDimension=dim} prob = do
+  res :: SMT.Result (I.InterpretationProof () (), I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
+    <- SMT.smtSolveSt (SMT.smtSolveTctM prob) $ do
+      encoding@(_,pint,_) <- I.orient p prob absi shift (uargs p == Arg.UArgs) (urules p == Arg.URules)
+      SMT.assertM $ kindConstraints kind pint
+      return $ SMT.decode encoding
+  case res of
+    SMT.Sat a -> let order = mkOrder a in
+      CD.succeedWith
+        (PC.Applicable $ PC.Order order)
+        (certification p order)
+        (I.newProblem prob (mint_ order))
 
-  entscheide1 p aorder encoding decoding forceAny prob
+    SMT.Error s -> throwError (userError s)
+    _           -> CD.abortWith "Incompatible"
+
   where
 
     absi =  I.Interpretation $ Map.mapWithKey (curry $ MI.abstractInterpretation kind (miDimension p)) (Sig.toMap sig)
-
     sig   = Prob.signature prob
-    kind = mxKind (miKind p) (miDimension p) (miDegree p) (Prob.startTerms prob)
-
     shift = maybe I.All I.Shift (selector p)
+    kind = mxKind (miKind p) dim (miDegree p) (Prob.startTerms prob)
 
-
-
-entscheide1 ::
-  NaturalMI
-  -> MatrixOrder c
-  -> SMT.SmtState Int
-  -> (I.Interpretation F (SomeLInter (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
-  -> I.ForceAny
-  -> Prob.Trs
-  -> CD.TctM (CD.Return NaturalMI)
-entscheide1 p aorder encoding decoding forceAny prob
-  | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
-  | otherwise           = do
-    res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
-      <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
-    case res of
-      SMT.Sat a -> CD.succeedWith  (PC.Applicable $ PC.Order order) (certification p order) (I.newProblem prob (mint_ order))
-        where order = mkOrder a
-
-      SMT.Error s -> throwError (userError s)
-      _           -> CD.abortWith (PC.Applicable PC.Incompatible :: PC.ApplicationProof NaturalMIProof)
+    mkOrder (proof, inter, ufuns) = MatrixOrder
+      { kind_ = kind
+      , dim_  = dim
+      , mint_ = proof
+        { I.inter_     = inter
+        , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
+        , I.strictDPs_ = sDPs
+        , I.strictTrs_ = sTrs
+        , I.weakDPs_   = wDPs
+        , I.weakTrs_   = wTrs }}
       where
 
-        assertx st e = st {SMT.asserts = e: SMT.asserts st}
-        srules = RS.toList $ Prob.strictComponents prob
+          (sDPs,wDPs) = List.partition isStrict' (rs $ Prob.dpComponents prob)
+          (sTrs,wTrs) = List.partition isStrict' (rs $ Prob.trsComponents prob)
+          isStrict' (r,i) = r `RS.member` Prob.strictComponents prob && uncurry isStrict i
 
-        mkOrder (inter, ufuns) = aorder { mint_ = mkInter (mint_ aorder) inter ufuns }
-        mkInter aproof inter ufuns = aproof
-          { I.inter_     = inter
-          , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
-          , I.strictDPs_ = sDPs
-          , I.strictTrs_ = sTrs
-          , I.weakDPs_   = wDPs'
-          , I.weakTrs_   = wTrs' }
-          where
-
-
-          (sDPs,wDPs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
-          (sTrs,wTrs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
-          wDPs' = filter (uncurry isWeak . snd) wDPs
-          wTrs' = filter (uncurry isWeak . snd) wTrs
           rs trs =
             [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
             | r@(RR.Rule lhs rhs) <- RS.toList trs
@@ -629,6 +602,55 @@ entscheide1 p aorder encoding decoding forceAny prob
 
           isUsable Nothing _ = True
           isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
+
+
+
+
+-- entscheide1 ::
+--   NaturalMI
+--   -> MatrixOrder c
+--   -> SMT.SmtState Int
+--   -> (I.Interpretation F (SomeLInter (SMT.IExpr Int)), Maybe (UREnc.UsableEncoder F Int))
+--   -> Prob.Trs
+--   -> CD.TctM (CD.Return NaturalMI)
+-- entscheide1 p aorder encoding decoding forceAny prob
+--   | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
+--   | otherwise           = do
+--     res :: SMT.Result (I.Interpretation F (SomeLInter Int), Maybe (UREnc.UsableSymbols F))
+--       <- SMT.solve (SMT.smtSolveTctM prob) (encoding `assertx` forceAny srules) (SMT.decode decoding)
+--     case res of
+--       SMT.Sat a -> CD.succeedWith  (PC.Applicable $ PC.Order order) (certification p order) (I.newProblem prob (mint_ order))
+--         where order = mkOrder a
+
+--       SMT.Error s -> throwError (userError s)
+--       _           -> CD.abortWith (PC.Applicable PC.Incompatible :: PC.ApplicationProof NaturalMIProof)
+--       where
+
+--         assertx st e = st {SMT.asserts = e: SMT.asserts st}
+--         srules = RS.toList $ Prob.strictComponents prob
+
+--         mkOrder (inter, ufuns) = aorder { mint_ = mkInter (mint_ aorder) inter ufuns }
+--         mkInter aproof inter ufuns = aproof
+--           { I.inter_     = inter
+--           , I.ufuns_     = UREnc.runUsableSymbols `fmap` ufuns
+--           , I.strictDPs_ = sDPs
+--           , I.strictTrs_ = sTrs
+--           , I.weakDPs_   = wDPs'
+--           , I.weakTrs_   = wTrs' }
+--           where
+
+
+--           (sDPs,wDPs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.dpComponents prob)
+--           (sTrs,wTrs) = List.partition (\(r,i) -> r `RS.member` Prob.strictComponents prob && uncurry isStrict i) (rs $ Prob.trsComponents prob)
+--           wDPs' = filter (uncurry isWeak . snd) wDPs
+--           wTrs' = filter (uncurry isWeak . snd) wTrs
+--           rs trs =
+--             [ (r, (interpretf (miDimension p) inter  lhs, interpretf (miDimension p) inter  rhs))
+--             | r@(RR.Rule lhs rhs) <- RS.toList trs
+--             , isUsable ufuns r]
+
+--           isUsable Nothing _ = True
+--           isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
 
 
 ----------------------------------------------------------------------
@@ -639,16 +661,14 @@ entscheide1 p aorder encoding decoding forceAny prob
 {- | create options/ configuration  for the NaturalMI strategy -}
 matrixStrategy :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector F V)
-               -> Arg.Greedy
                -> CD.Strategy Prob.Trs Prob.Trs
-matrixStrategy dim deg nmiKind ua ur sl gr = CD.Apply $
+matrixStrategy dim deg nmiKind ua ur sl = CD.Apply $
   NaturalMI { miDimension = dim
             , miDegree = deg
             , miKind = nmiKind
             , uargs = ua
             , urules = ur
             , selector = sl
-            , greedy = gr
             }
 
 
@@ -682,16 +702,14 @@ args ::
   , CD.Argument 'CD.Optional NaturalMIKind
   , CD.Argument 'CD.Optional Arg.UsableArgs
   , CD.Argument 'CD.Optional Arg.UsableRules
-  , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V))
-  , CD.Argument 'CD.Optional Arg.Greedy )
+  , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V)) )
 args =
   ( dimArg          `CD.optional` 1
   , degArg          `CD.optional` 1
   , nmiKindArg      `CD.optional` Algebraic
   , Arg.usableArgs  `CD.optional` Arg.UArgs
   , Arg.usableRules `CD.optional` Arg.URules
-  , slArg           `CD.optional` Just (RS.selAnyOf RS.selStricts)
-  , Arg.greedy      `CD.optional` Arg.Greedy )
+  , slArg           `CD.optional` Just (RS.selAnyOf RS.selStricts) )
 
 {- | declare the matrix strategy -}
 matrixDeclaration :: CD.Declaration (
@@ -701,7 +719,6 @@ matrixDeclaration :: CD.Declaration (
    , CD.Argument 'CD.Optional Arg.UsableArgs
    , CD.Argument 'CD.Optional Arg.UsableRules
    , CD.Argument 'CD.Optional (Maybe (RS.ExpressionSelector F V))
-   , CD.Argument 'CD.Optional Arg.Greedy
   ] CD.:-> CD.Strategy Prob.Trs Prob.Trs)
 matrixDeclaration = CD.declare "matrix" description args matrixStrategy
 
@@ -710,7 +727,6 @@ matrix = CD.deflFun matrixDeclaration
 
 matrix' :: Int -> Int -> NaturalMIKind -> Arg.UsableArgs -> Arg.UsableRules
                -> Maybe (TD.ExpressionSelector F V)
-               -> Arg.Greedy
                -> CD.Strategy Prob.Trs Prob.Trs
 matrix' = CD.declFun matrixDeclaration
 
@@ -755,7 +771,7 @@ instance I.AbstractInterpretation NaturalMI where
   addConstant _ (MI.LInter coeffs vec) smtexpr =
     MI.LInter coeffs vec'
     where
-      vec' = EncM.adjustVector (SMT.add smtexpr) 1 vec
+      vec' = EncM.adjustVector (smtexpr .+) 1 vec
 
   {- | compares two concrete linear interpretations with the 'greater or equal' relation -}
   -- gte :: NaturalMI -> C NaturalMI -> C NaturalMI -> SMT.Expr
@@ -807,7 +823,7 @@ instance CD.Processor NaturalMI where
 
 instance CP.IsComplexityPair NaturalMI where
   solveComplexityPair p sel prob = do
-  pt <- CD.evaluate (CD.Apply p{selector=Just sel, greedy=NoGreedy}) (CD.Open prob)
+  pt <- CD.evaluate (CD.Apply p{selector=Just sel}) (CD.Open prob)
   return $ if CD.isFailing pt
     then Left $ "application of cp failed"
     else case CD.open pt of
@@ -825,7 +841,6 @@ matrixComplexityPair dim deg nmiKind ua ur = CP.toComplexityPair $
             , uargs = ua
             , urules = ur
             , selector = Nothing
-            , greedy = NoGreedy
             }
 
 matrixCPDeclaration :: CD.Declaration (

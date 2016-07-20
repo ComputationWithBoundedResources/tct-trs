@@ -31,7 +31,7 @@ import qualified Data.Rewriting.Rule          as R (lhs, rhs)
 import qualified Data.Rewriting.Term          as R
 
 import           Tct.Common.ProofCombinators
-import           Tct.Common.SMT               ((.&&), (.<=>), (.=<), (.==), (.=>), (.>), (.||))
+import           Tct.Common.SMT               ((.&&), (.<=>), (.<=), (.==), (.=>), (.>), (.||))
 import qualified Tct.Common.SMT               as SMT
 
 import           Tct.Trs.Data
@@ -103,7 +103,7 @@ data PrecedenceEncoder f w = PrecedenceEncoder
 precedenceEncoder :: (SMT.Fresh w, Ord f) => Signature f -> SMT.SmtSolverSt w (PrecedenceEncoder f w)
 precedenceEncoder sig = PrecedenceEncoder (Prec.empty sig) . M.fromList <$> mapM bounded (S.toList ds)
   where
-    bounded f = do v <- SMT.ivarM'; SMT.assert (v .> SMT.zero .&& v .=< SMT.num k); return (f,v)
+    bounded f = do v <- SMT.ivarM'; SMT.assert (v .> SMT.zero .&& v .<= SMT.num k); return (f,v)
     ds        = Sig.defineds sig
     k         = S.size ds
 
@@ -267,7 +267,7 @@ orient allowEcomp sig prec safe mu a =
     Eposub s t -> s `eposubimp` t
     Eq s t     -> s `equivimp` t
   where
-    ite g t e = SMT.implies g t `SMT.band` SMT.implies (SMT.bnot g) e
+    ite g t e = (g .=> t) .&& ((SMT.bnot g) .=> e)
     unsatisfiable = unorientable sig
 
     s `epo` t    = orient allowEcomp sig prec safe mu (Epo s t)
@@ -302,7 +302,7 @@ orient allowEcomp sig prec safe mu a =
                   rec  = epolex (k+1)
                   comp = SMT.bigOr [ si `eposub` tj, SMT.bigAnd [si `equiv` tj, rec] ]
                 in
-                SMT.bigAnd [mu f (i,k), mu g (j,k)] `SMT.implies` ite (safe g j) rec comp
+                SMT.bigAnd [mu f (i,k), mu g (j,k)] .=> ite (safe g j) rec comp
                 | (i, si) <- ssi, (j, tj) <- tsi]
         epo23 _ _ = SMT.bot
 
@@ -336,7 +336,7 @@ orient allowEcomp sig prec safe mu a =
           | otherwise       -> SMT.bigAnd
             [ prec (f:~:g)
             , SMT.bigAnd
-              [ SMT.bigAnd [mu f (i,k), mu g (j,k)] `SMT.implies` (si `equiv` tj)
+              [ SMT.bigAnd [mu f (i,k), mu g (j,k)] .=> (si `equiv` tj)
               | (i,si) <- zip [1..] ss, (j,tj) <- zip [1..] ts, k <- [1..length ss] ]
             ]
           where unsat = length ss /= length ts || (Sig.isConstructor f sig /= Sig.isConstructor g sig)
