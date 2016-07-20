@@ -8,6 +8,7 @@ module Tct.Trs.Strategy.Competition
 
 import Tct.Core
 import Tct.Core.Data                 (declFun, deflFun)
+import Tct.Core.Processor.MSum       (madd)
 
 import Tct.Trs.Data
 import Tct.Trs.Data.Problem          (isRCProblem)
@@ -33,6 +34,6 @@ competitionStrategy :: CombineWith -> TrsStrategy
 competitionStrategy cmb =
   withProblem $ \p ->
     if isRCProblem p
-      then runtime' cmb
+      then timeoutIn 5 decreasingLoops `madd` runtime' cmb
       else derivational
 
