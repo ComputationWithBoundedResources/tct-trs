@@ -1,13 +1,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Tct.Trs.Processor.Matrix.MI
   (
-  jordan'
-  , binaryJordan'
-  , triangular'
-  , almostTriangular'
-  , algebraic'
-  , eda'
-  , ida'
+  triangular'
+  -- jordan'
+  -- , binaryJordan'
+  -- , triangular
+  -- , almostTriangular'
+  -- , algebraic'
+  -- , eda'
+  -- , ida'
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -751,16 +752,22 @@ upperbound st dim kind li = case kind of
 
 -- 11cai setup
 
-mkmi :: Int -> Kind -> TrsStrategy
-mkmi dim kind = T.processor MI{miKind=kind, miDimension=dim,miUArgs=NoUArgs,miURules=NoURules,miSelector=Nothing}
+-- mkmi :: Int -> Kind -> TrsStrategy
+-- mkmi dim kind = T.processor MI{miKind=kind, miDimension=dim,miUArgs=NoUArgs,miURules=NoURules,miSelector=Nothing}
 
+-- jordan'           = \dim     -> mkmi dim (MaximalMatrix LikeJordan)
+-- binaryJordan'     = \dim     -> mkmi dim (MaximalMatrix LikeBinaryJordan)
+-- almostTriangular' = \dim     -> mkmi dim (MaximalMatrix $ AlmostTriangular 1)
+-- triangular'       = \dim     -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity Nothing))
+-- algebraic'        = \dim deg -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity (Just deg)))
 
-jordan'           = \dim     -> mkmi dim (MaximalMatrix LikeJordan)
-binaryJordan'     = \dim     -> mkmi dim (MaximalMatrix LikeBinaryJordan)
-almostTriangular' = \dim     -> mkmi dim (MaximalMatrix $ AlmostTriangular 1)
-triangular'       = \dim     -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity Nothing))
-algebraic'        = \dim deg -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity (Just deg)))
+-- eda' = \dim     -> mkmi dim (Automaton Nothing)
+-- ida' = \dim deg -> mkmi dim (Automaton (Just deg))
 
-eda' = \dim     -> mkmi dim (Automaton Nothing)
-ida' = \dim deg -> mkmi dim (Automaton (Just deg))
+-- competition setup
+
+triangular' dim deg ua ur sel = T.processor MI{miKind=kind,miDimension=dim,miUArgs=ua,miURules=ur,miSelector=sel} where
+  kind 
+    | deg < dim = MaximalMatrix $ UpperTriangular (Multiplicity (Just deg))
+    | otherwise = MaximalMatrix $ UpperTriangular (Multiplicity Nothing)
 

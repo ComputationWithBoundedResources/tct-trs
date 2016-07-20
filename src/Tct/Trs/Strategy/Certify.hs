@@ -14,13 +14,14 @@ module Tct.Trs.Strategy.Certify
   ) where
 
 import           Tct.Core
-import qualified Tct.Core.Data          as T
+import qualified Tct.Core.Data               as T
 
-import           Tct.Trs.Data           (TrsStrategy)
-import qualified Tct.Trs.Data.Problem   as Prob
-import qualified Tct.Trs.Data.Rules     as RS
-import qualified Tct.Trs.Data.Signature as Sig
-import           Tct.Trs.Processors     hiding (matchbounds)
+import           Tct.Trs.Data                (TrsStrategy)
+import qualified Tct.Trs.Data.Problem        as Prob
+import qualified Tct.Trs.Data.Rules          as RS
+import qualified Tct.Trs.Data.Signature      as Sig
+import           Tct.Trs.Processors          hiding (matchbounds)
+import           Tct.Trs.Processor.Matrix.MI (triangular')
 
 
 -- | Declaration for strategy "certify".
@@ -62,7 +63,7 @@ intes n = mx n
 
 px,mx :: (?ua :: UsableArgs) => Degree -> TrsStrategy
 px d = poly' (Mixed d) Restrict ?ua URules (Just selAny)
-mx d = matrix' d d Triangular ?ua URules (Just selAny)
+mx d = triangular' d d ?ua URules (Just selAny)
 
 top :: [TrsStrategy] -> TrsStrategy
 top = best cmpTimeUB
@@ -124,6 +125,6 @@ certifyDC deg =
   .>>! (matchbounds .<||> interpretations 1 deg)
   where
     interpretations l u = chain [ tew (mxAny d) | d <- [(max 0 l) .. (min u deg)] ]
-    mxAny d = matrix' d d Triangular NoUArgs NoURules (Just selAny)
+    mxAny d = triangular' d d NoUArgs NoURules (Just selAny)
     -- mxAll d = matrix' d d Triangular NoUArgs NoURules (Just sel) NoGreedy
 

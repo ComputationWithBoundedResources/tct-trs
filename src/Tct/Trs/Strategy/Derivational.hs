@@ -15,6 +15,7 @@ import           Tct.Trs.Data
 import           Tct.Trs.Data.Signature (arity, symbols)
 import qualified Tct.Trs.Data.Rules as RS
 import           Tct.Trs.Processors
+import           Tct.Trs.Processor.Matrix.MI (triangular')
 
 -- MS:
 -- decomposition after shifting does not work (as composition basically searches for an interpretation)
@@ -71,8 +72,8 @@ compose =
 type Dimension = Int
 
 mx,mx' :: Dimension -> Degree -> TrsStrategy
-mx dim deg  = matrix' dim deg Algebraic NoUArgs NoURules (Just selAny)
-mx' dim deg = matrix' dim deg Algebraic NoUArgs NoURules Nothing
+mx dim deg  = triangular' dim deg NoUArgs NoURules (Just selAny)
+mx' dim deg = triangular' dim deg NoUArgs NoURules Nothing
 
 mxCP :: Dimension -> Degree -> ComplexityPair
 mxCP dim deg = matrixCP' dim deg Algebraic NoUArgs NoURules
