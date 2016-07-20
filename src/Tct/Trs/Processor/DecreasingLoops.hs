@@ -6,7 +6,6 @@ module Tct.Trs.Processor.DecreasingLoops
   , decreasingLoopsDeclaration
 
   , Loop(..)
-  , Narrow(..)
   ) where
 
 
@@ -144,7 +143,7 @@ data Loop = AnyLoop | LinearLoop | ExponentialLoop
 
 data DecreasingLoops = DecreasingLoops
   { bound  :: Loop
-  , narrow :: Narrow
+  , narrow :: Int
   } deriving Show
 
 -- MS: output is not really good it, it would be nice to display
@@ -193,8 +192,8 @@ entscheide _ prob | not (Prob.isRCProblem prob)       = Nothing
 entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob = search bnd nrwsteps where
 
   nrwsteps
-    | nrw == Narrow && Prob.isRCProblem prob && not (Prob.isInnermostProblem prob) = 10
-    | otherwise                                                                    = 0
+    | Prob.isRCProblem prob && not (Prob.isInnermostProblem prob) = nrw
+    | otherwise                                                   = 0
 
   normalise r = R.rename (flip find $ zip (R.vars r) [V' 0..]) r
   allrules    = normalise `fmap` RS.toList (Prob.allComponents prob)
@@ -206,7 +205,9 @@ entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob = search bnd nrwsteps wher
 
   gen 0 rs = rs
   gen 1 _ = []
-  gen n rs = rs ++ gen (n-1 :: Int) (concatMap narrowings rs)
+  gen n rs
+    | n >= 0    = rs ++ gen (n-1 :: Int) (concatMap narrowings rs)
+    | otherwise = []
 
   k f Rule{lhs=l,rhs=r} = f l r
   search ExponentialLoop nrws = alternative (k anyExponential) (gen nrws startrules)
@@ -219,25 +220,22 @@ entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob = search bnd nrwsteps wher
 boundArg :: T.Argument 'T.Required Loop
 boundArg = T.flag "loop" [ "This argument specifies which bound to search for." ]
 
-data Narrow = Narrow | NoNarrow
-  deriving (Show, Eq, Enum, Bounded)
-
-narrowArg :: T.Argument 'T.Required Narrow
-narrowArg = T.flag "narrow" [ "This argument specifies wether narrow should be applied." ]
+narrowArg :: T.Argument 'T.Required T.Nat
+narrowArg = T.nat "narrow" [ "This argument specifies how many narrowing should be applied." ]
 
 
-decreasingLoopsDeclaration :: T.Declaration ('[T.Argument 'T.Optional Loop, T.Argument 'T.Optional Narrow] T.:-> TrsStrategy)
+decreasingLoopsDeclaration :: T.Declaration ('[T.Argument 'T.Optional Loop, T.Argument 'T.Optional T.Nat] T.:-> TrsStrategy)
 decreasingLoopsDeclaration =
   T.declare
     "decreasingLoops"
     ["Tries to find decreasing loops."]
-    (boundArg `T.optional` AnyLoop, narrowArg `T.optional` Narrow)
+    (boundArg `T.optional` AnyLoop, narrowArg `T.optional` 10)
     (\bnd nrw -> T.processor DecreasingLoops{bound=bnd,narrow=nrw})
 
 decreasingLoops :: TrsStrategy
 decreasingLoops = T.deflFun decreasingLoopsDeclaration
 
-decreasingLoops' :: Loop -> Narrow -> TrsStrategy
+decreasingLoops' :: Loop -> Int -> TrsStrategy
 decreasingLoops' = T.declFun decreasingLoopsDeclaration
 
 
