@@ -94,6 +94,10 @@ data Problem f v = Problem
   , weakTrs    :: Rules f v
 
   , dpGraph    :: DependencyGraph f v
+  --
+  -- original rules problem for ceta output
+  , srs :: [R.Rule f v]
+  , wrs :: [R.Rule f v]
   } deriving (Show, Eq)
 
 
@@ -162,7 +166,11 @@ fromRewriting prob =
         , weakDPs    = RS.empty
         , weakTrs    = wTrs
 
-        , dpGraph = DPG.empty }
+        , dpGraph = DPG.empty
+
+        , srs = fmap toFun . RP.strictRules $ RP.rules prob
+        , wrs = fmap toFun . RP.weakRules   $ RP.rules prob
+        }
     else
       Left "problem not wellformed."
   where
@@ -310,18 +318,20 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
                     _ -> PP.empty
           sts = case startTerms prob of
                  st@AllTerms{} -> PP.text "derivational complexity wrt. signature" PP.<+> PP.set' (alls st)
-                 st@BasicTerms {} -> PP.text "runtime complexity wrt. defined symbols" 
+                 st@BasicTerms {} -> PP.text "runtime complexity wrt. defined symbols"
                                      PP.<+> PP.set' (defineds st) PP.<+> PP.text "and constructors" PP.<+> PP.set' (constructors st)
 
 -- MS: the ceta instance is not complete as it contains a tag <complexityClass> which depends on ProofTree
 -- furthermore CeTA (2.2) only supports polynomial bounds; so we add the tag manually in the output
 instance (Ord f, Ord v, Xml.Xml f, Xml.Xml v) => Xml.Xml (Problem f v) where
   toXml prob =
-    Xml.elt "problem"
-      [ Xml.elt "strictTrs"         [Xml.toXml (strictTrs prob)]
-      , Xml.elt "weakTrs"           [Xml.toXml (strictTrs prob)]
-      , Xml.elt "strictDPs"         [Xml.toXml (strictTrs prob)]
-      , Xml.elt "weakDPs"           [Xml.toXml (strictTrs prob)] ]
+    Xml.elt "complexityInput"
+      [ Xml.elt "trsInput"
+          [ Xml.elt "trs" [xmlrules $ srs prob]
+          , Xml.toCeTA (strategy prob)
+          , Xml.elt "relativeRules" [xmlrules $ wrs prob] ]
+      , Xml.toCeTA (startTerms prob, signature prob) ]
+    where xmlrules rs = Xml.elt "rules" [ Xml.toXml r | r <- rs ]
   toCeTA prob =
     Xml.elt "complexityInput"
       [ Xml.elt "trsInput"

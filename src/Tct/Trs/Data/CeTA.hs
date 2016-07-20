@@ -61,6 +61,16 @@ cetaSubProblem partial pt@(T.Open prob)      = cetaProblem partial prob pt
 cetaSubProblem partial pt@(T.Success pn _ _) = cetaProblem partial (T.problem pn) pt
 cetaSubProblem _ _                           = Left Infeasible
 
+xmlProblem :: Xml.Xml prob => Bool -> prob -> T.ProofTree t -> Result Xml.XmlContent
+xmlProblem partial prob pt = do
+  c <- isFeasible partial pt
+  return $ Xml.addChildren (Xml.toXml prob) [c]
+
+xmlSubProblem :: Xml.Xml t => Bool -> T.ProofTree t -> Result Xml.XmlContent
+xmlSubProblem partial pt@(T.Open prob)      = xmlProblem partial prob pt
+xmlSubProblem partial pt@(T.Success pn _ _) = xmlProblem partial (T.problem pn) pt
+xmlSubProblem _ _                           = Left Infeasible
+
 isCertifiable :: Xml.XmlContent -> Bool
 isCertifiable c = Xml.rootTag c /= "unsupported"
 
@@ -94,7 +104,7 @@ totalProof :: (Ord f, Ord v, Xml f, Xml v) => T.ProofTree (Problem f v) -> Resul
 totalProof pt = toDoc <$> totalProofM1 pt <*> subProblem pt
   where
     toDoc a b = C.cetaDocument (C.certificationProblem b a)
-    subProblem = cetaSubProblem False
+    subProblem = xmlSubProblem False
 
     totalProofM1 r = C.complexityProof <$> totalProofM2 r
     totalProofM2 (T.Open _)            = Left $ Unsupported "open problem"
