@@ -188,12 +188,11 @@ find a = fromMaybe err . lookup a
 -- * reachable term:
 --   generalise to l' ->+ l ->+ C[r]
 entscheide :: (Ord f, Ord v, Show f, Show v) => DecreasingLoops -> Problem f v -> Maybe (Omega' f V')
-entscheide _ prob | not (Prob.isRCProblem prob)       = Nothing
-entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob = search bnd nrwsteps where
-
-  nrwsteps
-    | Prob.isRCProblem prob && not (Prob.isInnermostProblem prob) = nrw
-    | otherwise                                                   = 0
+entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob 
+  | not (Prob.isRCProblem prob)             = Nothing
+  | Prob.isInnermostProblem prob || nrw < 0 = search bnd 0
+  | otherwise                               = search bnd nrw
+  where
 
   normalise r = R.rename (flip find $ zip (R.vars r) [V' 0..]) r
   allrules    = normalise `fmap` RS.toList (Prob.allComponents prob)
@@ -204,10 +203,8 @@ entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob = search bnd nrwsteps wher
   narrowings r = (rename . R.narrowing) `fmap` (R.narrowings `concatMap`  R.narrow r allrules)
 
   gen 0 rs = rs
-  gen 1 _ = []
-  gen n rs
-    | n >= 0    = rs ++ gen (n-1 :: Int) (concatMap narrowings rs)
-    | otherwise = []
+  gen 1 _  = []
+  gen n rs = rs ++ gen (n-1 :: Int) (concatMap narrowings rs)
 
   k f Rule{lhs=l,rhs=r} = f l r
   search ExponentialLoop nrws = alternative (k anyExponential) (gen nrws startrules)
