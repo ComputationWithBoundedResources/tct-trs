@@ -34,8 +34,8 @@ derivational = T.deflFun derivationalDeclaration
 dcfast :: TrsStrategy
 dcfast =
   combine
-    [ timeoutIn 25 matchbounds
-    , whenSRS $ withMini $ tew (mx 1 1) .>>> tew (mx 2 2)
+    [ timeoutIn 15 matchbounds
+    -- , whenSRS $ withMini $ tew (mx 1 1) .>>> tew (mx 2 2)
     , interpretations .>>> basics
     , composition ]
   where
