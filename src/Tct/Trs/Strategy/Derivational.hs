@@ -34,21 +34,21 @@ derivational = T.deflFun derivationalDeclaration
 dcfast :: TrsStrategy
 dcfast =
   combine
-    [ timeoutIn 15 matchbounds
-    -- , whenSRS $ withMini $ tew (mx 1 1) .>>> tew (mx 2 2)
-    , interpretations .>>> basics
+    [ timeoutIn 25 matchbounds
+    , whenSRS $ timeoutIn 5 $ withMini (mx' 1 1)
+    , alternative [ timeoutIn 5 (mx' i i) | i <- [1.. ideg] ]
+    , interpretations .>>! basics
     , composition ]
   where
 
-  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "8", "-ob", "10"])
-  combine  = best cmpTimeUB
   ideg     = 4
   mdeg     = 6
+  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "8", "-ob", "10"])
+  combine  = fastest --best cmpTimeUB
 
   basics          = fastest $ timeoutIn 5 matchbounds : [ mx' d d | d <- [succ ideg .. mdeg] ]
-  -- interpretations = tew . fastest $ [ mx d d | d <- [1 .. ideg] ] ++ [ wg d d | d <- [1 .. ideg] ] -- ++ [ whenSRS (withMini $ mx 1 1 <||> mx 2 2) ]
   interpretations = matrices 1 ideg
-  composition     = compose .>>! combine [ interpretations .>>> basics , composition ]
+  composition     = force compose .>>! combine [ interpretations .>>! basics , composition ]
 
 
 iteNonSizeIncreasing :: TrsStrategy -> TrsStrategy -> TrsStrategy
@@ -71,8 +71,8 @@ compose =
 
 type Dimension = Int
 
-mx,mx' :: Dimension -> Degree -> TrsStrategy
-mx dim deg  = triangular' dim deg NoUArgs NoURules (Just selAny)
+mx' :: Dimension -> Degree -> TrsStrategy
+-- mx dim deg  = triangular' dim deg NoUArgs NoURules (Just selAny)
 mx' dim deg = triangular' dim deg NoUArgs NoURules Nothing
 
 mxCP :: Dimension -> Degree -> ComplexityPair
