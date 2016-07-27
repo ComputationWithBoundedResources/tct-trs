@@ -33,22 +33,23 @@ derivational = T.deflFun derivationalDeclaration
 
 dcfast :: TrsStrategy
 dcfast =
-  combine
+  best'
     [ timeoutIn 25 matchbounds
     , whenSRS $ timeoutIn 5 $ withMini (mx' 1 1)
     , alternative [ timeoutIn 5 (mx' i i) | i <- [1.. ideg] ]
     , interpretations .>>! basics
     , composition ]
   where
+  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "8", "-ob", "10"])
+  fastest' = fastest . fmap (.>>> close)
+  best'    = best cmpTimeUB . fmap (.>>> close)
 
   ideg     = 4
   mdeg     = 6
-  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "8", "-ob", "10"])
-  combine  = fastest --best cmpTimeUB
 
   basics          = fastest $ timeoutIn 5 matchbounds : [ mx' d d | d <- [succ ideg .. mdeg] ]
   interpretations = matrices 1 ideg
-  composition     = force compose .>>! combine [ interpretations .>>! basics , composition ]
+  composition     = compose .>>! fastest' [ interpretations .>>! basics , wait 3 composition ]
 
 
 iteNonSizeIncreasing :: TrsStrategy -> TrsStrategy -> TrsStrategy
@@ -63,7 +64,7 @@ whenSRS :: TrsStrategy -> TrsStrategy
 whenSRS st = withProblem $ \prob -> when (isSRS prob) st
 
 compose :: TrsStrategy
-compose =
+compose = force $
   iteNonSizeIncreasing
     (mul 1 .<|> mul 2 .<|> (mul 3 .<||> mul 4))
     (com 1 .<|> com 2 .<|> (com 3 .<||> com 4))
