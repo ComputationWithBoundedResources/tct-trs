@@ -36,20 +36,17 @@ dcfast =
   fastest'
     [ timeoutIn 20 matchbounds
     , whenSRS $ timeoutIn 5 $ withMini (mx' 1 1)
-    , alternative [ timeoutIn 5 (mx' i i) | i <- [1.. ideg] ]
-    , interpretations .>>! basics
-    , composition ]
+    , basics
+    , interpretations
+    , composed ]
   where
-  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "8", "-ob", "10"])
   fastest' = fastest . fmap (.>>> close)
-  -- best'    = best cmpTimeUB . fmap (.>>> close)
-
+  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "6", "-ob", "8"])
   ideg     = 4
-  mdeg     = 6
 
-  basics          = fastest $ timeoutIn 5 matchbounds : [ mx' d d | d <- [succ ideg .. mdeg] ]
-  interpretations = matrices 1 ideg
-  composition     = compose .>>! fastest' [ interpretations .>>! basics , wait 3 composition ]
+  basics          = fastest' $ timeoutIn 5 matchbounds : [ mx' d d | d <- [1 .. ideg] ]
+  interpretations = matrices 1 ideg .>>> close
+  composed        = compose .>>! fastest' [ basics , wait 3 composed ]
 
 
 iteNonSizeIncreasing :: TrsStrategy -> TrsStrategy -> TrsStrategy
