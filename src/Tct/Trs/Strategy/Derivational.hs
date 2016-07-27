@@ -33,8 +33,8 @@ derivational = T.deflFun derivationalDeclaration
 
 dcfast :: TrsStrategy
 dcfast =
-  best'
-    [ timeoutIn 25 matchbounds
+  fastest'
+    [ timeoutIn 20 matchbounds
     , whenSRS $ timeoutIn 5 $ withMini (mx' 1 1)
     , alternative [ timeoutIn 5 (mx' i i) | i <- [1.. ideg] ]
     , interpretations .>>! basics
@@ -42,7 +42,7 @@ dcfast =
   where
   withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "8", "-ob", "10"])
   fastest' = fastest . fmap (.>>> close)
-  best'    = best cmpTimeUB . fmap (.>>> close)
+  -- best'    = best cmpTimeUB . fmap (.>>> close)
 
   ideg     = 4
   mdeg     = 6
