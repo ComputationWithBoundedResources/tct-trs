@@ -30,23 +30,23 @@ derivationalDeclaration = strategy "derivational" () dcfast
 derivational :: TrsStrategy
 derivational = T.deflFun derivationalDeclaration
 
-
 dcfast :: TrsStrategy
 dcfast =
-  fastest'
-    [ timeoutIn 20 matchbounds
-    , whenSRS $ timeoutIn 5 $ withMini (mx' 1 1)
-    , basics
-    , interpretations
-    , composed ]
+  combine
+    [ timeoutIn 25 matchbounds
+    , timeoutIn  5 $ whenSRS $ withMini (mx' 1 1)
+    , interpretations .>>> basics
+    , composition ]
   where
-  fastest' = fastest . fmap (.>>> close)
-  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "6", "-ob", "8"])
-  ideg     = 4
 
-  basics          = fastest' $ timeoutIn 5 matchbounds : [ mx' d d | d <- [1 .. ideg] ]
-  interpretations = matrices 1 ideg .>>> close
-  composed        = compose .>>! fastest' [ basics , wait 3 composed ]
+  withMini = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", "6", "-ob", "8"])
+  combine  = best cmpTimeUB
+  ideg     = 4
+  mdeg     = 6
+
+  basics          = fastest $ timeoutIn 5 matchbounds : [ mx' d d | d <- [succ ideg .. mdeg] ]
+  interpretations = matrices 1 ideg
+  composition     = compose .>>! combine [ interpretations .>>> basics , composition ]
 
 
 iteNonSizeIncreasing :: TrsStrategy -> TrsStrategy -> TrsStrategy
@@ -58,7 +58,7 @@ isSRS prob = S.fold (\sym -> (arity sig sym == 1 &&)) True (symbols sig)
   where sig = signature prob
 
 whenSRS :: TrsStrategy -> TrsStrategy
-whenSRS st = withProblem $ \prob -> when (isSRS prob) st
+whenSRS st = force $ withProblem $ \prob -> when (isSRS prob) st
 
 compose :: TrsStrategy
 compose = force $
