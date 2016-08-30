@@ -183,28 +183,35 @@ find a = fromMaybe err . lookup a
 --   variants of narrowing that (under-approximattes) innermost rewriting (eg non-overlapping narrowing)
 -- * relative setting:
 --   in principle only one rewrite step has to be strict, ie l ->=* . ->+ . ->=* C[r]
+--   currently I just require the start rule to be strict; this is not exhausitve but enough for the TPDB
 -- * non-left linear start term:
 --   ok when corresponding variables only appear in the context, eg Various04_18.xml : +(*(x,y),*(x,z)) -> *(x,+(y,z))
 -- * reachable term:
 --   generalise to l' ->+ l ->+ C[r]
+--   currently I require that narrowed rules are 'valid', then the pumping substitution is a constructor term; this can be relaxed
 entscheide :: (Ord f, Ord v, Show f, Show v) => DecreasingLoops -> Problem f v -> Maybe (Omega' f V')
-entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob 
+entscheide DecreasingLoops{bound=bnd,narrow=nrw} prob
   | not (Prob.isRCProblem prob)             = Nothing
   | Prob.isInnermostProblem prob || nrw < 0 = search bnd 0
   | otherwise                               = search bnd nrw
   where
 
+  isValidRule Rule{lhs=l, rhs=r} =
+    case r of {Var _ -> False; _ -> True}
+    && R.isLinear l
+    && Prob.isStartTerm (Prob.startTerms prob) l
+
   normalise r = R.rename (flip find $ zip (R.vars r) [V' 0..]) r
   allrules    = normalise `fmap` RS.toList (Prob.allComponents prob)
-  startrules  = normalise `fmap` RS.toList (Prob.strictComponents prob) & filter f
-    where f Rule{lhs=l} = R.isLinear l && Prob.isStartTerm (Prob.startTerms prob) l
+  startrules  = normalise `fmap` RS.toList (Prob.strictComponents prob) & filter isValidRule
 
-  rename      = R.rename (either (succ . (*2)) (*2))
-  narrowings r = (rename . R.narrowing) `fmap` (R.narrowings `concatMap`  R.narrow r allrules)
+  rename       = R.rename (either (succ . (*2)) (*2))
+  narrowings r = filter isValidRule $ (rename . R.narrowing) <$> (R.narrowings `concatMap` R.narrow r allrules)
 
   gen 0 rs = rs
   gen 1 _  = []
   gen n rs = rs ++ gen (n-1 :: Int) (concatMap narrowings rs)
+
 
   k f Rule{lhs=l,rhs=r} = f l r
   search ExponentialLoop nrws = alternative (k anyExponential) (gen nrws startrules)
