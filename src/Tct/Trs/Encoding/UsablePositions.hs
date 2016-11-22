@@ -7,6 +7,7 @@ module Tct.Trs.Encoding.UsablePositions
   , usableArgs
   , usableArgsWhereApplicable
   , usablePositions
+  , usablePositionsOf
   , fullWithSignature
   ) where
 
