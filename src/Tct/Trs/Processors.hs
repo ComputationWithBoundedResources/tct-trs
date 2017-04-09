@@ -46,6 +46,7 @@ import qualified Tct.Trs.Data.Rules as RS
 -- MS: FIXME:
 -- naming of arguments/methods gets increasingly more difficult
 -- should they be imported qualified?
+import Tct.Trs.Processor.AmortisedAnalysis as M
 import           Tct.Trs.Processor.Bounds                           as M
 import           Tct.Trs.Processor.Decompose                        as M
 import           Tct.Trs.Processor.ComplexityPair                   as M

@@ -78,6 +78,9 @@ trsDeclarations =
   -- ** Strategies
   , SD $ strategy "matchbounds"           () matchbounds
 
+  , SD $ strategy "ara"                   () ara
+
+
   , SD certifyDeclaration
   , SD derivationalDeclaration
   , SD runtimeDeclaration
