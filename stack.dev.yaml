@@ -2,7 +2,7 @@ flags: {}
 packages:
 - '.'
 - '../term-rewriting-xml'
-
+- '../term-rewriting-ext'
 - '../slogic'
 - '../tct-core'
 - '../tct-common'
