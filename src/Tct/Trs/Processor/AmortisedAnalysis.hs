@@ -14,45 +14,69 @@ module Tct.Trs.Processor.AmortisedAnalysis
 
 import           Control.Applicative
 import           Control.Monad
-import qualified Data.Array                   as Ar
-import qualified Data.Foldable                as F (foldr)
-import qualified Data.Map.Strict              as M
-import           Data.Maybe                   (fromMaybe)
-import           Data.Monoid                  ((<>))
 import qualified Data.Set                     as S
+import qualified Control.Exception            as E
+import           Control.Monad.State
+import           Data.Maybe                                                (fromJust)
+import Data.List (nub, sortBy)
+import Data.Function (on)
 
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
 import qualified Tct.Core.Data                as T
 
-import           SLogic.Smt.Solver            (minismt)
-
 import qualified Data.Rewriting.Rule          as R
-import qualified Data.Rewriting.Term          as R
-import qualified Data.Rewriting.Problem       as R
 import qualified Data.Rewriting.Typed.Rule    as RT
-import qualified Data.Rewriting.Typed.Term    as RT
 import qualified Data.Rewriting.Typed.Problem as RT
+import qualified Data.Rewriting.Typed.Signature as RT
+
 
 import           Tct.Common.ProofCombinators
-import           Tct.Common.SMT               ((.&&), (.<=>), (.<=), (.==), (.=>), (.>), (.||))
-import qualified Tct.Common.SMT               as SMT
 
 import           Tct.Trs.Data
-import           Tct.Trs.Data.Precedence      (Order (..), Precedence (..))
-import qualified Tct.Trs.Data.Precedence      as Prec
+import Tct.Trs.Data.Symbol (unV, unF)
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
-import qualified Tct.Trs.Data.Rewriting       as R (directSubterms)
 import qualified Tct.Trs.Data.Signature       as Sig
 import qualified Tct.Trs.Data.Rules as RS
-import qualified Tct.Trs.Encoding.SafeMapping as SM
 
-import Debug.Trace
+import Tct.Trs.Processor.ARA.InferTypes
+import           Tct.Trs.Processor.ARA.ByInferenceRules.Analyzer
+import           Tct.Trs.Processor.ARA.ByInferenceRules.CmdLineArguments
+import           Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.SMT
+import           Tct.Trs.Processor.ARA.ByInferenceRules.Graph.Ops
+import           Tct.Trs.Processor.ARA.ByInferenceRules.Prove
+import Tct.Trs.Processor.ARA.ByInferenceRules.HelperFunctions
+import           Tct.Trs.Processor.ARA.ByInferenceRules.TypeSignatures
+import           Tct.Trs.Processor.ARA.Exception
+import           Tct.Trs.Processor.ARA.Exception.Pretty                       ()
 
 
-data Ara = Ara { heuristics_ :: Heuristics }
-            deriving Show
+data Ara = Ara { heuristics_ :: Heuristics -- ^ Use heuristics. TODO: Heuristics
+                                           -- not yet functional as type inference
+                                           -- only infers a single datatype.
+               , minDegree  :: Int         -- ^ Minimal degree to look for
+               , maxDegree  :: Int         -- ^ Maximal degree to look for
+               }
+         deriving Show
+
+
+defaultArgs :: ArgumentOptions
+defaultArgs = ArgumentOptions {filePath = ""
+                       , minVectorLength = 1
+                       , maxVectorLength = 3
+                       , uniqueConstrFuns = False
+                       , separateBaseCtr = False
+                       , tempFilePath = "/tmp"
+                       , helpText = False
+                       , keepFiles = False
+                       , printInfTree = False
+                       , verbose = False
+                       , shift = False
+                       , allowLowerSCC = False
+                       , lowerbound = False
+                       }
+
 
 data Heuristics = Heuristics | NoHeuristics deriving (Bounded, Enum, Eq, Show)
 
@@ -60,11 +84,10 @@ data Heuristics = Heuristics | NoHeuristics deriving (Bounded, Enum, Eq, Show)
 -- useHeuristics = (Heuristics==)
 
 data AraProof f v = AraProof
-  { stricts_             :: Rules f v        -- ^ The oriented input TRS.
-  -- , safeMapping_         :: SM.SafeMapping f -- ^ The safe mapping.
-  -- , precedence_          :: Precedence f     -- ^ The precedence.
-  -- , argumentPermutation_ :: MuMapping f      -- ^ Employed argument permutation.
-  -- , signature_           :: Signature f      -- ^ Signature underlying 'epoInputTrs'
+  { signatures        :: [ASignatureSig] -- ^ Signatures used for the proof
+  , cfSignatures      :: [ASignatureSig] -- ^ Cost-free signatures used for the proof
+  , baseCtrSignatures :: [ASignatureSig] -- ^ Base constructors used for the proof
+                                         -- (cf. Superposition of constructors)
   } deriving Show
 
 
@@ -74,51 +97,102 @@ instance T.Processor Ara where
   type Out Ara         = Trs
   type Forking Ara     = T.Judgement
 
-  execute p prob =
-    trace ("TODO: ara execute")
-    trace ("show p: " ++ show p)
-    trace ("prob: " ++ show prob)
-    trace ("prob: " ++ show (typeProblem prob))
+  execute p probTcT =
 
-    -- check left linearity
+    maybe araFun (\s -> T.abortWith (Inapplicable s :: ApplicationProof
+                                   (OrientationProof (AraProof F V)))) maybeApplicable
 
-    -- check innermost
+    where maybeApplicable = Prob.isRCProblem' probTcT <|>    -- check left linearity
+                            Prob.isInnermostProblem' probTcT -- check innermost
+                            -- <|> RS.isConstructorTrs' sig trs -- not needed
 
-    undefined
+          prob = inferTypesAndSignature (convertProblem probTcT)
+
+          araFun :: T.TctM (T.Return Ara)
+          araFun =
+            join $ liftIO $ E.catch
+                 (do
+                     -- set arguments
+                     let args = defaultArgs { minVectorLength = minDegree p
+                                            , maxVectorLength = maxDegree p
+                                            }
+
+                     -- Find out SCCs
+                     let reachability = analyzeReachability prob
 
 
-typeProblem :: Prob.Problem F V -> RT.Problem F V String String String String
-typeProblem inProb = RT.Problem { RT.startTerms = convertStartTerms $ Prob.startTerms inProb
-                                , RT.strategy = convertStrategy $ Prob.strategy inProb
-                                , RT.theory = Nothing
-                                , RT.datatypes = Nothing
-                                , RT.signatures = Nothing
-                                , RT.rules = RT.RulesPair
-                                  (fmap convertRule $ RS.toList $ Prob.strictTrs inProb)
-                                  (fmap convertRule $ RS.toList $ Prob.weakTrs inProb)
-                                , RT.variables =
-                                    S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
-                                                        Prob.weakTrs inProb)
-                                , RT.symbols =
-                                    S.toList (Sig.defineds (Prob.signature inProb)) ++
-                                    S.toList (Sig.constructors (Prob.signature inProb))
-                                , RT.comment = Nothing
+                     (prove, infTrees) <- analyzeProblem args reachability prob
+                     -- Solve cost constraints
+                     let cond = conditions prove
+                     let probSig = RT.signatures (problem prove)
+
+                     -- check if it lowerbound problem
+                     when (lowerbound args) $
+                       E.throw $ FatalException "Lowerbound analysis not yet implemented!"
+
+                     -- Solve datatype constraints
+                     (sigs, cfSigs, valsNs, vals, baseCtrs, cfBaseCtrs, bigO) <-
+                       solveProblem args (fromJust probSig) cond (signatureMap prove)
+                       (costFreeSigs prove)
+
+                     return $
+                       T.succeedWith0 (Applicable . Order $ AraProof sigs cfSigs baseCtrs)
+                       (const $ T.timeUBCert (T.Poly (Just bigO)))
+
+                 ) (\(e :: ProgException) ->
+                      -- do
+                      --  case (e :: ProgException) of
+                      --    ShowTextOnly txt -> do
+                      --      putStrLn "MAYBE"
+                      --      putStrLn txt
+                      --    WarningException txt -> do
+                      --      putStrLn "MAYBE"
+                      --      putStrLn txt
+                      --    FatalException txt -> do
+                      --      putStr "ERROR:"
+                      --      putStrLn txt
+                      --    ParseException txt -> do
+                      --      putStr "ERROR:"
+                      --      putStrLn txt
+                      --    UnsolveableException txt -> do
+                      --      putStrLn "MAYBE"
+                      --      putStrLn "UNSAT"
+                      --      putStrLn txt
+                      --    SemanticException txt -> do
+                      --      putStr "ERROR:"
+                      --      putStrLn txt
+                       return $
+                         T.abortWith (Applicable (Incompatible :: OrientationProof (AraProof F V))))
+
+
+convertProblem :: Prob.Problem F V -> RT.Problem String String String String String String
+convertProblem inProb =
+  RT.Problem { RT.startTerms = convertStartTerms $ Prob.startTerms inProb
+             , RT.strategy = convertStrategy $ Prob.strategy inProb
+             , RT.theory = Nothing
+             , RT.datatypes = Nothing
+             , RT.signatures = Nothing
+             , RT.rules = RT.RulesPair (fmap convertRule $ RS.toList $ Prob.strictTrs inProb)
+                          (fmap convertRule $ RS.toList $ Prob.weakTrs inProb)
+             , RT.variables = fmap unV $
+                              S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
+                                                  Prob.weakTrs inProb)
+             , RT.symbols = fmap unF $
+                            S.toList (Sig.defineds (Prob.signature inProb)) ++
+                            S.toList (Sig.constructors (Prob.signature inProb))
+             , RT.comment = Nothing
                                 }
   where convertStartTerms Prob.AllTerms{} = RT.AllTerms
         convertStartTerms Prob.BasicTerms{} = RT.BasicTerms
         convertStrategy Prob.Innermost = RT.Innermost
         convertStrategy Prob.Full = RT.Full
         convertStrategy Prob.Outermost = RT.Outermost
-        -- convertTheory (R.SymbolProperty a b) = (RT.SymbolProperty a b)
-        -- convertTheory (R.Equations rules) = RT.Equations (fmap convertRule rules)
-        -- convertRulesPair (R.RulesPair strict weak) =
-        --   RT.RulesPair (fmap convertRule strict) (fmap convertRule weak)
-        -- convertRules (RS.RulesT set) = fmap convertRule (S.toList set)
         convertRule (R.Rule lhs rhs) = RT.Rule (convertTerm lhs) (convertTerm rhs)
-        convertTerm (R.Var v) = RT.Var v
-        convertTerm (R.Fun f ch) = RT.Fun f (fmap convertTerm ch)
-        -- makeSyms (Sig.Signature sigs defs cons) = S.toList defs ++ S.toList cons
+        convertTerm (R.Var v) = RT.Var (unV v)
+        convertTerm (R.Fun f ch) = RT.Fun (unF f) (fmap convertTerm ch)
 
+
+        -- makeSyms (Sig.Signature sigs defs cons) = S.toList defs ++ S.toList cons
 
     -- maybe epo (\s -> T.abortWith (Inapplicable s :: ApplicationProof (OrientationProof (EpoStarProof F V)))) maybeApplicable
     -- where
@@ -260,24 +334,39 @@ typeProblem inProb = RT.Problem { RT.startTerms = convertStartTerms $ Prob.start
 -- --- * instances ------------------------------------------------------------------------------------------------------
 
 heuristicsArg :: T.Argument 'T.Required Heuristics
-heuristicsArg = T.flag "TODO"
-  [ "Description is to be done" ]
+heuristicsArg = T.flag "Wether to use heuristics or not."
+  [ "WARNING: Not yet functional, as type inference not yet implemented." ]
+
+minDimArg :: T.Argument 'T.Required Int
+minDimArg = T.flag "minimum Degree"
+  [ "Minimum degree to be looked for (minimal length of vectors in signatures).",
+    "Default is 1."]
+
+maxDimArg :: T.Argument 'T.Required Int
+maxDimArg = T.flag "maximum Degree"
+  [ "Maximum degree to be looked for (maximal length of vectors in signatures). ",
+    "Default is 3." ]
 
 description :: [String]
 description = [ unwords
   [ "This processor implements the amortised resource analysis."] ]
 
-araStrategy :: Heuristics -> TrsStrategy
-araStrategy = T.Apply . Ara
+araStrategy :: Heuristics -> Int -> Int -> TrsStrategy
+araStrategy h minD maxD = T.Apply (Ara h minD maxD)
 
-araDeclaration :: T.Declaration ('[T.Argument 'T.Optional Heuristics] T.:-> TrsStrategy)
-araDeclaration = T.declare "ara" description (T.OneTuple exArg) araStrategy
-  where exArg = heuristicsArg `T.optional` NoHeuristics
+araDeclaration :: T.Declaration ('[T.Argument 'T.Optional Heuristics
+                                  ,T.Argument 'T.Optional Int
+                                  ,T.Argument 'T.Optional Int] T.:-> TrsStrategy)
+araDeclaration = T.declare "ara" description (hArg,minDim,maxDim) araStrategy
+  where hArg = heuristicsArg `T.optional` NoHeuristics
+        minDim = minDimArg `T.optional` 1
+        maxDim = minDimArg `T.optional` 3
+
 
 ara :: TrsStrategy
 ara = T.deflFun araDeclaration
 
-ara' :: Heuristics -> TrsStrategy
+ara' :: Heuristics -> Int -> Int -> TrsStrategy
 ara' = T.declFun araDeclaration
 
 
@@ -285,7 +374,21 @@ ara' = T.declFun araDeclaration
 --------------------------------------------------------------------------------
 
 instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
-  pretty proof = PP.text "TODO"
+  pretty proof =
+    -- Signatures
+    PP.text "Signatures used:" PP.<$>
+    PP.text "----------------" PP.<$>
+    PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted $ signatures proof)) PP.<$>
+    PP.line PP.<$>
+    PP.text "Cost-free Signatures used:" PP.<$>
+    PP.text "--------------------------" PP.<$>
+    PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted $ cfSignatures proof)) PP.<$>
+    PP.line PP.<$>
+    PP.text "Base Constructor Signatures used:" PP.<$>
+    PP.text "---------------------------------" PP.<$>
+    PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted $ baseCtrSignatures proof))
+
+
   -- PP.vcat
   --   [ PP.text "Strict Rules in Predicative Notation:"
   --   , ppind (SM.prettySafeTrs (safeMapping_ proof) (stricts_ proof))
@@ -296,6 +399,7 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
   --   , PP.text "Precedence:"
   --   , ppind (precedence_ proof) ]
   --   where ppind a = PP.indent 2 $ PP.pretty a
+    where sorted = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
 
 instance Xml.Xml (AraProof f v) where
   toXml _ = Xml.empty

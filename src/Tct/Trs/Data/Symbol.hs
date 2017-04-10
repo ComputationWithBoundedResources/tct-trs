@@ -4,6 +4,7 @@ module Tct.Trs.Data.Symbol
   , AFun (..)
   , F , fun
   , V , var
+  , unF, unV
   ) where
 
 
@@ -48,11 +49,19 @@ instance Fun F where
 
   compoundFun                  = F . ComFun
 
-  isMarkedFun (F (DpFun _))    = True
-  isMarkedFun _                = False
+  isMarkedFun (F (DpFun _)) = True
+  isMarkedFun _             = False
 
   isCompoundFun (F (ComFun _)) = True
   isCompoundFun _              = False
+
+-- Hack to get amortised running. FIXME: need to optimize amortised analysis to not
+-- use strings, but rather F, V, ...
+unF :: F -> String
+unF (F (TrsFun bs)) = BS.unpack bs
+
+unV :: V -> String
+unV (V bs) = BS.unpack bs
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------

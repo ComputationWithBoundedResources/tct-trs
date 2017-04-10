@@ -1,0 +1,7 @@
+(VAR x y)
+
+(RULES
+  id(0) -> 0
+  id(s(x)) -> s(id(x))
+)
+

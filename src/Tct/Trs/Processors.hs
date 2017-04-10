@@ -24,6 +24,7 @@ module Tct.Trs.Processors
   , matrices
   , polys
   , ints
+  , araBounds
   , dpsimps
   , decomposeIndependent
   , decomposeIndependentSG
@@ -187,6 +188,9 @@ polys = shift pxs
 -- | Applies a selection of interpretations, depending on the given lower and uppper bound.
 ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
+
+araBounds :: Degree -> Degree -> TrsStrategy
+araBounds = ara' NoHeuristics
 
 
 --- * simplifications ------------------------------------------------------------------------------------------------
