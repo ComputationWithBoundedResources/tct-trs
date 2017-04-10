@@ -52,6 +52,17 @@ import           Tct.Trs.Processor.ARA.Exception
 import           Tct.Trs.Processor.ARA.Exception.Pretty                       ()
 
 
+-- TODO's (it currently works but there are optimizations):
+-- --------------------------------------------------------
+-- 1. Problem F V ... shall be used instead of Problem String String String ...
+-- 2. Use SMT solver as other strategies do
+-- 3. Get rid of the warnings
+-- 4. Use the same PrettyPrinting library
+-- 5. Cleanup of unused modules/code
+-- 6. Implement type inference for heuristics
+-- 7. Possibly: Add argument options, e.g. for printing the inference trees.
+
+
 data Ara = Ara { heuristics_ :: Heuristics -- ^ Use heuristics. TODO: Heuristics
                                            -- not yet functional as type inference
                                            -- only infers a single datatype.
