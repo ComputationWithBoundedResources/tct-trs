@@ -77,65 +77,6 @@ library
     Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interactive
     Tct.Trs.Processor.AmortisedAnalysis
-    Tct.Trs.Processor.ARA.Constants
-    Tct.Trs.Processor.ARA.ByInferenceRules.Analyzer
-    Tct.Trs.Processor.ARA.ByInferenceRules.Analyzer.Ops
-    Tct.Trs.Processor.ARA.ByInferenceRules.Analyzer.StartingProve
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerCondition
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerCondition.Pretty
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerCondition.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerCost
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerCost.Pretty
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerCost.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerDatatype
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerDatatype.Ops
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerDatatype.Pretty
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerDatatype.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerSignature
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerSignature.Ops
-    Tct.Trs.Processor.ARA.ByInferenceRules.Graph.Ops
-    Tct.Trs.Processor.ARA.ByInferenceRules.AnalyzerSignature.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.CmdLineArguments
-    Tct.Trs.Processor.ARA.ByInferenceRules.CmdLineArguments.Parse
-    Tct.Trs.Processor.ARA.ByInferenceRules.CmdLineArguments.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.Inserts
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.SMT
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.SMT.ConvertSolutionToData
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.SMT.ConvertToSMTProblem
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.SMT.IO
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.Heuristic
-    Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.SMT.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.Data.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.HelperFunctions
-    Tct.Trs.Processor.ARA.ByInferenceRules.InfTreeNode
-    Tct.Trs.Processor.ARA.ByInferenceRules.InfTreeNode.Ops
-    Tct.Trs.Processor.ARA.ByInferenceRules.InfTreeNode.Pretty
-    Tct.Trs.Processor.ARA.ByInferenceRules.InfTreeNode.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules.InfRuleComposition
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules.InfRuleFunction
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules.InfRuleIdentity
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules.InfRuleMisc
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules.InfRuleShare
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules.InfRuleWeak
-    Tct.Trs.Processor.ARA.ByInferenceRules.InferenceRules.Ops
-    Tct.Trs.Processor.ARA.ByInferenceRules.Operator
-    Tct.Trs.Processor.ARA.ByInferenceRules.Operator.Pretty
-    Tct.Trs.Processor.ARA.ByInferenceRules.Operator.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.Prove
-    Tct.Trs.Processor.ARA.ByInferenceRules.Prove.Ops
-    Tct.Trs.Processor.ARA.ByInferenceRules.Prove.Pretty
-    Tct.Trs.Processor.ARA.ByInferenceRules.Prove.Type
-    Tct.Trs.Processor.ARA.ByInferenceRules.TypeSignatures
-    Tct.Trs.Processor.ARA.ByInferenceRules.Vector.Pretty
-    Tct.Trs.Processor.ARA.ByInferenceRules.Vector.Type
-    Tct.Trs.Processor.ARA.Exception
-    Tct.Trs.Processor.ARA.Exception.Pretty
-    Tct.Trs.Processor.ARA.Exception.Type
-    Tct.Trs.Processor.ARA.InferTypes
-    Tct.Trs.Processor.ARA.Pretty
-    Tct.Trs.Processor.ARA.Pretty.Pretty
     Tct.Trs.Processor.Bounds
     Tct.Trs.Processor.ComplexityPair
     Tct.Trs.Processor.Decompose
@@ -186,14 +127,9 @@ library
     tct-core           == 3.2.*,
 
     -- ARA stuff
+    ara-inference,
     term-rewriting-ext == 0.*,
-    pretty,
-    ansi-wl-pprint,
-    lens               >= 4.13,
-    text,
-    unordered-containers >=0.2,
-    parallel,
-    monad-parallel
+    pretty
 
 
   ghc-options:

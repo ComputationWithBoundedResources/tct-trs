@@ -40,16 +40,16 @@ import qualified Tct.Trs.Data.ProblemKind     as Prob
 import qualified Tct.Trs.Data.Signature       as Sig
 import qualified Tct.Trs.Data.Rules as RS
 
-import Tct.Trs.Processor.ARA.InferTypes
-import           Tct.Trs.Processor.ARA.ByInferenceRules.Analyzer
-import           Tct.Trs.Processor.ARA.ByInferenceRules.CmdLineArguments
-import           Tct.Trs.Processor.ARA.ByInferenceRules.ConstraintSolver.SMT
-import           Tct.Trs.Processor.ARA.ByInferenceRules.Graph.Ops
-import           Tct.Trs.Processor.ARA.ByInferenceRules.Prove
-import Tct.Trs.Processor.ARA.ByInferenceRules.HelperFunctions
-import           Tct.Trs.Processor.ARA.ByInferenceRules.TypeSignatures
-import           Tct.Trs.Processor.ARA.Exception
-import           Tct.Trs.Processor.ARA.Exception.Pretty                       ()
+import Data.Rewriting.ARA.InferTypes
+import           Data.Rewriting.ARA.ByInferenceRules.Analyzer
+import           Data.Rewriting.ARA.ByInferenceRules.CmdLineArguments
+import           Data.Rewriting.ARA.ByInferenceRules.ConstraintSolver.SMT
+import           Data.Rewriting.ARA.ByInferenceRules.Graph.Ops
+import           Data.Rewriting.ARA.ByInferenceRules.Prove
+import Data.Rewriting.ARA.ByInferenceRules.HelperFunctions
+import           Data.Rewriting.ARA.ByInferenceRules.TypeSignatures
+import           Data.Rewriting.ARA.Exception
+import           Data.Rewriting.ARA.Exception.Pretty                       ()
 
 
 -- TODO's (it currently works but there are optimizations):
