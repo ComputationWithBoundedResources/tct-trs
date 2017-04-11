@@ -15,15 +15,17 @@ packages:
     git: https://github.com/ComputationWithBoundedResources/tct-common
     commit: b88ce5394cb9a7dde6d3a08a0a15391991e36ed5
 - location:
-    git: https://github.com/ComputationWithBoundedResources/term-rewriting-ext
-    commit: b70f6b2274848cd852a58ab20fedf65ace7997ae
-- location:
     git: https://github.com/ComputationWithBoundedResources/ara-inference.git
-    commit: 1ad704e0e4b2186cec42d367fb22c155742e7ced
+    commit: 341b583a42ce877761297fa2f94cc83609f148d7
+- location:
+    git: https://github.com/ComputationWithBoundedResources/term-rewriting-ext
+    commit: df5dd6777ae4ff04d04047f880da18daf50a8383
+
 extra-deps:
 - dotgen-0.4.2
 - fgl-visualize-0.1.0.1
 - multiset-0.2.2
 - term-rewriting-0.2
+- ara-inference-0.1.0.0
 - union-find-array-0.1.0.2
 resolver: lts-3.4
