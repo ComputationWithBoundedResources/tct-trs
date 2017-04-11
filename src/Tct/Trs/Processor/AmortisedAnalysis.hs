@@ -74,25 +74,22 @@ data Ara = Ara { heuristics_ :: Heuristics -- ^ Use heuristics. TODO: Heuristics
 
 defaultArgs :: ArgumentOptions
 defaultArgs = ArgumentOptions {filePath = ""
-                       , minVectorLength = 1
-                       , maxVectorLength = 3
-                       , uniqueConstrFuns = False
-                       , separateBaseCtr = False
-                       , tempFilePath = "/tmp"
-                       , helpText = False
-                       , keepFiles = False
-                       , printInfTree = False
-                       , verbose = False
-                       , shift = False
-                       , allowLowerSCC = False
-                       , lowerbound = False
-                       }
+                              , minVectorLength = 1
+                              , maxVectorLength = 3
+                              , uniqueConstrFuns = False
+                              , separateBaseCtr = False
+                              , tempFilePath = "/tmp"
+                              , helpText = False
+                              , keepFiles = False
+                              , printInfTree = False
+                              , verbose = False
+                              , shift = False
+                              , allowLowerSCC = False
+                              , lowerbound = False
+                              }
 
 
 data Heuristics = Heuristics | NoHeuristics deriving (Bounded, Enum, Eq, Show)
-
--- useHeuristics :: Heuristics -> Bool
--- useHeuristics = (Heuristics==)
 
 data AraProof f v = AraProof
   { signatures        :: [ASignatureSig] -- ^ Signatures used for the proof
