@@ -86,6 +86,7 @@ defaultArgs = ArgumentOptions {filePath = ""
                               , shift = False
                               , allowLowerSCC = False
                               , lowerbound = False
+                              , timeout = Nothing
                               }
 
 
