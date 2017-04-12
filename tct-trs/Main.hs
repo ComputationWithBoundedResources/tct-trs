@@ -24,7 +24,7 @@ instance Declared Trs Trs where decls = ds
 
 
 main :: IO ()
-main = runTrs trsConfig
+main = runTrs $ trsConfig `setSolver` ("z3",[])
 
 ds =
   trsDeclarations ++
