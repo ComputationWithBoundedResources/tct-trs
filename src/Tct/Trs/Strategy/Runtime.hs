@@ -118,13 +118,17 @@ rci =
 interpretations =
   tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
   .>>> fastest
-    [ tew (px 2) .>>> tew (px 3) .>>> empty
+    [ -- tew (px 2) .>>> tew (px 3) .>>> empty
+      tew (ax 1 2) .>>> empty
     , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty]
   where
     mxs1 = mx 2 1 .<||> mx 3 1
     mxs2 = mx 2 2 .<||> mx 3 2 .<||> wg 2 2
     mxs3 = mx 3 3 .<||> mx 4 3
     mxs4 = mx 4 4
+
+ax lo up = ara' NoHeuristics lo up
+
 
 dpi =
   tew (withCWDG trans) .>>> basics
@@ -150,7 +154,8 @@ dpi =
       where proc = try simps .>>> tew shiftLeafs .>>> basics .>>> empty
 
     basics = tew shift
-      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
+      -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
+      where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 4 .<||>  mx 4 4
 
     simps =
       try empty
