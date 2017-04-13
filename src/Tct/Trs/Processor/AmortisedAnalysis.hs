@@ -181,8 +181,13 @@ convertProblem inProb =
              , RT.theory = Nothing
              , RT.datatypes = Nothing
              , RT.signatures = Nothing
-             , RT.rules = RT.RulesPair (fmap convertRule $ RS.toList $ Prob.strictTrs inProb)
-                          (fmap convertRule $ RS.toList $ Prob.weakTrs inProb)
+             , RT.rules = RT.RulesPair
+                          (fmap convertRule $
+                           RS.toList (Prob.strictTrs inProb) ++
+                           RS.toList (Prob.strictDPs inProb))
+                          (fmap convertRule $
+                           RS.toList (Prob.weakTrs inProb) ++
+                           RS.toList (Prob.weakDPs inProb))
              , RT.variables = fmap unV $
                               S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
                                                   Prob.weakTrs inProb)
