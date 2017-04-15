@@ -5,6 +5,7 @@ module Tct.Trs.Processors
   , Degree
   , degreeArg
   , boundedArgs
+  , araArgs
   , timeoutArg
   , CombineWith (..)
   , combineWithArg
@@ -84,6 +85,15 @@ boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
   where
     lArg = nat "from" ["from degree"]
     uArg = nat "to"   ["to degree"]
+
+-- | Arguments for bounded degrees. @:form nat :to nat@
+araArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional T.Nat)
+araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60)
+  where
+    lArg = nat "from" ["from degree"]
+    uArg = nat "to"   ["to degree"]
+    tArg = nat "timeout" ["timeout for SMT solver"]
+
 
 -- | Argument for timeout. @:timeout nat@
 timeoutArg :: Argument 'Required T.Nat
@@ -189,8 +199,8 @@ polys = shift pxs
 ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
 
-araBounds :: Degree -> Degree -> TrsStrategy
-araBounds = ara' NoHeuristics
+araBounds :: Degree -> Degree -> Int -> TrsStrategy
+araBounds = ara' NoHeuristics Nothing
 
 
 --- * simplifications ------------------------------------------------------------------------------------------------

@@ -31,7 +31,7 @@ ds =
   [ SD $ strategy "Cpolys"    args $ over pxs
   , SD $ strategy "Cmatrices" args $ over mxs
   , SD $ strategy "Cints"     args $ over ixs
-  , SD $ strategy "Cara" () $ ara' NoHeuristics 1 3
+  , SD $ strategy "Cara" () $ ara' NoHeuristics Nothing 1 3 60
   ]
 
 args = (degreeArg `optional` 1, degreeArg `optional` 3)
