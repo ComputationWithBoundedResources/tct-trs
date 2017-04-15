@@ -129,7 +129,7 @@ interpretations =
     mxs3 = mx 3 3 .<||> mx 4 3
     mxs4 = mx 4 4
 
-ax lo up = ara' NoHeuristics (Just 1) lo up 20
+ax lo up = ara' NoHeuristics (Just 1) lo up 15
 
 
 dpi =
@@ -157,7 +157,7 @@ dpi =
 
     basics = tew shift
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
-      where shift = ax 2 4 .<||> mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
+      where shift = ax 1 3 .<||> mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
 
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 4 .<||>  mx 4 4  -- run No. 1
 
