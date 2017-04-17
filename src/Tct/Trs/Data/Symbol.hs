@@ -59,8 +59,8 @@ instance Fun F where
 -- use strings, but rather F, V, ...
 unF :: F -> String
 unF (F (TrsFun bs)) = BS.unpack bs
-unF (F (DpFun bs)) = BS.unpack bs
-unF (F (ComFun bs)) = show bs
+unF (F (DpFun bs))  = BS.unpack bs
+unF (F (ComFun bs)) = "comFun_" ++ show bs
 
 unV :: V -> String
 unV (V bs) = BS.unpack bs
