@@ -17,7 +17,7 @@ import           Control.Monad
 import qualified Data.Set                     as S
 import qualified Control.Exception            as E
 import           Control.Monad.State
-import           Data.Maybe                                                (fromJust)
+import           Data.Maybe
 import Data.List (nub, sortBy)
 import Data.Function (on)
 
@@ -70,7 +70,7 @@ data Ara = Ara { heuristics_ :: Heuristics -- ^ Use heuristics. TODO: Heuristics
                , minDegree  :: Int         -- ^ Minimal degree to look for
                , maxDegree  :: Int         -- ^ Maximal degree to look for
                , araTimeout :: Int         -- ^ Timeout
-               , araFindStrictRules :: Maybe Int -- ^ Min nr of strict rules to
+               , araRuleShifting :: Maybe Int -- ^ Min nr of strict rules to
                                                  -- orient strict.
                }
          deriving Show
@@ -133,7 +133,7 @@ instance T.Processor Ara where
                      let args = defaultArgs { minVectorLength = minDegree p
                                             , maxVectorLength = maxDegree p
                                             , timeout = Just $ araTimeout p
-                                            , findStrictRules = araFindStrictRules p
+                                            , findStrictRules = araRuleShifting p
                                             }
 
                      -- Find out SCCs
@@ -161,17 +161,15 @@ instance T.Processor Ara where
                      let strictDPs' = RS.filter ((`notElem` strictRls) . convertRule) strictDPs
                      let weakDPsAdd' = RS.filter ((`elem` strictRls) . convertRule) strictDPs
 
-                     let newProb' :: Problem F V
-                         newProb' = probTcT { Prob.strictDPs = strictDPs'
-                                            , Prob.strictTrs = strictRules'
-                                            , Prob.weakDPs = Prob.weakDPs probTcT
-                                                             `RS.union` weakDPsAdd'
-                                            , Prob.weakTrs = Prob.weakTrs probTcT
-                                                             `RS.union` weakRulesAdd'
-                                            }
+                     let newProb' :: Trs
+                         newProb'= probTcT { Prob.strictDPs = strictDPs'
+                                           , Prob.strictTrs = strictRules'
+                                           , Prob.weakDPs = Prob.weakDPs probTcT
+                                                            `RS.union` weakDPsAdd'
+                                           , Prob.weakTrs = Prob.weakTrs probTcT
+                                                            `RS.union` weakRulesAdd'
+                                           }
 
-                     let newProb :: Trs
-                         newProb = newProb'
 
                      let compl :: T.Complexity
                          compl = T.Poly (Just bigO)
@@ -179,39 +177,20 @@ instance T.Processor Ara where
                      return $
                        T.succeedWith
                        (Applicable . Order $ AraProof sigs cfSigs baseCtrs strictRls weakRls)
-                       -- type: CertificateFn p = Forking p C.Certificate -> C.Certificate
                        (if null weakRls
                         then const (T.timeUBCert compl) -- prove done
                         else certification compl)       -- only a step in the proof
-                       (if null weakRls
+                       (if null weakRls ||              -- could be dis/enabled
+                                                        -- (but hides/shows empty
+                                                        -- processor)
+                           isNothing (araRuleShifting p) -- always finished
                         then T.Null
-                        else T.Opt $ T.toId newProb)
+                        else T.Opt $ T.toId newProb')
 
 
-                 ) (\(e :: ProgException) ->
-                      -- do
-                      --  case (e :: ProgException) of
-                      --    ShowTextOnly txt -> do
-                      --      putStrLn "MAYBE"
-                      --      putStrLn txt
-                      --    WarningException txt -> do
-                      --      putStrLn "MAYBE"
-                      --      putStrLn txt
-                      --    FatalException txt -> do
-                      --      putStr "ERROR:"
-                      --      putStrLn txt
-                      --    ParseException txt -> do
-                      --      putStr "ERROR:"
-                      --      putStrLn txt
-                      --    UnsolveableException txt -> do
-                      --      putStrLn "MAYBE"
-                      --      putStrLn "UNSAT"
-                      --      putStrLn txt
-                      --    SemanticException txt -> do
-                      --      putStr "ERROR:"
-                      --      putStrLn txt
+                 ) (\(_ :: ProgException) ->
                        return $
-                         T.abortWith (Applicable (Incompatible :: OrientationProof (AraProof F V))))
+                       T.abortWith (Applicable (Incompatible :: OrientationProof (AraProof F V))))
 
 certification :: T.Complexity -> T.Optional T.Id T.Certificate -> T.Certificate
 certification comp cert = case cert of
@@ -336,17 +315,6 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
          PP.nest 2 (PP.text "2. Weak:" PP.<$>
                     PP.vcat (fmap PP.pretty (weaklyTyped proof)))
 
-
-  -- PP.vcat
-  --   [ PP.text "Strict Rules in Predicative Notation:"
-  --   , ppind (SM.prettySafeTrs (safeMapping_ proof) (stricts_ proof))
-  --   , PP.text "Safe Mapping:"
-  --   , ppind (safeMapping_ proof)
-  --   , PP.text "Argument Permuation:"
-  --   , ppind (argumentPermutation_ proof)
-  --   , PP.text "Precedence:"
-  --   , ppind (precedence_ proof) ]
-  --   where ppind a = PP.indent 2 $ PP.pretty a
     where sorted = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
 
 instance Xml.Xml (AraProof f v) where
