@@ -183,7 +183,9 @@ instance T.Processor Ara where
                        (if null weakRls
                         then const (T.timeUBCert compl) -- prove done
                         else certification compl)       -- only a step in the proof
-                       (T.Opt $ T.toId newProb)
+                       (if null weakRls
+                        then T.Null
+                        else T.Opt $ T.toId newProb)
 
 
                  ) (\(e :: ProgException) ->
