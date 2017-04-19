@@ -119,9 +119,9 @@ interpretations =
   tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
   .>>> fastest
     [ tew (px 2) .>>> tew (px 3) .>>> empty
-      -- tew (ax 1 2) .>>> empty -- alt run no 1
     -- , tew (ax 1 1) .>>> tew (ax 2 2) .>>> tew (ax 3 3) .>>> empty
     , tew (ax 1 3) .>>> empty
+    , tew (axHeur 2 3) .>>> empty
     -- , tew (ax 2 2) .>>> empty
     -- , tew (ax 3 3) .>>> empty
     -- , axLeaf 1 3 .>>> empty
@@ -136,6 +136,7 @@ interpretations =
 ax, axLeaf :: Int -> Int -> TrsStrategy
 ax lo up = ara' NoHeuristics (Just 1) lo up 8
 axLeaf lo up = ara' NoHeuristics Nothing lo up 5
+axHeur lo up = ara' Heuristics Nothing lo up 3
 
 dpi =
   tew (withCWDG trans) .>>> basics
@@ -162,7 +163,7 @@ dpi =
 
     basics = tew shift
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
-      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 1 3 .<||> mx 4 4
+      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 3 .<||> mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 1 3 .<||> mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 4 .<||>  mx 4 4  -- run No. 1
 

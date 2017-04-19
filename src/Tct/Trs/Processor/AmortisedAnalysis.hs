@@ -64,7 +64,7 @@ import           Data.Rewriting.ARA.Exception.Pretty                       ()
 -- 7. Possibly: Add argument options, e.g. for printing the inference trees.
 
 
-data Ara = Ara { heuristics_ :: Heuristics -- ^ Use heuristics. TODO: Heuristics
+data Ara = Ara { araHeuristics :: Heuristics -- ^ Use heuristics. TODO: Heuristics
                                            -- not yet functional as type inference
                                            -- only infers a single datatype.
                , minDegree  :: Int         -- ^ Minimal degree to look for
@@ -134,6 +134,9 @@ instance T.Processor Ara where
                                             , maxVectorLength = maxDegree p
                                             , timeout = Just $ araTimeout p
                                             , findStrictRules = araRuleShifting p
+                                            , shift = case araHeuristics p of
+                                                        Heuristics -> True
+                                                        _ -> False
                                             }
 
                      -- Find out SCCs
@@ -274,11 +277,11 @@ araDeclaration :: Maybe Int -> T.Declaration ('[T.Argument 'T.Optional Heuristic
                                   ,T.Argument 'T.Optional Int
                                   ] T.:-> TrsStrategy)
 araDeclaration orientStrict =
-  T.declare "ara" description (hArg,minDim,maxDim,timeout) (araStrategy orientStrict)
+  T.declare "ara" description (hArg,minDim,maxDim,to) (araStrategy orientStrict)
   where hArg = heuristicsArg `T.optional` NoHeuristics
         minDim = minDimArg `T.optional` 1
         maxDim = minDimArg `T.optional` 3
-        timeout = araTimeoutArg `T.optional` 15
+        to = araTimeoutArg `T.optional` 15
 
 
 ara :: TrsStrategy
