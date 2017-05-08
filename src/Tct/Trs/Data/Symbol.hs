@@ -46,13 +46,6 @@ instance Read V where
   readsPrec _ str = let [(x,xs)] = reads str :: [(BS.ByteString, String)]
                     in [(V x, xs)]
 
-
-  -- readPrec = parens $ (prec app_prec $ do
-  --                             Ident "Leaf" <- lexP
-  --                             m <- step readPrec
-  --                             return (Leaf m))
-
-
 instance Fun F where
   markFun (F (TrsFun f))       = F (DpFun f)
   markFun _                    = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
