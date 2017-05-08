@@ -12,7 +12,6 @@ module Tct.Trs.Processor.AmortisedAnalysis
   ) where
 
 
-import           Control.Applicative
 import           Control.Monad
 import qualified Data.Set                     as S
 import qualified Control.Exception            as E
@@ -35,7 +34,7 @@ import qualified Data.Rewriting.Typed.Signature as RT
 import           Tct.Common.ProofCombinators
 
 import           Tct.Trs.Data
-import Tct.Trs.Data.Symbol (unV, unF)
+import Tct.Trs.Data.Symbol
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.ProblemKind     as Prob
 import qualified Tct.Trs.Data.Signature       as Sig
@@ -98,13 +97,18 @@ defaultArgs = ArgumentOptions {filePath = ""
 
 data Heuristics = Heuristics | NoHeuristics deriving (Bounded, Enum, Eq, Show)
 
+type DT = String
+
 data AraProof f v = AraProof
-  { signatures        :: [ASignatureSig] -- ^ Signatures used for the proof
-  , cfSignatures      :: [ASignatureSig] -- ^ Cost-free signatures used for the proof
-  , baseCtrSignatures :: [ASignatureSig] -- ^ Base constructors used for the proof
-                                         -- (cf. Superposition of constructors)
-  , strictlyTyped :: [RT.Rule String String]
-  , weaklyTyped :: [RT.Rule String String]
+  { signatures        :: [ASignatureSig F DT]      -- ^ Signatures used for the
+                                                   -- proof
+  , cfSignatures      :: [ASignatureSig F DT]      -- ^ Cost-free signatures used
+                                                   -- for the proof
+  , baseCtrSignatures :: [ASignatureSig String DT] -- ^ Base constructors used for
+                                                   -- the proof (cf. Superposition
+                                                   -- of constructors)
+  , strictlyTyped :: [RT.Rule F V]
+  , weaklyTyped :: [RT.Rule F V]
   } deriving Show
 
 
@@ -201,7 +205,7 @@ certification comp cert = case cert of
   T.Opt (T.Id c) -> T.updateTimeUBCert c (`SR.add` comp)
 
 
-convertProblem :: Prob.Problem F V -> RT.Problem String String String String String String
+convertProblem :: Prob.Problem F V -> RT.Problem F V F dt dt F
 convertProblem inProb =
   RT.Problem { RT.startTerms = convertStartTerms $ Prob.startTerms inProb
              , RT.strategy = convertStrategy $ Prob.strategy inProb
@@ -213,10 +217,10 @@ convertProblem inProb =
                             RS.toList (Prob.strictDPs inProb))
                           (fmap convertRule $ RS.toList (Prob.weakTrs inProb) ++
                             RS.toList (Prob.weakDPs inProb))
-             , RT.variables = fmap unV $
+             , RT.variables = -- fmap unV $
                               S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
                                                   Prob.weakTrs inProb)
-             , RT.symbols = fmap unF $
+             , RT.symbols = -- fmap unF $
                             S.toList (Sig.defineds (Prob.signature inProb)) ++
                             S.toList (Sig.constructors (Prob.signature inProb))
              , RT.comment = Nothing
@@ -229,11 +233,12 @@ convertStrategy :: Strategy -> RT.Strategy
 convertStrategy Prob.Innermost = RT.Innermost
 convertStrategy Prob.Full = RT.Full
 convertStrategy Prob.Outermost = RT.Outermost
-convertRule :: R.Rule F V -> RT.Rule String String
+convertRule :: R.Rule F V -> RT.Rule F V
 convertRule (R.Rule lhs rhs) = RT.Rule (convertTerm lhs) (convertTerm rhs)
-convertTerm :: R.Term F V -> RT.Term String String
-convertTerm (R.Var v) = RT.Var (unV v)
-convertTerm (R.Fun f ch) = RT.Fun (unF f) (fmap convertTerm ch)
+convertTerm :: R.Term F V -> RT.Term F V
+convertTerm (R.Var v) = RT.Var v -- (unV v)
+convertTerm (R.Fun f ch) = RT.Fun f -- (unF f)
+                           (fmap convertTerm ch)
 
 
 -- --- * instances ------------------------------------------------------------------------------------------------------
@@ -307,7 +312,7 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
     PP.line PP.<$>
     PP.text "Base Constructor Signatures used:" PP.<$>
     PP.text "---------------------------------" PP.<$>
-    PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted $ baseCtrSignatures proof)) PP.<$>
+    PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted' $ baseCtrSignatures proof)) PP.<$>
     if null (strictlyTyped proof ++ weaklyTyped proof)
     then PP.empty
     else PP.line PP.<$>
@@ -319,6 +324,7 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
                     PP.vcat (fmap PP.pretty (weaklyTyped proof)))
 
     where sorted = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
+          sorted' = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
 
 instance Xml.Xml (AraProof f v) where
   toXml _ = Xml.empty

@@ -4,7 +4,6 @@ module Tct.Trs.Data.Symbol
   , AFun (..)
   , F , fun
   , V , var
-  , unF, unV
   ) where
 
 
@@ -43,6 +42,17 @@ newtype V = V BS.ByteString
 var  :: String -> V
 var = V . BS.pack
 
+instance Read V where
+  readsPrec _ str = let [(x,xs)] = reads str :: [(BS.ByteString, String)]
+                    in [(V x, xs)]
+
+
+  -- readPrec = parens $ (prec app_prec $ do
+  --                             Ident "Leaf" <- lexP
+  --                             m <- step readPrec
+  --                             return (Leaf m))
+
+
 instance Fun F where
   markFun (F (TrsFun f))       = F (DpFun f)
   markFun _                    = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
@@ -54,16 +64,6 @@ instance Fun F where
 
   isCompoundFun (F (ComFun _)) = True
   isCompoundFun _              = False
-
--- Hack to get amortised running. FIXME: need to optimize amortised analysis to not
--- use strings, but rather F, V, ...
-unF :: F -> String
-unF (F (TrsFun bs)) = BS.unpack bs
-unF (F (DpFun bs))  = "dpFun_" ++ BS.unpack bs
-unF (F (ComFun bs)) = "comFun_" ++ show bs
-
-unV :: V -> String
-unV (V bs) = BS.unpack bs
 
 
 --- * proofdata ------------------------------------------------------------------------------------------------------
