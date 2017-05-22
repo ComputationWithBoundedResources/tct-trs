@@ -12,7 +12,6 @@ import qualified Data.ByteString.Char8  as BS
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml    as Xml
 
-
 -- | Abstract function interface.
 class Fun f where
   markFun       :: f -> f
@@ -43,8 +42,9 @@ var  :: String -> V
 var = V . BS.pack
 
 instance Read V where
-  readsPrec _ str = let [(x,xs)] = reads str :: [(BS.ByteString, String)]
-                    in [(V x, xs)]
+  readsPrec _ str = let str' = filter (/= '"') str
+                        x = BS.pack $ if take 2 str' == "V " then drop 2 str' else str'
+                    in [(V x, [])]
 
 instance Fun F where
   markFun (F (TrsFun f))       = F (DpFun f)
