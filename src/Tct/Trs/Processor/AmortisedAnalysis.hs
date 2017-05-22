@@ -51,10 +51,10 @@ import           Data.Rewriting.ARA.ByInferenceRules.TypeSignatures
 import           Data.Rewriting.ARA.Exception
 import           Data.Rewriting.ARA.Exception.Pretty                       ()
 
-
--- TODO's (it currently works but there are optimizations):
--- --------------------------------------------------------
+-- Possible Improvements (it currently works but there are optimizations):
+-- -----------------------------------------------------------------
 -- 1. Problem F V ... shall be used instead of Problem String String String ...
+--    ... DONE except that show is used for generating SMT strings
 -- 2. Use SMT solver as other strategies do
 -- 3. Get rid of the warnings
 -- 4. Use the same PrettyPrinting library
@@ -83,7 +83,7 @@ defaultArgs = ArgumentOptions {filePath = ""
                               , separateBaseCtr = False
                               , tempFilePath = "/tmp"
                               , helpText = False
-                              , keepFiles = False
+                              , keepFiles = True
                               , printInfTree = False
                               , verbose = False
                               , shift = False
@@ -161,6 +161,7 @@ instance T.Processor Ara where
                        solveProblem args (fromJust probSig) cond (signatureMap prove)
                        (costFreeSigs prove)
 
+
                      let strictRules = Prob.strictTrs probTcT
                      let strictRules' = RS.filter ((`notElem` strictRls) . convertRule) strictRules
                      let weakRulesAdd' = RS.filter ((`elem` strictRls) . convertRule) strictRules
@@ -195,7 +196,7 @@ instance T.Processor Ara where
                         else T.Opt $ T.toId newProb')
 
 
-                 ) (\(_ :: ProgException) ->
+                 ) (\(e :: ProgException) ->
                        return $
                        T.abortWith (Applicable (Incompatible :: OrientationProof (AraProof F V))))
 
