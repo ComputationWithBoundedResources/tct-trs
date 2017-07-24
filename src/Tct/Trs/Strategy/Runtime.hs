@@ -118,9 +118,13 @@ rci =
 interpretations =
   tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
   .>>> fastest
-    [ tew (px 2) .>>> tew (px 3) .>>> empty
-    , tew (ax 1 1) .>>> tew (ax 2 2) .>>> tew (ax 3 3) .>>> empty
-    -- , tew (ax 1 3) .>>> empty
+
+    [ -- uncomment following TWO lines for start
+      tew (px 2) .>>> tew (px 3) .>>> empty
+    , tew (ax 1 3) .>>> empty
+    -- , tew (ax 1 1) .>>> tew (ax 2 2) .>>> tew (ax 3 3) .>>> empty
+
+    -- uncomment following line for start
     , tew (axHeur 2 3) .>>> empty
     -- , tew (ax 2 2) .>>> empty
     -- , tew (ax 3 3) .>>> empty
@@ -165,7 +169,7 @@ dpi =
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 3 .<||> mx 4 4
       -- uncomment following line for script.sh
-      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  ax 2 2 .<||> ax 3 3 .<||> mx 4 4
+      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  ax 1 3 .<||> mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 1 3 .<||> mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 4 .<||>  mx 4 4  -- run No. 1
