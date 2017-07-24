@@ -89,9 +89,11 @@ defaultArgs = ArgumentOptions {filePath = ""
                               , shift = False
                               , allowLowerSCC = False
                               , lowerbound = False
+                              , lowerboundArg = Nothing
                               , timeout = Nothing
                               , smtSolver = Z3
                               , findStrictRules = Nothing
+                              , directArgumentFilter = False
                               }
 
 
