@@ -167,7 +167,7 @@ dpi =
 
     basics = tew shift
       -- uncomment following line for script.sh
-      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  ax 2 2 .<||> ax 3 3 .<||> mx 4 4
+      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
 
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 3 .<||> mx 4 4

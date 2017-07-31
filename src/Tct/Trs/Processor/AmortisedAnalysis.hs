@@ -1,5 +1,6 @@
 {-# LANGUAGE ParallelListComp    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 -- Implementation details can be found in the technical report '@tba@'.
 -- | This module provides the \AmortisedAnalysis\ processor.
 module Tct.Trs.Processor.AmortisedAnalysis
@@ -239,12 +240,11 @@ convertStrategy Prob.Outermost = RT.Outermost
 convertRule :: R.Rule F V -> RT.Rule F V
 convertRule (R.Rule lhs rhs) = RT.Rule (convertTerm lhs) (convertTerm rhs)
 convertTerm :: R.Term F V -> RT.Term F V
-convertTerm (R.Var v) = RT.Var v -- (unV v)
-convertTerm (R.Fun f ch) = RT.Fun f -- (unF f)
-                           (fmap convertTerm ch)
+convertTerm (R.Var v) = RT.Var v
+convertTerm (R.Fun f ch) = RT.Fun f (fmap convertTerm ch)
 
 
--- --- * instances ------------------------------------------------------------------------------------------------------
+-- instances
 
 heuristicsArg :: T.Argument 'T.Required Heuristics
 heuristicsArg = T.flag "Wether to use heuristics or not."
