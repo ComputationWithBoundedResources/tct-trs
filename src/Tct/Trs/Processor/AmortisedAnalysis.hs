@@ -247,7 +247,7 @@ convertTerm (R.Fun f ch) = RT.Fun f (fmap convertTerm ch)
 -- instances
 
 heuristicsArg :: T.Argument 'T.Required Heuristics
-heuristicsArg = T.flag "Wether to use heuristics or not."
+heuristicsArg = T.flag "Whether to use heuristics or not."
   [ "WARNING: Not yet functional, as type inference not yet implemented." ]
 
 minDimArg :: T.Argument 'T.Required Int
