@@ -78,7 +78,7 @@ trsDeclarations =
   -- ** Strategies
   , SD $ strategy "matchbounds"           () matchbounds
 
-  , SD $ strategy "ara"                   boundedArgs araBounds
+  , SD $ strategy "ara"                   araArgs araBounds
 
 
   , SD certifyDeclaration
