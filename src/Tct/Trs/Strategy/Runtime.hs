@@ -174,7 +174,7 @@ dpi =
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 1 3 .<||> mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 4 .<||>  mx 4 4  -- run No. 1
-      -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
+      -- -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
 
     simps =
       try empty

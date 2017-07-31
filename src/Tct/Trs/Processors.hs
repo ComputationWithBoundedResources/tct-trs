@@ -6,6 +6,7 @@ module Tct.Trs.Processors
   , degreeArg
   , boundedArgs
   , araArgs
+  , checkPropArgs
   , timeoutArg
   , CombineWith (..)
   , combineWithArg
@@ -71,6 +72,9 @@ import           Tct.Trs.Processor.Poly.NaturalPI                   as M
 import           Tct.Trs.Processor.ToInnermost                      as M
 import           Tct.Trs.Processor.WithCertification                as M
 
+-- processor for checking properties
+import Tct.Trs.Processor.CheckProperty as M
+
 -- TODO: MS: move to strategies?
 
 type Degree = Int
@@ -93,6 +97,11 @@ araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60)
     lArg = nat "from" ["from degree"]
     uArg = nat "to"   ["to degree"]
     tArg = nat "timeout" ["timeout for SMT solver"]
+
+
+checkPropArgs :: (Argument 'Optional (Maybe LL), Argument 'Optional (Maybe Ctr))
+checkPropArgs = ( checkPropLLArg `T.optional` Just IsLL
+                , checkPropCtrArg `T.optional` Just IsCtr)
 
 
 -- | Argument for timeout. @:timeout nat@

@@ -77,6 +77,7 @@ library
     Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interactive
     Tct.Trs.Processor.AmortisedAnalysis
+    Tct.Trs.Processor.CheckProperty
     Tct.Trs.Processor.Bounds
     Tct.Trs.Processor.ComplexityPair
     Tct.Trs.Processor.Decompose

@@ -80,6 +80,7 @@ trsDeclarations =
 
   , SD $ strategy "ara"                   araArgs araBounds
 
+  , SD $ strategy "checkProperty"         checkPropArgs checkProp'
 
   , SD certifyDeclaration
   , SD derivationalDeclaration
