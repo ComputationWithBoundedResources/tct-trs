@@ -218,8 +218,8 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (CheckPropProof f v) whe
     -- Signatures
     maybe PP.empty (pretty chLL) prLL PP.<$>
     maybe PP.empty (pretty chCtr) prCtr PP.<$>
-    PP.text "Overall Answer to question if TRS is " PP.<> question PP.<> PP.colon PP.<$>
-    PP.bool answer
+    PP.text "Overall Answer to question if TRS " PP.<> question PP.<> PP.colon
+    PP.<> PP.bool answer
 
     where question = PP.hcat $ intersperse (PP.text " and ") $
                      [ maybe PP.empty PP.pretty chLL
@@ -239,7 +239,7 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (CheckPropProof f v) whe
                    (zip [prLL,prCtr] chks)
 
           pretty Nothing _ = PP.empty
-          pretty (Just x) o = PP.pretty x PP.<> PP.colon PP.<+> PP.pretty o
+          pretty (Just (_::a)) o = PP.pretty (pos :: a) PP.<> PP.colon PP.<+> PP.pretty o
 
 
 instance Xml.Xml (CheckPropProof f v) where
