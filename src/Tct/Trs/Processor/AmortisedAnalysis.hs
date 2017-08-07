@@ -77,7 +77,7 @@ data Ara = Ara { araHeuristics :: Heuristics -- ^ Use heuristics. TODO: Heuristi
 
 
 defaultArgs :: ArgumentOptions
-defaultArgs = ArgumentOptions {filePath = ""
+defaultArgs = ArgumentOptions { filePath = ""
                               , minVectorLength = 1
                               , maxVectorLength = 3
                               , uniqueConstrFuns = False

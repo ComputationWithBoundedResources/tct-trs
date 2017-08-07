@@ -99,9 +99,11 @@ araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60)
     tArg = nat "timeout" ["timeout for SMT solver"]
 
 
-checkPropArgs :: (Argument 'Optional (Maybe LL), Argument 'Optional (Maybe Ctr))
-checkPropArgs = ( checkPropLLArg `T.optional` Just IsLL
-                , checkPropCtrArg `T.optional` Just IsCtr)
+checkPropArgs :: (Argument 'Optional LogOp,
+                  Argument 'Optional (Maybe LL), Argument 'Optional (Maybe Ctr))
+checkPropArgs = ( checkPropLogOpArg `T.optional` AND
+                , checkPropLLArg    `T.optional` Nothing
+                , checkPropCtrArg   `T.optional` Nothing)
 
 
 -- | Argument for timeout. @:timeout nat@
@@ -193,7 +195,7 @@ shift :: (Degree -> TrsStrategy) -> Degree -> Degree -> TrsStrategy
 shift s l u = chain [ tew (s n) | n <- [max 0 (min l u)..max 0 u] ]
 
 mx,wg :: Degree -> Degree -> TrsStrategy
-mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny)
+mx dim deg = matrix' dim deg Automaton UArgs URules (Just selAny)
 wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
 
 -- | Like 'ints' but applies only matrix interpretations.

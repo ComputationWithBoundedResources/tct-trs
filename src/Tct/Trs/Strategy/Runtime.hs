@@ -116,13 +116,13 @@ rci =
   where
 
 interpretations =
-  tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
+  -- tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
+  tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3)
   .>>> fastest
-
     [ -- uncomment following TWO lines for start
       tew (px 2) .>>> tew (px 3) .>>> empty
-    , tew (ax 1 3) .>>> empty
-    -- , tew (ax 1 1) .>>> tew (ax 2 2) .>>> tew (ax 3 3) .>>> empty
+    -- , tew (ax 1 3) .>>> empty
+    , axLeaf 1 3 .>>> empty
 
     -- uncomment following line for start
     -- , tew (axHeur 2 3) .>>> empty
@@ -167,7 +167,12 @@ dpi =
 
     basics = tew shift
       -- uncomment following line for script.sh
-      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
+      where shift =
+              fastest [ mx 1 1 .<||> ax 1 1 .<||>
+                        mx 2 2 .<||> ax 2 2 .<||> px 2 .<||>
+                        mx 3 3 .<||> px 3 .<||> ax 3 3 .<||>
+                        mx 4 4
+                      ]
 
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
       -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 3 .<||> mx 4 4
