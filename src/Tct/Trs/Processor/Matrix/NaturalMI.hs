@@ -142,7 +142,7 @@ results.
 -- | Kind of the Matrix Interpretation
 data NaturalMIKind
   = Algebraic    -- ^ Count number of ones in diagonal to compute induced complexity function.
-  | Automaton    -- ^ Use automaton techniques to compute induced complexity function.
+  -- | Automaton    -- ^ Use automaton techniques to compute induced complexity function.
   | Triangular   -- ^ Use triangular matrices only.
   | Unrestricted -- ^ Put no further restrictions on the interpretations.
   deriving (Bounded, Enum, Eq, Show)
@@ -458,8 +458,8 @@ mxKind kind dim deg  st = case (kind, st) of
   (Triangular,   ProbK.AllTerms{})   -> MI.TriangularMatrix Nothing
   (Algebraic,    ProbK.BasicTerms{}) -> MI.ConstructorBased cs md
   (Algebraic,    ProbK.AllTerms{})   -> MI.TriangularMatrix md
-  (Automaton,    ProbK.BasicTerms{}) -> MI.ConstructorEda cs (min 1 `fmap` md)
-  (Automaton,    ProbK.AllTerms{})   -> MI.TriangularMatrix (min 1 `fmap` md)
+  -- (Automaton,    ProbK.BasicTerms{}) -> MI.ConstructorEda cs (min 1 `fmap` md)
+  -- (Automaton,    ProbK.AllTerms{})   -> MI.TriangularMatrix (min 1 `fmap` md)
   where
     cs = ProbK.constructors st
     md = let d = max 0 deg in if d < dim then Just d else Nothing
