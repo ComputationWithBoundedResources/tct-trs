@@ -5,6 +5,8 @@ module Tct.Trs.Processors
   , Degree
   , degreeArg
   , boundedArgs
+  , araArgs
+  , checkPropArgs
   , timeoutArg
   , CombineWith (..)
   , combineWithArg
@@ -24,6 +26,7 @@ module Tct.Trs.Processors
   , matrices
   , polys
   , ints
+  , araBounds
   , dpsimps
   , decomposeIndependent
   , decomposeIndependentSG
@@ -46,6 +49,7 @@ import qualified Tct.Trs.Data.Rules as RS
 -- MS: FIXME:
 -- naming of arguments/methods gets increasingly more difficult
 -- should they be imported qualified?
+import Tct.Trs.Processor.AmortisedAnalysis as M
 import           Tct.Trs.Processor.Bounds                           as M
 import           Tct.Trs.Processor.Decompose                        as M
 import           Tct.Trs.Processor.ComplexityPair                   as M
@@ -68,6 +72,9 @@ import           Tct.Trs.Processor.Poly.NaturalPI                   as M
 import           Tct.Trs.Processor.ToInnermost                      as M
 import           Tct.Trs.Processor.WithCertification                as M
 
+-- processor for checking properties
+import Tct.Trs.Processor.CheckProperty as M
+
 -- TODO: MS: move to strategies?
 
 type Degree = Int
@@ -82,6 +89,22 @@ boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
   where
     lArg = nat "from" ["from degree"]
     uArg = nat "to"   ["to degree"]
+
+-- | Arguments for bounded degrees. @:form nat :to nat@
+araArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional T.Nat)
+araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60)
+  where
+    lArg = nat "from" ["from degree"]
+    uArg = nat "to"   ["to degree"]
+    tArg = nat "timeout" ["timeout for SMT solver"]
+
+
+checkPropArgs :: (Argument 'Optional LogOp,
+                  Argument 'Optional (Maybe LL), Argument 'Optional (Maybe Ctr))
+checkPropArgs = ( checkPropLogOpArg `T.optional` AND
+                , checkPropLLArg    `T.optional` Nothing
+                , checkPropCtrArg   `T.optional` Nothing)
+
 
 -- | Argument for timeout. @:timeout nat@
 timeoutArg :: Argument 'Required T.Nat
@@ -172,7 +195,7 @@ shift :: (Degree -> TrsStrategy) -> Degree -> Degree -> TrsStrategy
 shift s l u = chain [ tew (s n) | n <- [max 0 (min l u)..max 0 u] ]
 
 mx,wg :: Degree -> Degree -> TrsStrategy
-mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny)
+mx dim deg = matrix' dim deg Automaton UArgs URules (Just selAny)
 wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
 
 -- | Like 'ints' but applies only matrix interpretations.
@@ -186,6 +209,9 @@ polys = shift pxs
 -- | Applies a selection of interpretations, depending on the given lower and uppper bound.
 ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
+
+araBounds :: Degree -> Degree -> Int -> TrsStrategy
+araBounds = ara' NoHeuristics Nothing
 
 
 --- * simplifications ------------------------------------------------------------------------------------------------

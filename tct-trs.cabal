@@ -29,6 +29,20 @@ executable tct-trs
   extensions:     FlexibleInstances, MultiParamTypeClasses
   ghc-options:
     -Wall -threaded -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+  extensions:
+    ConstraintKinds,
+    DataKinds,
+    DeriveFoldable,
+    DeriveFunctor,
+    DeriveTraversable,
+    FlexibleContexts,
+    FlexibleInstances,
+    GADTs,
+    GeneralizedNewtypeDeriving,
+    MultiParamTypeClasses,
+    TypeFamilies,
+    TypeOperators
+
 
 library
   hs-source-dirs:
@@ -62,6 +76,8 @@ library
     Tct.Trs.Encoding.UsablePositions
     Tct.Trs.Encoding.UsableRules
     Tct.Trs.Interactive
+    Tct.Trs.Processor.AmortisedAnalysis
+    Tct.Trs.Processor.CheckProperty
     Tct.Trs.Processor.Bounds
     Tct.Trs.Processor.ComplexityPair
     Tct.Trs.Processor.Decompose
@@ -109,7 +125,13 @@ library
 
     slogic             == 0.*,
     tct-common         == 3.2.*,
-    tct-core           == 3.2.*
+    tct-core           == 3.2.*,
+
+    -- ARA stuff
+    ara-inference,
+    term-rewriting-ext == 0.*,
+    pretty
+
 
   ghc-options:
     -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N

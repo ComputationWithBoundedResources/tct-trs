@@ -116,15 +116,31 @@ rci =
   where
 
 interpretations =
-  tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
+  -- tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
+  tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3)
   .>>> fastest
-    [ tew (px 2) .>>> tew (px 3) .>>> empty
-    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty]
+    [ -- uncomment following TWO lines for start
+      tew (px 2) .>>> tew (px 3) .>>> empty
+    -- , tew (ax 1 3) .>>> empty
+    , axLeaf 1 3 .>>> empty
+
+    -- uncomment following line for start
+    -- , tew (axHeur 2 3) .>>> empty
+    -- , tew (ax 2 2) .>>> empty
+    -- , tew (ax 3 3) .>>> empty
+    -- , axLeaf 1 3 .>>> empty
+    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty
+    ]
   where
     mxs1 = mx 2 1 .<||> mx 3 1
     mxs2 = mx 2 2 .<||> mx 3 2 .<||> wg 2 2
     mxs3 = mx 3 3 .<||> mx 4 3
     mxs4 = mx 4 4
+
+ax, axLeaf :: Int -> Int -> TrsStrategy
+ax lo up = ara' NoHeuristics (Just 1) lo up 8
+axLeaf lo up = ara' NoHeuristics Nothing lo up 5
+axHeur lo up = ara' Heuristics Nothing lo up 3
 
 dpi =
   tew (withCWDG trans) .>>> basics
@@ -150,7 +166,20 @@ dpi =
       where proc = try simps .>>> tew shiftLeafs .>>> basics .>>> empty
 
     basics = tew shift
-      where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
+      -- uncomment following line for script.sh
+      where shift =
+              fastest [ mx 1 1 .<||> ax 1 1 .<||>
+                        mx 2 2 .<||> ax 2 2 .<||> px 2 .<||>
+                        mx 3 3 .<||> px 3 .<||> ax 3 3 .<||>
+                        mx 4 4
+                      ]
+
+      -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
+      -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 3 .<||> mx 4 4
+      -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
+      -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 1 3 .<||> mx 4 4
+      -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 4 .<||>  mx 4 4  -- run No. 1
+      -- -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
 
     simps =
       try empty

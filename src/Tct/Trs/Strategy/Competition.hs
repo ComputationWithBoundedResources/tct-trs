@@ -20,7 +20,7 @@ import Tct.Trs.Strategy.Runtime
 -- | Declaration for "competition" strategy.
 competitionDeclaration :: Declaration ('[Argument 'Optional CombineWith] :-> TrsStrategy)
 competitionDeclaration = strategy "competition" (OneTuple cmb) competitionStrategy
-  where cmb = combineWithArg `optional` Best
+  where cmb = combineWithArg `optional` Fastest
 
 -- | Default competition strategy.
 competition :: TrsStrategy
@@ -34,6 +34,7 @@ competitionStrategy :: CombineWith -> TrsStrategy
 competitionStrategy cmb =
   withProblem $ \p ->
     if isRCProblem p
-      then timeoutIn 5 decreasingLoops `madd` runtime' cmb
+      then -- timeoutIn 5 decreasingLoops `madd`
+           runtime' cmb
       else derivational
 
