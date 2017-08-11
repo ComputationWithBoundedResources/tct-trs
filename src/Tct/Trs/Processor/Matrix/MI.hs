@@ -8,6 +8,8 @@ module Tct.Trs.Processor.Matrix.MI
   , algebraic'
   , eda'
   , ida'
+  , mxeda
+  , mxida
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -41,6 +43,7 @@ import qualified Tct.Trs.Data.Arguments          as Arg
 import qualified Tct.Trs.Data.Problem            as Prob
 import           Tct.Trs.Data.ProblemKind        (StartTerms (..))
 import qualified Tct.Trs.Data.Rules              as RS
+import qualified Tct.Trs.Data.RuleSelector       as RS
 import qualified Tct.Trs.Data.Signature          as Sig
 import           Tct.Trs.Encoding.Interpretation (Interpretation)
 import qualified Tct.Trs.Encoding.Interpretation as I
@@ -754,13 +757,25 @@ upperbound st dim kind li = case kind of
 mkmi :: Int -> Kind -> TrsStrategy
 mkmi dim kind = T.processor MI{miKind=kind, miDimension=dim,miUArgs=NoUArgs,miURules=NoURules,miSelector=Nothing}
 
-
 jordan'           = \dim     -> mkmi dim (MaximalMatrix LikeJordan)
 binaryJordan'     = \dim     -> mkmi dim (MaximalMatrix LikeBinaryJordan)
 almostTriangular' = \dim     -> mkmi dim (MaximalMatrix $ AlmostTriangular 1)
 triangular'       = \dim     -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity Nothing))
 algebraic'        = \dim deg -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity (Just deg)))
 
-eda' = \dim     -> mkmi dim (Automaton Nothing)
-ida' = \dim deg -> mkmi dim (Automaton (Just deg))
+eda' dim  = mkmi dim (Automaton Nothing)
+ida' dim deg = mkmi dim (Automaton (Just deg))
+
+mxida dim deg uargs urules sel =
+  T.processor MI
+    { miKind      = Automaton $ if deg' < dim' then Just deg' else Nothing
+    , miDimension = dim'
+    , miUArgs     = uargs
+    , miURules    = urules
+    , miSelector  = sel }
+  where
+    dim' = max 1 dim
+    deg' = max 0 deg
+
+mxeda dim = mxida dim dim
 

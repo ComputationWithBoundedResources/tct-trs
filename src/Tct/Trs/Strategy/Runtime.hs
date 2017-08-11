@@ -16,6 +16,7 @@ import qualified Tct.Trs.Data.DependencyGraph as DG
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.Rules as RS
 import           Tct.Trs.Processors
+import           Tct.Trs.Processor.Matrix.MI  as MI (mxeda, mxida)
 
 
 -- | Declaration for "derivational" strategy.
@@ -35,6 +36,9 @@ runtime' = T.declFun runtimeDeclaration
 
 mx dim deg   = matrix' dim deg Algebraic ?ua ?ur ?sel
 mxCP dim deg = matrixCP' dim deg Algebraic ?ua ?ur
+
+mxeda dim       = MI.mxeda dim     ?ua ?ur ?sel
+mxida dim deg   = MI.mxida dim deg ?ua ?ur ?sel
 
 px 1 = poly' Linear Restrict ?ua ?ur ?sel
 px n = poly' (Mixed n) Restrict ?ua ?ur ?sel
