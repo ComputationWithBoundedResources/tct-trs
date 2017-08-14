@@ -117,7 +117,7 @@ rci =
 
 interpretations =
   -- tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
-  tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3)
+  tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3 .<||> wg 1 1)
   .>>> fastest
     [ -- uncomment following TWO lines for start
       tew (px 2) .>>> tew (px 3) .>>> empty
