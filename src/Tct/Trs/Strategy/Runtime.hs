@@ -37,8 +37,8 @@ runtime' = T.declFun runtimeDeclaration
 mx dim deg   = matrix' dim deg Algebraic ?ua ?ur ?sel
 mxCP dim deg = matrixCP' dim deg Algebraic ?ua ?ur
 
-mxeda dim       = MI.mxeda dim     ?ua ?ur ?sel
-mxida dim deg   = MI.mxida dim deg ?ua ?ur ?sel
+mxseda dim       = MI.mxeda dim     ?ua ?ur ?sel
+mxsida dim deg   = MI.mxida dim deg ?ua ?ur ?sel
 
 px 1 = poly' Linear Restrict ?ua ?ur ?sel
 px n = poly' (Mixed n) Restrict ?ua ?ur ?sel
@@ -48,6 +48,11 @@ pxCP n = polyCP' (Mixed n) Restrict ?ua ?ur
 
 wgOnUsable dim deg = weightgap' dim deg Algebraic ?ua WgOnTrs
 wg dim deg         = weightgap' dim deg Algebraic ?ua WgOnAny
+
+ax, axLeaf :: Int -> Int -> TrsStrategy
+ax lo up = ara' NoHeuristics (Just 1) lo up 8
+axLeaf lo up = ara' NoHeuristics Nothing lo up 5
+axHeur lo up = ara' Heuristics Nothing lo up 3
 
 --- * rc -------------------------------------------------------------------------------------------------------------
 
@@ -67,7 +72,12 @@ runtimeStrategy' combineWith mto =
 
   withProblem $ \ prob ->
     if Prob.isInnermostProblem prob
-      then rci
+      then ?combine
+      	   [ raml
+	   , interpretations
+	   , rci
+	   ]
+	   -- rci
       else ite toInnermost rci rc
 
 withDP =
@@ -106,6 +116,52 @@ trivialDP =
 withCWDG s = withProblem $ \ prob -> s (Prob.congruenceGraph prob)
 
 
+--- ** interpretations  ----------------------------------------------------------------------------------------------------------
+
+interpretations =
+  tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3)
+  .>>> fastest
+    [ 
+      tew (px 2) .>>> tew (px 3) .>>> empty
+    , axLeaf 1 3 .>>> empty
+    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty
+    ]
+  where
+    mxs1 = mxsida 2 1 .<||> mxsida 3 1
+    mxs2 = mxsida 2 2 .<||> mxsida 3 2 .<||> wg 2 2
+    mxs3 = mxsida 3 3 .<||> mxsida 4 3
+    mxs4 = mxsida 4 4
+
+
+--- ** raml ----------------------------------------------------------------------------------------------------------
+
+raml =
+  dependencyTuples
+  .>>>  try dpsimps
+  .>>>  tew decomposeDG'
+  .>||> try dpsimps
+  .>>>  tew basics' .>>> empty
+  where 
+
+basics' =
+ tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1 .<||> axs2)
+ .>>> fastest
+    [ 
+    tew (?timeoutRel 15 axs2) .>>> tew axs3 .>>> tew axs4 .>>> empty
+    , tew (?timeoutRel 15 eda2) .>>> tew ida4 .>>> tew ida5 .>>> empty
+    ]
+ where
+    -- eda1 = mxseda 1
+    eda2 = mxseda 2
+    -- eda3 = mxseda 3
+    -- eda4 = mxseda 4
+    -- axs1 = ax 1 1
+    axs2 = ax 1 2
+    axs3 = ax 1 3
+    axs4 = ax 1 4
+    ida4 = mxsida 4 1 .<||> mxsida 4 2 .<||> mxsida 4 3
+    ida5 = mxsida 5 1 .<||> mxsida 5 2 .<||> mxsida 5 3 .<||> mxsida 5 4
+
 --- ** rci ----------------------------------------------------------------------------------------------------------
 
 rci =
@@ -113,39 +169,10 @@ rci =
   .>>! ?combine
     [ timeoutIn 7 $ trivialDP   .>>> empty
     , timeoutIn 7 $ matchbounds .>>> empty
-    , ?combine
-        [ interpretations .>>> empty
-        , withDP .>>!! dpi .>>> empty ]
+    , withDP .>>!! dpi .>>> empty 
     ]
   where
-
-interpretations =
-  -- tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1)
-  tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3)
-  .>>> fastest
-    [ -- uncomment following TWO lines for start
-      tew (px 2) .>>> tew (px 3) .>>> empty
-    -- , tew (ax 1 3) .>>> empty
-    , axLeaf 1 3 .>>> empty
-
-    -- uncomment following line for start
-    -- , tew (axHeur 2 3) .>>> empty
-    -- , tew (ax 2 2) .>>> empty
-    -- , tew (ax 3 3) .>>> empty
-    -- , axLeaf 1 3 .>>> empty
-    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty
-    ]
-  where
-    mxs1 = mx 2 1 .<||> mx 3 1
-    mxs2 = mx 2 2 .<||> mx 3 2 .<||> wg 2 2
-    mxs3 = mx 3 3 .<||> mx 4 3
-    mxs4 = mx 4 4
-
-ax, axLeaf :: Int -> Int -> TrsStrategy
-ax lo up = ara' NoHeuristics (Just 1) lo up 8
-axLeaf lo up = ara' NoHeuristics Nothing lo up 5
-axHeur lo up = ara' Heuristics Nothing lo up 3
-
+  
 dpi =
   tew (withCWDG trans) .>>> basics
   where
