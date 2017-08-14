@@ -195,7 +195,7 @@ shift :: (Degree -> TrsStrategy) -> Degree -> Degree -> TrsStrategy
 shift s l u = chain [ tew (s n) | n <- [max 0 (min l u)..max 0 u] ]
 
 mx,wg :: Degree -> Degree -> TrsStrategy
-mx dim deg = matrix' dim deg Automaton UArgs URules (Just selAny)
+mx dim deg = matrix' dim deg Algebraic UArgs URules (Just selAny)
 wg dim deg = weightgap' dim deg Algebraic UArgs WgOnAny
 
 -- | Like 'ints' but applies only matrix interpretations.

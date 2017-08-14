@@ -1,24 +1,12 @@
--- {-# OPTIONS_GHC -fno-warn-unused-imports #-}
--- module Main (main) where
-
--- import Tct.Core
--- import Tct.Trs
--- import Tct.Trs.Interactive
-
--- instance Declared Trs Trs where decls = trsDeclarations
-
--- main :: IO ()
--- main = runTrs trsConfig
---   -- `setSolver` ("z3",[])
-
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 module Main (main) where
 
-import           Tct.Core
-import           Tct.Core.Data
+import Tct.Core
+import Tct.Core.Interactive
 
-import           Tct.Trs
-import           Tct.Trs.Processor.Matrix.MI (eda')
+import Tct.Trs
+import Tct.Trs.Processor.Matrix.MI (eda')
 
 instance Declared Trs Trs where decls = ds
 

@@ -10,8 +10,6 @@ module Tct.Trs.Processor.Matrix.MI
   , ida'
   , mxeda
   , mxida
-
-
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -759,7 +757,6 @@ upperbound st dim kind li = case kind of
 
 mkmi :: Int -> Kind -> TrsStrategy
 mkmi dim kind = T.processor MI{miKind=kind, miDimension=dim,miUArgs=NoUArgs,miURules=NoURules,miSelector=Nothing}
-
 
 jordan'           = \dim     -> mkmi dim (MaximalMatrix LikeJordan)
 binaryJordan'     = \dim     -> mkmi dim (MaximalMatrix LikeBinaryJordan)
