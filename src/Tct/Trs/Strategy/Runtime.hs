@@ -121,7 +121,7 @@ withCWDG s = withProblem $ \ prob -> s (Prob.congruenceGraph prob)
 interpretations =
   tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3)
   .>>> fastest
-    [ 
+    [
       tew (px 2) .>>> tew (px 3) .>>> empty
     , axLeaf 1 3 .>>> empty
     , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty
@@ -141,12 +141,12 @@ raml =
   .>>>  tew decomposeDG'
   .>||> try dpsimps
   .>>>  tew basics' .>>> empty
-  where 
+  where
 
 basics' =
  tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1 .<||> axs2)
  .>>> fastest
-    [ 
+    [
     tew (?timeoutRel 15 axs2) .>>> tew axs3 .>>> tew axs4 .>>> empty
     , tew (?timeoutRel 15 eda2) .>>> tew ida4 .>>> tew ida5 .>>> empty
     ]
@@ -169,10 +169,10 @@ rci =
   .>>! ?combine
     [ timeoutIn 7 $ trivialDP   .>>> empty
     , timeoutIn 7 $ matchbounds .>>> empty
-    , withDP .>>!! dpi .>>> empty 
+    , withDP .>>!! dpi .>>> empty
     ]
   where
-  
+
 dpi =
   tew (withCWDG trans) .>>> basics
   where

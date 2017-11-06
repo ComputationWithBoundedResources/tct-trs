@@ -38,7 +38,10 @@ newtype F = F (AFun BS.ByteString)
   deriving (Eq, Ord)
 
 instance Show F where
-  show (F x) = show x
+  -- show (F x) = show x
+  show (F (TrsFun f)) = show $ PP.text (BS.unpack f)
+  show (F (DpFun f))  = show $ PP.text (BS.unpack f) PP.<> PP.char '#'
+  show (F (ComFun i)) = show $ PP.pretty "c_" PP.<> PP.int i
 
 fun  :: String -> F
 fun = F . TrsFun . BS.pack
@@ -58,8 +61,8 @@ instance Read V where
                     in [(V x, [])]
 
 instance Fun F where
-  markFun (F (TrsFun f))       = F (DpFun f)
-  markFun _                    = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
+  markFun (F (TrsFun f)) = F (DpFun f)
+  markFun _              = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
 
   compoundFun                  = F . ComFun
 

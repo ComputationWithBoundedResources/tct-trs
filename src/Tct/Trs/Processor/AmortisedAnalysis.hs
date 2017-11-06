@@ -52,17 +52,6 @@ import           Data.Rewriting.ARA.ByInferenceRules.TypeSignatures
 import           Data.Rewriting.ARA.Exception
 import           Data.Rewriting.ARA.Exception.Pretty                       ()
 
--- Possible Improvements (it currently works but there are optimizations):
--- -----------------------------------------------------------------
--- 1. Problem F V ... shall be used instead of Problem String String String ...
---    ... DONE except that show is used for generating SMT strings
--- 2. Use SMT solver as other strategies do
--- 3. Get rid of the warnings
--- 4. Use the same PrettyPrinting library
--- 5. Cleanup of unused modules/code
--- 6. Implement type inference for heuristics
--- 7. Possibly: Add argument options, e.g. for printing the inference trees.
-
 
 data Ara = Ara { araHeuristics :: Heuristics -- ^ Use heuristics. TODO: Heuristics
                                            -- not yet functional as type inference
@@ -149,7 +138,6 @@ instance T.Processor Ara where
                      -- Find out SCCs
                      let reachability = analyzeReachability prob
 
-
                      (prove, infTrees) <- analyzeProblem args reachability prob
                      -- Solve cost constraints
                      let cond = conditions prove
@@ -221,14 +209,12 @@ convertProblem inProb =
                             RS.toList (Prob.strictDPs inProb))
                           (fmap convertRule $ RS.toList (Prob.weakTrs inProb) ++
                             RS.toList (Prob.weakDPs inProb))
-             , RT.variables = -- fmap unV $
-                              S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
+             , RT.variables = S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
                                                   Prob.weakTrs inProb)
-             , RT.symbols = -- fmap unF $
-                            S.toList (Sig.defineds (Prob.signature inProb)) ++
+             , RT.symbols = S.toList (Sig.defineds (Prob.signature inProb)) ++
                             S.toList (Sig.constructors (Prob.signature inProb))
              , RT.comment = Nothing
-                                }
+             }
 
 convertStartTerms :: StartTerms t -> RT.StartTerms
 convertStartTerms Prob.AllTerms{} = RT.AllTerms
