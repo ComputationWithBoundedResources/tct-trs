@@ -73,12 +73,17 @@ runtimeStrategy' combineWith mto =
   withProblem $ \ prob ->
     if Prob.isInnermostProblem prob
       then ?combine
-      	   [ raml
-	   , interpretations
-	   , rci
-	   ]
-	   -- rci
+           [ timeoutIn 7 direct
+           , timeoutIn 18 interp
+           , timeoutIn 20 raml
+           , rci
+           ]
       else ite toInnermost rci rc
+
+direct = try trivial
+  .>>> tew (fastest [axHeur 1 2, axLeaf 1 2]) -- up to quadratic bound
+  .>>> empty
+
 
 withDP =
   try (withProblem toDP')
@@ -118,14 +123,13 @@ withCWDG s = withProblem $ \ prob -> s (Prob.congruenceGraph prob)
 
 --- ** interpretations  ----------------------------------------------------------------------------------------------------------
 
-interpretations =
-  tew (?timeoutRel 15 $ mx 1 1 .<||> axLeaf 1 3 .<||> axHeur 1 3)
-  .>>> fastest
-    [
-      tew (px 2) .>>> tew (px 3) .>>> empty
-    , axLeaf 1 3 .>>> empty
-    , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty
-    ]
+interp = try trivial
+  .>>> tew (try $ fastest [mx 1 1, px 1, ax 1 1])
+  .>>> tew (try $ fastest [ax 2 2, px 2])
+  .>>> tew (try $ fastest [mx 3 3, px 3])
+  .>>> tew (try $ fastest [mxs1 .>>> tew mxs2 .>>> tew mxs3 .>>> tew mxs4])
+  .>>> empty
+
   where
     mxs1 = mxsida 2 1 .<||> mxsida 3 1
     mxs2 = mxsida 2 2 .<||> mxsida 3 2 .<||> wg 2 2
@@ -133,32 +137,42 @@ interpretations =
     mxs4 = mxsida 4 4
 
 
+-- Is now included in interp function
+-- interpretations =
+--   tew (?timeoutRel 15 $ mx 1 1 .<||> px 1)
+--   .>>>
+--   fastest
+--     [ tew (px 3) .>>> empty
+--     , tew (?timeoutRel 15 mxs1) .>>> tew (?timeoutRel 15 mxs2) .>>> tew mxs3 .>>> tew mxs4 .>>> empty
+--     ]
+--   where
+--     mxs1 = mxsida 2 1 .<||> mxsida 3 1
+--     mxs2 = mxsida 2 2 .<||> mxsida 3 2 .<||> wg 2 2
+--     mxs3 = mxsida 3 3 .<||> mxsida 4 3
+--     mxs4 = mxsida 4 4
+
+
 --- ** raml ----------------------------------------------------------------------------------------------------------
 
-raml =
-  dependencyTuples
+raml =  dependencyTuples
   .>>>  try dpsimps
   .>>>  tew decomposeDG'
   .>||> try dpsimps
   .>>>  tew basics' .>>> empty
-  where
+
 
 basics' =
- tew (?timeoutRel 15 $ mx 1 1 .<||> wg 1 1 .<||> axs2)
- .>>> fastest
-    [
-    tew (?timeoutRel 15 axs2) .>>> tew axs3 .>>> tew axs4 .>>> empty
-    , tew (?timeoutRel 15 eda2) .>>> tew ida4 .>>> tew ida5 .>>> empty
-    ]
+       tew (try $ ?timeoutRel 15 $ fastest [mx 1 1, wg 1 1])
+  .>>> tew (try $ ?timeoutRel 15 $ fastest [eda2, ax 2 2])
+  .>>> tew (try $ ?timeoutRel 15 $ fastest [eda3])
+  .>>> tew (try $                  fastest [ida4])
+  .>>> tew (try $                  fastest [ida5])
+
  where
     -- eda1 = mxseda 1
     eda2 = mxseda 2
-    -- eda3 = mxseda 3
-    -- eda4 = mxseda 4
-    -- axs1 = ax 1 1
-    axs2 = ax 1 2
-    axs3 = ax 1 3
-    axs4 = ax 1 4
+    eda3 = mxseda 3
+    eda4 = mxseda 4
     ida4 = mxsida 4 1 .<||> mxsida 4 2 .<||> mxsida 4 3
     ida5 = mxsida 5 1 .<||> mxsida 5 2 .<||> mxsida 5 3 .<||> mxsida 5 4
 
@@ -167,7 +181,7 @@ basics' =
 rci =
   try innermostRuleRemoval
   .>>! ?combine
-    [ timeoutIn 7 $ trivialDP   .>>> empty
+    [ timeoutIn 7 $ trivialDP .>>> empty
     , timeoutIn 7 $ matchbounds .>>> empty
     , withDP .>>!! dpi .>>> empty
     ]
@@ -182,7 +196,6 @@ dpi =
 
     cwdgDepth cwdg = maximum $ 0 : [ dp r | r <- DG.roots cwdg]
       where dp n = maximum $ 0 : [ 1 + dp m | m <- DG.successors cwdg n]
-
 
     shiftLeafs = force $ removeLeafs 0 .<||> (removeLeafs 1 .<|> removeLeafs 2)
 
@@ -199,9 +212,9 @@ dpi =
     basics = tew shift
       -- uncomment following line for script.sh
       where shift =
-              fastest [ mx 1 1 .<||> ax 1 1 .<||>
+              fastest [ mx 1 1 .<||> ax 1 1 .<||> px 1 .<||>
                         mx 2 2 .<||> ax 2 2 .<||> px 2 .<||>
-                        mx 3 3 .<||> px 3 .<||> ax 3 3 .<||>
+                        mx 3 3 .<||> px 3 .<||> -- ax 3 3 .<||>
                         mx 4 4
                       ]
 
@@ -227,7 +240,7 @@ rc =
     [ timeoutIn 7 $ trivialDP .>>> empty
     , timeoutIn 7 $ matchbounds .>>> empty
     , ?combine
-        [ interpretations .>>> empty
+        [ interp .>>> empty
         , withDP .>>!! dp .>>> empty ]
     ]
   where

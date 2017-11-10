@@ -78,8 +78,11 @@ defaultArgs = ArgumentOptions { filePath = ""
                               , verbose = False
                               , shift = False
                               , allowLowerSCC = False
+                              , allowCf = False
                               , lowerbound = False
                               , lowerboundArg = Nothing
+                              , lowerboundNoComplDef = False
+                              , constructorArgSelection = []
                               , timeout = Nothing
                               , smtSolver = Z3
                               , findStrictRules = Nothing
