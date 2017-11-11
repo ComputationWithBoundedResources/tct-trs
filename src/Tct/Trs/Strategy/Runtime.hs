@@ -72,12 +72,13 @@ runtimeStrategy' combineWith mto =
 
   withProblem $ \ prob ->
     if Prob.isInnermostProblem prob
-      then ?combine
-           [ timeoutIn 7 direct
-           , timeoutIn 18 interp
-           , timeoutIn 20 raml
-           , rci
-           ]
+      then best cmpTimeUB [ timeoutIn 7 direct
+                          , ?combine
+                            [ timeoutIn 18 interp
+                            , timeoutIn 20 raml
+                            , rci
+                            ]
+                          ]
       else ite toInnermost rci rc
 
 direct = try trivial
@@ -124,7 +125,7 @@ withCWDG s = withProblem $ \ prob -> s (Prob.congruenceGraph prob)
 --- ** interpretations  ----------------------------------------------------------------------------------------------------------
 
 interp = try trivial
-  .>>> tew (try $ fastest [mx 1 1, px 1, ax 1 1])
+  .>>> tew (try $ fastest [ax 1 1, mx 1 1, px 1])
   .>>> tew (try $ fastest [ax 2 2, px 2])
   .>>> tew (try $ fastest [mx 3 3, px 3])
   .>>> tew (try $ fastest [mxs1 .>>> tew mxs2 .>>> tew mxs3 .>>> tew mxs4])
@@ -137,7 +138,8 @@ interp = try trivial
     mxs4 = mxsida 4 4
 
 
--- Is now included in interp function
+-- | Is now included in interp function
+
 -- interpretations =
 --   tew (?timeoutRel 15 $ mx 1 1 .<||> px 1)
 --   .>>>
@@ -163,7 +165,7 @@ raml =  dependencyTuples
 
 basics' =
        tew (try $ ?timeoutRel 15 $ fastest [mx 1 1, wg 1 1])
-  .>>> tew (try $ ?timeoutRel 15 $ fastest [eda2, ax 2 2])
+  .>>> tew (try $ ?timeoutRel 15 $ fastest [ax 2 2, eda2])
   .>>> tew (try $ ?timeoutRel 15 $ fastest [eda3])
   .>>> tew (try $                  fastest [ida4])
   .>>> tew (try $                  fastest [ida5])
@@ -212,18 +214,11 @@ dpi =
     basics = tew shift
       -- uncomment following line for script.sh
       where shift =
-              fastest [ mx 1 1 .<||> ax 1 1 .<||> px 1 .<||>
-                        mx 2 2 .<||> ax 2 2 .<||> px 2 .<||>
+              fastest [ ax 1 1 .<||> mx 1 1 .<||> px 1 .<||>
+                        ax 2 2 .<||> mx 2 2 .<||> px 2 .<||>
                         mx 3 3 .<||> px 3 .<||> -- ax 3 3 .<||>
                         mx 4 4
                       ]
-
-      -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||>  mx 4 4
-      -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 3 .<||> mx 4 4
-      -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
-      -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 1 3 .<||> mx 4 4
-      -- where shift = mx 2 2 .<||> mx 3 3 .<||> ax 2 4 .<||>  mx 4 4  -- run No. 1
-      -- -- where shift = mx 2 2 .<||> mx 3 3 .<||> px 3 .<||> ax 2 2 .<||> ax 3 3 .<||> mx 4 4
 
     simps =
       try empty

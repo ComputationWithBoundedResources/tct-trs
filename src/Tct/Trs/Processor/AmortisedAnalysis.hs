@@ -113,7 +113,8 @@ instance T.Processor Ara where
   type Out Ara         = Prob.Trs
   type Forking Ara     = T.Optional T.Id
 
-  execute p probTcT =
+  execute p probTcT = -- T.abortWith (Inapplicable "" :: ApplicationProof
+                      --              (OrientationProof (AraProof F V)))
 
     maybe araFun (\s -> T.abortWith (Inapplicable s :: ApplicationProof
                                    (OrientationProof (AraProof F V)))) maybeApplicable
