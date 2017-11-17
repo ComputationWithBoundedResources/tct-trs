@@ -74,8 +74,8 @@ runtimeStrategy' combineWith mto =
     if Prob.isInnermostProblem prob
       then best cmpTimeUB [ timeoutIn 7 direct
                           , ?combine
-                            [ timeoutIn 18 interp
-                            , timeoutIn 20 raml
+                            [ timeoutIn 25 interp
+                            , raml
                             , rci
                             ]
                           ]
