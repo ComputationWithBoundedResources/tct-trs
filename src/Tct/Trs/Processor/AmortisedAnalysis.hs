@@ -73,7 +73,7 @@ defaultArgs = ArgumentOptions { filePath = ""
                               , separateBaseCtr = False
                               , tempFilePath = "/tmp"
                               , helpText = False
-                              , keepFiles = True
+                              , keepFiles = False
                               , printInfTree = False
                               , verbose = False
                               , shift = False
@@ -118,7 +118,7 @@ instance T.Processor Ara where
 
     maybe araFun (\s -> T.abortWith (Inapplicable s :: ApplicationProof
                                    (OrientationProof (AraProof F V)))) maybeApplicable
-
+ 
     where maybeApplicable = -- Prob.isRCProblem' probTcT <|>    -- check left linearity
                             Prob.isInnermostProblem' probTcT -- check innermost
                             -- <|> RS.isConstructorTrs' sig trs -- not needed
