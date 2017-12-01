@@ -156,6 +156,32 @@ interp = try trivial
 
 --- ** raml ----------------------------------------------------------------------------------------------------------
 
+toDP = dependencyTuples .<||> (dependencyPairs .>>> try usableRules .>>> try (wgOnUsable 2 1))
+  .>>> try removeInapplicable
+  .>>> try dpsimps
+
+simpDP = try cleanSuffix
+  .>>> te decomposeIndependentSG
+  .>>> te removeHeads
+  .>>> try trivial
+  .>>> try usableRules
+
+data Methods = PopStar | Matrices | Polys
+
+-- semantic methods i = whenNonTrivial $
+--   -- (when (PopStar `elem` methods) (peAny (spopstarPS `withDegree` Just i)))
+--   -- <||>
+--   (when (Matrices `elem` methods)
+--    (peAny (mx i i)
+--     .<||> peAny (mx (i + 1) i)
+--     .<||> when (i == 1) (mx 3 1))
+--     .<||> when (Polys `elem` methods && (i == 2 || i == 3))
+--     (peAny (poly `withDegree` Just i)))
+
+--   where peAny p = p `withPEOn`
+--           (selLeafWDG `selInter` selStricts) >>> try cleanUpTail
+
+
 raml =  dependencyTuples
   .>>>  try dpsimps
   .>>>  tew decomposeDG'
