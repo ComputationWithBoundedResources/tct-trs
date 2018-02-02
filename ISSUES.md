@@ -100,3 +100,9 @@ problem. It could be interesting to explore dedicated strategies for
 simplifying, decomposing polynomial interpretations.
 
 
+
+### * better defaults #minor #ui
+
+Derivational complexity is used per default. Should probably be Runtime
+Innermost.
+
