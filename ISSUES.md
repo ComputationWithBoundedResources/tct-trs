@@ -106,3 +106,11 @@ simplifying, decomposing polynomial interpretations.
 Derivational complexity is used per default. Should probably be Runtime
 Innermost.
 
+
+
+### * update dependencies to recent ghc/stackage version
+
+Building all packages is getting instable due to package conflicts. Update
+dependencies.
+
+
