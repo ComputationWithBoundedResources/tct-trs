@@ -24,7 +24,7 @@ import qualified Data.Vector                     as V
 
 import           SLogic.Logic.Matrix             (Matrix)
 import qualified SLogic.Logic.Matrix             as Mat
-import           SLogic.Smt                      ((.&&), (.*), (.+), (.<=), (.<=>), (.==), (.=>), (.>), (.>=))
+import           SLogic.Smt                      ((.&&), (.*), (.+), (.<), (.<=), (.<=>), (.==), (.=>), (.>), (.>=))
 import qualified SLogic.Smt                      as Smt
 
 import           Tct.Core.Common.Error           (throwError)
