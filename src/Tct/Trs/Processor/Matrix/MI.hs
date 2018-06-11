@@ -61,7 +61,7 @@ data MI = MI
   , miSelector  :: Maybe (ExpressionSelector F V)
   } deriving (Show)
 
--- |
+
 data Kind
   = MaximalMatrix MaximalMatrix -- ^ use maximal matrices
   | Automaton (Maybe Int)       -- ^ use automaton
@@ -70,15 +70,15 @@ data Kind
 
 -- | shape restrictions for maximum matrix
 data MaximalMatrix
-  = UpperTriangular TriangularBound          -- ^ restrict to triangular maximal matrices
-  | LowerTriangular TriangularBound          -- ^ restrict to triangular maximal matrices
-  | AlmostTriangular Int -- ^ restrict to almost triangular maximal matrices, ie if mat^k is triangular for some k
-  | CaTDirectImplicit -- ^ use constraints also implemented in the tool CaT
-  | Sturm -- ^ use constraints derived from Sturm's Theorem
-  | Budan -- ^ use (incomplete) constraints derived from Budan-Fourier theorem
-  | LikeJordan           -- ^ restrict to maximal matrices which are similar to JNF
-  | LikeBinaryJordan           -- ^ restrict to maximal matrices which are similar to JNF
-  | MaxAutomaton
+  = UpperTriangular TriangularBound -- ^ restrict to upper triangular maximal matrices
+  | LowerTriangular TriangularBound -- ^ restrict to lower triangular maximal matrices
+  | AlmostTriangular Int            -- ^ restrict to almost triangular maximal matrices, ie if mat^k is triangular for some k
+  | CaTDirectImplicit               -- ^ use constraints also implemented in the tool CaT
+  | Sturm                           -- ^ use constraints derived from Sturm's Theorem
+  | Budan                           -- ^ use (incomplete) constraints derived from Budan-Fourier theorem
+  | LikeJordan                      -- ^ restrict to maximal matrices which are similar to JNF
+  | LikeBinaryJordan                -- ^ restrict to maximal matrices which are similar to JNF; entries are restricted to 0,1
+  | MaxAutomaton                    -- ^ use EDA/IDA on maximal matrix
   deriving (Show)
 
 data TriangularBound
@@ -199,7 +199,7 @@ abstractInterpretation st dim kind sig = case kind of
   MaximalMatrix (LowerTriangular _)  -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absLTriMatrix) restricted
   MaximalMatrix (AlmostTriangular _) -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absMaxMatrix) restricted
   MaximalMatrix LikeJordan           -> M.map (mk absStdMatrix) masse
-  MaximalMatrix LikeBinaryJordan           -> M.map (mk absBinaryStdMatrix) masse
+  MaximalMatrix LikeBinaryJordan     -> M.map (mk absBinaryStdMatrix) masse
   MaximalMatrix CaTDirectImplicit    -> M.map (mk absEdaMatrix) masse
   MaximalMatrix Sturm                -> M.map (mk absEdaMatrix) masse
   MaximalMatrix Budan                -> M.map (mk absEdaMatrix) masse
@@ -657,13 +657,11 @@ almostTriangularConstraint :: Int -> Matrix IExpr -> SmtM (KindMatrices IExpr)
 almostTriangularConstraint pot m = Smt.assert (Smt.bany triangularConstraint mxs) >> return (AlmostTriangularMatrices mxs)
   where mxs = take (max 1 pot) (iterate (.*m) m)
 
--- almostTriangularConstraint' :: Int -> Int -> Matrix IExpr -> SmtM ()
--- almostTriangularConstraint' pot deg m = Smt.assert $ Smt.bany (\mx -> triangularConstraint mx .&& traceConstraint deg mx) $ take (max 1 pot) (iterate (.*m) m)
-
 -- | For a given maximal matrix finds a similar matrix in Jordan Normal Form. That is find P,J such that M = PJP-, J
 -- in JNF and PP- = I.
-likeJordanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
-likeJordanConstraint m = do
+-- When we restrict to natural numbers then P,P- are permutation matrices; hence we can restrict to 0,1 entries.
+likeJordanConstraint' :: SmtM IExpr -> Matrix IExpr -> SmtM (KindMatrices IExpr)
+likeJordanConstraint' varM m = do
   p <- someMatrix
   q <- someMatrix
   j <- someJordanMatrix
@@ -679,36 +677,21 @@ likeJordanConstraint m = do
           | i == j      = Smt.snvarM'
           | succ i == j = Smt.snvarM'
           | otherwise   = return Smt.zero
-    someMatrix = sequenceA $ Mat.fromList dim dim (repeat Smt.ivarM')
+    someMatrix = sequenceA $ Mat.fromList dim dim (repeat varM)
     m1 .==. m2 = Smt.bigAnd $ Mat.elementwise (.==) m1 m2
     idm = Mat.matrix dim dim $ \(i,j) -> if i == j then Smt.one else Smt.zero
     dim = Mat.nrows m
 
+likeJordanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+likeJordanConstraint = likeJordanConstraint' Smt.nvarM'
+
+-- like 'likeJordanConstraint' but restricted to 0,1 entries
 likeBinaryJordanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
-likeBinaryJordanConstraint m = do
-  p <- someMatrix
-  q <- someMatrix
-  j <- someJordanMatrix
-  Smt.assert $ (p.*q)    .==. idm
-  Smt.assert $ (p.*m.*q) .==. j
-  return $ LikeJordanMatrices (p,m,q,j)
-  where
-    someJordanMatrix  = someJordanMatrixM >>= \mx -> Smt.assert (Smt.bigAnd [ block (mx Mat.!.) i | i <- [1..pred dim] ]) >> return mx
-      where
-        block mx i = let j = succ i in mx (i,j) .== Smt.one .=> mx (i,i) .== mx (j,j)
-        someJordanMatrixM = sequenceA $ Mat.matrix dim dim k
-        k (i,j)
-          | i == j      = Smt.snvarM'
-          | succ i == j = Smt.snvarM'
-          | otherwise   = return Smt.zero
-    someMatrix = sequenceA $ Mat.fromList dim dim (repeat Smt.snvarM')
-    m1 .==. m2 = Smt.bigAnd $ Mat.elementwise (.==) m1 m2
-    idm = Mat.matrix dim dim $ \(i,j) -> if i == j then Smt.one else Smt.zero
-    dim = Mat.nrows m
+likeBinaryJordanConstraint = likeJordanConstraint' Smt.snvarM'
 
 -- | Kind related matrices for proof output.
-data KindMatrices a =
-  NoMatrix
+data KindMatrices a
+  = NoMatrix
   | MMatrix (Matrix a)
   | AlmostTriangularMatrices [Matrix a]
   | LikeJordanMatrices (Matrix a, Matrix a, Matrix a, Matrix a)
@@ -735,7 +718,7 @@ kindConstraints st dim kind inter = case kind of
 
   MaximalMatrix (AlmostTriangular pot)                      -> mm >>= almostTriangularConstraint pot
   MaximalMatrix LikeJordan                                  -> mm >>= likeJordanConstraint
-  MaximalMatrix LikeBinaryJordan                                  -> mm >>= likeBinaryJordanConstraint
+  MaximalMatrix LikeBinaryJordan                            -> mm >>= likeBinaryJordanConstraint
   MaximalMatrix CaTDirectImplicit                           -> mm >>= catDirectImplicitConstraint >> return NoMatrix
   MaximalMatrix Sturm                                       -> mm >>= sturmConstraint >> return NoMatrix
   MaximalMatrix Budan                                       -> mm >>= budanConstraint >> return NoMatrix
@@ -1027,6 +1010,7 @@ certification st mi order cert = case cert of
 countNonZeros :: Num c => Matrix c -> c
 countNonZeros = sum . fmap signum . F.toList . Mat.getDiagonal
 
+-- TODO: improve bound by explicitly computing it with IDA criterion
 upperbound :: StartTerms F -> Dim -> Kind -> I.Interpretation F (LinearInterpretation ArgPos Int) -> T.Complexity
 upperbound st dim kind li = case kind of
   MaximalMatrix (UpperTriangular Implicit)       -> T.Poly (Just dim)
@@ -1035,7 +1019,7 @@ upperbound st dim kind li = case kind of
   MaximalMatrix (LowerTriangular Multiplicity{}) -> T.Poly (Just $ countNonZeros mm)
   MaximalMatrix AlmostTriangular{}               -> T.Poly (Just dim) -- TODO: improve bound - take minimal multiplicty wrt. given triangular matrix
   MaximalMatrix LikeJordan                       -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
-  MaximalMatrix LikeBinaryJordan                       -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
+  MaximalMatrix LikeBinaryJordan                 -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
   MaximalMatrix CaTDirectImplicit                -> T.Poly (Just dim)
   MaximalMatrix Sturm                            -> T.Poly (Just dim)
   MaximalMatrix Budan                            -> T.Poly (Just dim)
