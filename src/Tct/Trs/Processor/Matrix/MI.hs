@@ -200,9 +200,9 @@ abstractInterpretation st dim kind sig = case kind of
   MaximalMatrix (AlmostTriangular _) -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absMaxMatrix) restricted
   MaximalMatrix LikeJordan           -> M.map (mk absStdMatrix) masse
   MaximalMatrix LikeBinaryJordan     -> M.map (mk absBinaryStdMatrix) masse
-  MaximalMatrix CaTDirectImplicit    -> M.map (mk absEdaMatrix) masse
-  MaximalMatrix Sturm                -> M.map (mk absEdaMatrix) masse
-  MaximalMatrix Budan                -> M.map (mk absEdaMatrix) masse
+  MaximalMatrix CaTDirectImplicit    -> M.map (mk absStdMatrix) masse
+  MaximalMatrix Sturm                -> M.map (mk absStdMatrix) masse
+  MaximalMatrix Budan                -> M.map (mk absStdMatrix) masse
   MaximalMatrix MaxAutomaton         -> M.map (mk absEdaMatrix) masse
 
   Unrestricted                       -> M.map (mk absStdMatrix) masse
