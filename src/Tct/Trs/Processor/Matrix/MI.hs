@@ -8,6 +8,7 @@ module Tct.Trs.Processor.Matrix.MI
   , algebraic'
   , catDirectImplicit'
   , sturm'
+  , subresultantPRS'
   , budan'
   , eda'
   , ida'
@@ -75,6 +76,7 @@ data MaximalMatrix
   | AlmostTriangular Int            -- ^ restrict to almost triangular maximal matrices, ie if mat^k is triangular for some k
   | CaTDirectImplicit               -- ^ use constraints also implemented in the tool CaT
   | Sturm                           -- ^ use constraints derived from Sturm's Theorem
+  | SubresultantPRS                 -- ^ use constraints derived from Subresultant PRS algorithm
   | Budan                           -- ^ use (incomplete) constraints derived from Budan-Fourier theorem
   | LikeJordan                      -- ^ restrict to maximal matrices which are similar to JNF
   | LikeBinaryJordan                -- ^ restrict to maximal matrices which are similar to JNF; entries are restricted to 0,1
@@ -202,6 +204,7 @@ abstractInterpretation st dim kind sig = case kind of
   MaximalMatrix LikeBinaryJordan     -> M.map (mk absBinaryStdMatrix) masse
   MaximalMatrix CaTDirectImplicit    -> M.map (mk absStdMatrix) masse
   MaximalMatrix Sturm                -> M.map (mk absStdMatrix) masse
+  MaximalMatrix SubresultantPRS      -> M.map (mk absStdMatrix) masse
   MaximalMatrix Budan                -> M.map (mk absStdMatrix) masse
   MaximalMatrix MaxAutomaton         -> M.map (mk absEdaMatrix) masse
 
@@ -559,6 +562,250 @@ sturmConstraint m =
                    ]
        _ -> error "dimension not supported"
 
+-- | constraints based on the Subresultant PRS algorithm; supports dimensions 2 and 3
+subresultantPRSConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+subresultantPRSConstraint m =
+ let dim = Mat.nrows m
+ in case dim of
+      1 -> Smt.assert (Mat.getEntry (1, 1) m .<= Smt.IVal 1) >> return (MMatrix m)
+      2 -> Smt.assert subresultant2D >> return (MMatrix m) -- the subresultant algorithm constraint has additional disjuncts for the 2D case
+        where subresultant2D =
+                Smt.bigOr
+                  [ Smt.bigAnd
+                    [ Smt.bigAdd
+                        [ Smt.IVal 1
+                        , Smt.INeg (Mat.getEntry (1, 1) m)
+                        , Smt.INeg (Mat.getEntry (2, 2) m)
+                        , Smt.IMul
+                            (Mat.getEntry (1, 1) m)
+                            (Mat.getEntry (2, 2) m)
+                        , Smt.INeg
+                            (Smt.IMul
+                               (Mat.getEntry (1, 2) m)
+                               (Mat.getEntry (2, 1) m))
+                        ] .>=
+                      Smt.IVal 0
+                    , Smt.bigAdd
+                        [ Smt.IVal 2
+                        , Smt.INeg (Mat.getEntry (1, 1) m)
+                        , Smt.INeg (Mat.getEntry (2, 2) m)
+                        ] .>=
+                      Smt.IVal 0
+                    ]
+                  , Smt.bigAnd
+                      [ Smt.bigAdd
+                          [ Smt.IMul
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                          , Smt.bigMul
+                              [ Smt.IVal 4
+                              , Mat.getEntry (1, 2) m
+                              , Mat.getEntry (2, 1) m
+                              ]
+                          ] .<
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IMul
+                              (Mat.getEntry (1, 1) m)
+                              (Mat.getEntry (2, 2) m)
+                          , Smt.INeg
+                              (Smt.IMul
+                                 (Mat.getEntry (1, 2) m)
+                                 (Mat.getEntry (2, 1) m))
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          , Smt.IVal 1
+                          ] .>
+                        Smt.IVal 0
+                      ]
+                  , Smt.bigAnd
+                      [ Smt.bigAdd
+                          [ Smt.IMul
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                          , Smt.bigMul
+                              [ Smt.IVal 4
+                              , Mat.getEntry (1, 2) m
+                              , Mat.getEntry (2, 1) m
+                              ]
+                          ] .==
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IVal 2
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          ] .<
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IMul
+                              (Mat.getEntry (1, 1) m)
+                              (Mat.getEntry (2, 2) m)
+                          , Smt.INeg
+                              (Smt.IMul
+                                 (Mat.getEntry (1, 2) m)
+                                 (Mat.getEntry (2, 1) m))
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          , Smt.IVal 1
+                          ] .==
+                        Smt.IVal 0
+                      ]
+                  , Smt.bigAnd
+                      [ Smt.bigAdd
+                          [ Smt.IMul
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                          , Smt.bigMul
+                              [ Smt.IVal 4
+                              , Mat.getEntry (1, 2) m
+                              , Mat.getEntry (2, 1) m
+                              ]
+                          ] .==
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IVal 2
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          ] .<=
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IMul
+                              (Mat.getEntry (1, 1) m)
+                              (Mat.getEntry (2, 2) m)
+                          , Smt.INeg
+                              (Smt.IMul
+                                 (Mat.getEntry (1, 2) m)
+                                 (Mat.getEntry (2, 1) m))
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          , Smt.IVal 1
+                          ] .<
+                        Smt.IVal 0
+                      ]
+                  ]
+      3 -> Smt.assert subresultant3D >> return (MMatrix m)
+        where p =
+                Smt.bigAdd
+                  [ Mat.getEntry (1, 1) m
+                  , Mat.getEntry (2, 2) m
+                  , Mat.getEntry (3, 3) m
+                  ]
+              q =
+                Smt.bigAdd
+                  [ Smt.IMul (Mat.getEntry (1, 2) m) (Mat.getEntry (2, 1) m)
+                  , Smt.IMul (Mat.getEntry (1, 3) m) (Mat.getEntry (3, 1) m)
+                  , Smt.IMul (Mat.getEntry (2, 3) m) (Mat.getEntry (3, 2) m)
+                  , Smt.INeg
+                      (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (2, 2) m))
+                  , Smt.INeg
+                      (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (3, 3) m))
+                  , Smt.INeg
+                      (Smt.IMul (Mat.getEntry (2, 2) m) (Mat.getEntry (3, 3) m))
+                  ]
+              r =
+                Smt.bigAdd
+                  [ Smt.bigMul
+                      [ Mat.getEntry (1, 1) m
+                      , Mat.getEntry (2, 2) m
+                      , Mat.getEntry (3, 3) m
+                      ]
+                  , Smt.bigMul
+                      [ Mat.getEntry (1, 2) m
+                      , Mat.getEntry (2, 3) m
+                      , Mat.getEntry (3, 1) m
+                      ]
+                  , Smt.bigMul
+                      [ Mat.getEntry (1, 3) m
+                      , Mat.getEntry (2, 1) m
+                      , Mat.getEntry (3, 2) m
+                      ]
+                  , Smt.INeg
+                      (Smt.bigMul
+                         [ Mat.getEntry (1, 3) m
+                         , Mat.getEntry (2, 2) m
+                         , Mat.getEntry (3, 1) m
+                         ])
+                  , Smt.INeg
+                      (Smt.bigMul
+                         [ Mat.getEntry (1, 2) m
+                         , Mat.getEntry (2, 1) m
+                         , Mat.getEntry (3, 3) m
+                         ])
+                  , Smt.INeg
+                      (Smt.bigMul
+                         [ Mat.getEntry (1, 1) m
+                         , Mat.getEntry (2, 3) m
+                         , Mat.getEntry (3, 2) m
+                         ])
+                  ]
+              z = Smt.IVal 0
+              e =
+                Smt.bigAdd
+                  [ Smt.bigMul [Smt.IVal 3, p, q]
+                  , Smt.IMul (Smt.IVal 6) p
+                  , Smt.IMul (Smt.IVal 8) q
+                  , Smt.INeg (Smt.IMul (Smt.IVal 9) r)
+                  , Smt.INeg (Smt.IVal 4)
+                  ]
+              f =
+                Smt.bigAdd
+                  [ Smt.INeg (Smt.bigMul [Smt.IVal 3, p, p, q, q])
+                  , Smt.bigMul [Smt.IVal 8, p, q, q]
+                  , Smt.bigMul [Smt.IVal 18, p, q, r]
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 12, p, r])
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 4, q, q, q])
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 4, q, q])
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 27, r, r])
+                  , Smt.IMul (Smt.IVal 8) r
+                  ]
+              i = Smt.bigAdd [p, q, r, Smt.IVal 1]
+              ii =
+                Smt.bigAdd [Smt.IMul (Smt.IVal 2) p, q, Smt.INeg (Smt.IVal 3)]
+              iii =
+                Smt.bigAdd
+                  [ Smt.IMul (Smt.IVal 6) p
+                  , Smt.INeg (Smt.IMul (Smt.IVal 6) q)
+                  , Smt.INeg (Smt.IVal 4)
+                  ]
+              subresultant3D =
+                Smt.bigOr
+                  [ Smt.bigAnd [i .== z, ii .< z, e .> z, iii .< z, f .== z]
+                  , Smt.bigAnd [i .> z, ii .< z, e .> z, iii .< z, f .> z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .== z, iii .< z, f .> z]
+                  , Smt.bigAnd [i .< z, ii .<= z, e .<= z, iii .>= z, f .== z]
+                  , Smt.bigAnd [i .< z, e .> z, iii .< z, f .== z]
+                  , Smt.bigAnd [i .< z, ii .> z, e .== z, iii .< z, f .== z]
+                  , Smt.bigAnd [i .== z, ii .< z, e .<= z, iii .>= z, f .== z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .< z, iii .>= z, f .== z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .> z, iii .<= z, f .< z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .> z, iii .> z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .>= z, iii .>= z, f .>= z]
+                  , Smt.bigAnd [i .== z, ii .> z, e .< z, iii .< z]
+                  , Smt.bigAnd [i .== z, ii .> z, e .< z, f .< z]
+                  , Smt.bigAnd [i .>= z, ii .> z, e .>= z, iii .>= z]
+                  , Smt.bigAnd [i .== z, ii .> z, e .>= z, iii .< z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .< z, e .<= z, iii .>= z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .< z, iii .>= z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .== z, iii .>= z, f .<= z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .> z, iii .>= z]
+                  , Smt.bigAnd [i .> z, ii .> z, e .< z, iii .>= z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .< z, e .== z, iii .< z]
+                  , Smt.bigAnd [i .> z, e .< z, iii .< z]
+                  ]
+      _ -> error "dimension not supported"
+
 -- | constraints based on Budan-Fourier theorem; these constraints are for dimension 3 but can easily be extended to other dimensions
 budanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
 budanConstraint m =
@@ -721,6 +968,7 @@ kindConstraints st dim kind inter = case kind of
   MaximalMatrix LikeBinaryJordan                            -> mm >>= likeBinaryJordanConstraint
   MaximalMatrix CaTDirectImplicit                           -> mm >>= catDirectImplicitConstraint >> return NoMatrix
   MaximalMatrix Sturm                                       -> mm >>= sturmConstraint >> return NoMatrix
+  MaximalMatrix SubresultantPRS                             -> mm >>= subresultantPRSConstraint >> return NoMatrix
   MaximalMatrix Budan                                       -> mm >>= budanConstraint >> return NoMatrix
   MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim Nothing inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
 
@@ -1022,6 +1270,7 @@ upperbound st dim kind li = case kind of
   MaximalMatrix LikeBinaryJordan                 -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
   MaximalMatrix CaTDirectImplicit                -> T.Poly (Just dim)
   MaximalMatrix Sturm                            -> T.Poly (Just dim)
+  MaximalMatrix SubresultantPRS                  -> T.Poly (Just dim)
   MaximalMatrix Budan                            -> T.Poly (Just dim)
   MaximalMatrix MaxAutomaton                     -> T.Poly (Just dim)
 
@@ -1069,6 +1318,7 @@ triangular'       = \dim     -> mkmi dim (MaximalMatrix $ UpperTriangular (Multi
 algebraic'        = \dim deg -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity (Just deg)))
 catDirectImplicit' = \dim    -> mkmi dim (MaximalMatrix CaTDirectImplicit)
 sturm'            = \dim     -> mkmi dim (MaximalMatrix Sturm)
+subresultantPRS'  = \dim     -> mkmi dim (MaximalMatrix SubresultantPRS)
 budan'            = \dim     -> mkmi dim (MaximalMatrix Budan)
 
 eda' = \dim     -> mkmi' dim (Automaton Nothing)
