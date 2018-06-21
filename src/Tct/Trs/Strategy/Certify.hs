@@ -28,24 +28,29 @@ import           Tct.Trs.Processors          hiding (matchbounds)
 
 
 -- | Declaration for strategy "certify".
-certifyDeclaration :: T.Declaration ('[Argument 'Optional T.Nat] T.:-> TrsStrategy)
-certifyDeclaration = strategy "certify" (OneTuple $ degreeArg `optional` 5) certifyStrategy
+certifyDeclaration :: T.Declaration ('[T.Argument 'Optional CombineWith, Argument 'Optional T.Nat] T.:-> TrsStrategy)
+certifyDeclaration =
+  strategy
+    "certify"
+    ( combineWithArg `optional` Fastest
+    , degreeArg      `optional` 5)
+    certifyStrategy
 
 -- | Default "certify" strategy.
 certify :: TrsStrategy
 certify = T.deflFun certifyDeclaration
 
--- | > certify = certify' 5
-certify' :: Degree -> TrsStrategy
+-- | > certify = certify' Fastest 5
+certify' :: CombineWith -> Degree -> TrsStrategy
 certify' = T.declFun certifyDeclaration
 
 -- | Default strategy for certification with CeTA.
-certifyStrategy :: Degree -> TrsStrategy
-certifyStrategy deg = withProblem k where
+certifyStrategy :: CombineWith -> Degree -> TrsStrategy
+certifyStrategy cmb deg = withProblem k where
   k prob
-    | isRC && isIn = let ?ua = UArgs in certifyRCI deg
-    | isRC         = let ?ua = NoUArgs in certifyRC deg
-    | otherwise    = certifyDC deg
+    | isRC && isIn = let ?ua = UArgs   in certifyRCI cmb deg
+    | isRC         = let ?ua = NoUArgs in certifyRC  cmb deg
+    | otherwise    = certifyDC cmb deg
     where
       isRC = Prob.isRCProblem prob
       isIn = Prob.isInnermostProblem prob
@@ -71,16 +76,20 @@ mx d = matrix' d d Triangular ?ua URules (Just selAny)
 top :: [TrsStrategy] -> TrsStrategy
 top = best cmpTimeUB
 
-certifyRC :: (?ua :: UsableArgs) => Int -> TrsStrategy
-certifyRC deg =
-  top
+combineWith :: CombineWith -> [TrsStrategy] -> TrsStrategy
+combineWith Fastest sts = fastest        [ st .>>> empty | st <- sts ]
+combineWith Best    sts = best cmpTimeUB [ st .>>> empty | st <- sts ]
+
+certifyRC :: (?ua :: UsableArgs) => CombineWith -> Degree -> TrsStrategy
+certifyRC cmb deg =
+  combineWith Best
     [ timeoutIn 8 trivialRC
     , timeoutIn 8 matchbounds .<||> interpretations ]
   where
 
   interpretations =
     shifts 1 1
-    .>>! fastest
+    .>>! combineWith cmb
       [ dependencyPairs' WDP .>>> try usableRules .>>> shifts 1 deg .>>> empty
       , ( force (shifts 2 2)
         .>>! fastest
@@ -94,18 +103,18 @@ certifyRC deg =
   trivialRC = shifts 0 0 .>>> dependencyPairs' WDP .>>> try usableRules .>>> shifts 0 0 .>>> empty
 
 
-certifyRCI :: (?ua :: UsableArgs) => Degree -> TrsStrategy
-certifyRCI deg =
+certifyRCI :: (?ua :: UsableArgs) => CombineWith -> Degree -> TrsStrategy
+certifyRCI cmb deg =
   withProblem $ \p ->
   try innermostRuleRemoval
-  .>>! top
+  .>>! combineWith Best
     [ timeoutIn 8 trivialRCI
     , timeoutIn 8 matchbounds .<||> interpretations p ]
 
   where
     interpretations p =
       shifts 1 1
-      .>>! fastest
+      .>>! combineWith cmb
         [ dt    .>>> try usableRules .>>> shifts 1 deg .>>> empty
         , wdp p .>>> try usableRules .>>> shifts 1 deg .>>> empty
         ,                                 shifts 2 deg .>>> empty ]
@@ -113,7 +122,7 @@ certifyRCI deg =
       .<|>
 
       shifts 1 1 .>>! force (shifts 2 2)
-      .>>! fastest
+      .>>! combineWith cmb
         [ dt    .>>> try usableRules .>>> shifts 1 deg .>>> empty
         , wdp p .>>> try usableRules .>>> shifts 1 deg .>>> empty
         ,                                 shifts 3 deg .>>> empty ]
@@ -124,23 +133,20 @@ certifyRCI deg =
 
 
 -- MS: termcomp2018:
--- The new version of CeTA is able to verify/infer the most precise bound wrt\. to the maximal matrix of the
+-- The new version of CeTA is able to verify/infer the most precise bound wrt. to the maximal matrix of the
 -- interpretation:
 --   * use EDA/IDA constraints on the maximal matrix
 --   * compute the degree of the maximal matrix (deg(M)) to obtain precise bounds
 --
-certifyDC :: Degree -> TrsStrategy
-certifyDC degree =
+certifyDC :: CombineWith -> Degree -> TrsStrategy
+certifyDC cmb degree =
   try innermostRuleRemoval
-  .>>! fastest'
+  .>>! combineWith cmb
     [ matchbounds
     , srs
     , interpretations degree mxf
     , interpretations degree mxs ]
   where
-
-    fastest' ss = fastest        [ s .>>> empty | s <- ss ]
-    best'    ss = best cmpTimeUB [ s .>>> empty | s <- ss ]
 
     isSRS prob = all (\sym -> Sig.arity sig sym == 1) (toList $ Sig.symbols sig) where sig = Prob.signature prob
     whenSRS st = withProblem $ \prob -> when (isSRS prob) st
@@ -158,16 +164,16 @@ certifyDC degree =
 
     mxu dim deg = mi dim $ MaximalMatrix (UpperTriangular $ Multiplicity $ if deg < dim then Just deg else Nothing)
     mxl dim deg = mi dim $ MaximalMatrix (LowerTriangular $ Multiplicity $ if deg < dim then Just deg else Nothing)
-    mxa dim deg = mi dim $ MaximalMatrix (MaxAutomaton    $ if deg < dim then Just deg else Nothing)
+    mxa dim deg = mi dim $ MaximalMatrix (MaxAutomaton                   $ if deg < dim then Just deg else Nothing)
 
     interpretations u st = chain [ tew (st n) | n <- [1 .. min u degree] ]
 
     -- SRS strategy
     -- try low  dimension with high bits
     -- try high dimension with low  bits
-    srs = whenSRS $ fastest'
-      [ withMini 8 10 $ tew (mxu 1 1)
-      , chain [ tew (withMini 1 2 $ mxf n) | n <- [1.. min 4 degree] ] ]
+    srs = whenSRS $ fastest
+      [ withMini 8 10  (tew (mxu 1 1))                                 .>>> empty
+      , chain [ tew (withMini 1 2 $ mxf n) | n <- [1.. min 4 degree] ] .>>> empty ]
 
     -- fast strategy
     -- rule shifting using triangular and EDA with implicit bounds
@@ -175,7 +181,8 @@ certifyDC degree =
     mxf 0 = mxu 1 1
     mxf 1 = mxu 1 1
     mxf 2 = mxu 2 2 .<||> mxl 2 2
-    mxf n = mxu n n .<||> mxa 2 2 .<||> withMini 1 2 (mxu n n .<||> mxa n n )
+    mxf 3 = mxu 3 3 .<||> mxa 3 3 .<||> withMini 1 2 (mxu 3 3 .<||> mxa 3 3 )
+    mxf n = withMini 1 2 (mxu n n .<||> mxa n n )
 
     -- precise strategy
     -- strategy with increasing bound
