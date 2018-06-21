@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Tct.Trs.Processor.Matrix.MI
   (
   jordan'
@@ -22,13 +23,13 @@ import qualified Data.List                       as L (partition, transpose)
 import qualified Data.Map                        as M
 import qualified Data.Set                        as S
 import qualified Data.Vector                     as V
+import qualified Data.Graph                      as G
 
 import           SLogic.Logic.Matrix             (Matrix)
 import qualified SLogic.Logic.Matrix             as Mat
 import           SLogic.Smt                      ((.&&), (.*), (.+), (.<), (.<=), (.<=>), (.==), (.=>), (.>), (.>=))
 import qualified SLogic.Smt                      as Smt
 
-import           Tct.Core.Common.Error           (throwError)
 import qualified Tct.Core.Common.Pretty          as PP
 import qualified Tct.Core.Common.SemiRing        as SR
 import qualified Tct.Core.Common.Xml             as Xml
@@ -1257,6 +1258,64 @@ certification st mi order cert = case cert of
 
 countNonZeros :: Num c => Matrix c -> c
 countNonZeros = sum . fmap signum . F.toList . Mat.getDiagonal
+
+
+-- computes the degree of an automaton
+-- cf. A. Weber and H. Seidl, On the degree of ambiguity of finite automata
+--
+-- For deg(M) = d, we have bound O(n^{d+1}).
+--
+-- * assumes not(EDA) or equivalently polynomial growth product matrix components
+-- * does not trim the automaton
+-- * returns O(n) if all matrices are zero-marices
+-- * for maximalautomaton should be certifiable
+--
+-- TODO: test against CeTA and EDA/IDA
+degM :: [Q] -> [Matrix Int] -> T.Complexity
+degM [] _   = T.Poly (Just 0)
+degM _  []  = T.Poly (Just 0)
+degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
+  where
+
+  a .~ b = \m -> Mat.entry a b m > 0
+  edges qs k     = [ (p, p, succs) | p <- qs, let succs = [ q | q <- qs, k p q ] ]
+  fromEdges qs k = G.graphFromEdges $ edges qs k
+
+  -- G1
+  -- graph of the automaton
+  (g1,_,v1) = G.graphFromEdges e1
+  e1 = edges q1 to
+    where to p q = any ( p .~ q ) mxs
+  p `hasEdge1` q = ((\a b -> (a,b) `elem` G.edges g1) <$> v1 p <*> v1 q) == Just True
+
+  -- G3
+  -- graph of the triple product automaton
+  q3 = [ (i,j,k) | i <- q1, j <- q1, k <- q1 ]
+  (g3,_,v3) = fromEdges q3 to
+    where to (i,j,k) (x,y,z) = any (\m -> (i .~ x) m && (j .~ y) m && (k .~ z) m) mxs
+  p `hasPath3` q = (G.path g3 <$> v3 p <*> v3 q) == Just True
+
+  -- G5
+  -- SCC components of G1
+  q5    = reverse $ G.flattenSCC `fmap` G.stronglyConnComp e1
+  -- walk along SCC components of G1
+  -- edges between components (bridges) have weight
+  -- (i)  zero if they originate from G1, or
+  -- (ii) one  if they they originate from G3 (ie compy with IDA)
+  height _ []  = 0
+  height _ [_] = 0
+  height qk (ql:qs)
+    | qk == ql  = maximum $ 0:[ k qk ql (height ql' qs) | ql' <- qs ]
+    | otherwise = height qk qs
+    where
+      k qi qj d
+        | qi .>> qj = 1 + d
+        | qi .~> qj = d
+        | otherwise = 0
+      qi .~> qj = or [ p `hasEdge1` q | p <- qi, q <- qj ]
+      qi .>> qj = or [ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
+
+
 
 -- TODO: improve bound by explicitly computing it with IDA criterion
 upperbound :: StartTerms F -> Dim -> Kind -> I.Interpretation F (LinearInterpretation ArgPos Int) -> T.Complexity
