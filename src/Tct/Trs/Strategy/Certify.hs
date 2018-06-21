@@ -13,14 +13,18 @@ module Tct.Trs.Strategy.Certify
   , certifyDeclaration
   ) where
 
-import           Tct.Core
-import qualified Tct.Core.Data          as T
+import           Data.Foldable               (toList)
 
-import           Tct.Trs.Data           (TrsStrategy)
-import qualified Tct.Trs.Data.Problem   as Prob
-import qualified Tct.Trs.Data.Rules     as RS
-import qualified Tct.Trs.Data.Signature as Sig
-import           Tct.Trs.Processors     hiding (matchbounds)
+import           Tct.Core
+import qualified Tct.Core.Data               as T
+
+import           Tct.Trs.Data                (TrsStrategy)
+import qualified Tct.Trs.Data.Problem        as Prob
+import qualified Tct.Trs.Data.Rules          as RS
+import qualified Tct.Trs.Data.Signature      as Sig
+import           Tct.Trs.Processor.Matrix.MI
+import           Tct.Trs.Processors          hiding (matchbounds)
+
 
 
 -- | Declaration for strategy "certify".
@@ -118,12 +122,67 @@ certifyRCI deg =
     wdp p1 = withProblem $ \p2 -> if Sig.defineds (Prob.signature p1) == Sig.defineds (RS.signature (Prob.allComponents p2)) then dependencyPairs' WDP else abort
     trivialRCI = shifts 0 0 .>>> dependencyTuples .>>> try usableRules .>>> shifts 0 0 .>>> empty
 
+
+-- MS: termcomp2018:
+-- The new version of CeTA is able to verify/infer the most precise bound wrt\. to the maximal matrix of the
+-- interpretation:
+--   * use EDA/IDA constraints on the maximal matrix
+--   * compute the degree of the maximal matrix (deg(M)) to obtain precise bounds
+--
 certifyDC :: Degree -> TrsStrategy
-certifyDC deg =
+certifyDC degree =
   try innermostRuleRemoval
-  .>>! (matchbounds .<||> interpretations 1 deg)
+  .>>! fastest'
+    [ matchbounds
+    , srs
+    , interpretations degree mxf
+    , interpretations degree mxs ]
   where
-    interpretations l u = chain [ tew (mxAny d) | d <- [(max 0 l) .. (min u deg)] ]
-    mxAny d = matrix' d d Triangular NoUArgs NoURules (Just selAny)
-    -- mxAll d = matrix' d d Triangular NoUArgs NoURules (Just sel) NoGreedy
+
+    fastest' ss = fastest        [ s .>>> empty | s <- ss ]
+    best'    ss = best cmpTimeUB [ s .>>> empty | s <- ss ]
+
+    isSRS prob = all (\sym -> Sig.arity sig sym == 1) (toList $ Sig.symbols sig) where sig = Prob.signature prob
+    whenSRS st = withProblem $ \prob -> when (isSRS prob) st
+
+    withMini :: Int -> Int -> TrsStrategy -> TrsStrategy
+    withMini ib ob = withKvPair ("solver", ["minismt", "-m", "-v2", "-neg", "-ib", show ib, "-ob", show ob])
+
+    mi dim kind =
+      T.processor MI
+        { miKind      = kind
+        , miDimension = dim
+        , miUArgs     = NoUArgs
+        , miURules    = NoURules
+        , miSelector  = Just (selAny) }
+
+    mxu dim deg = mi dim $ MaximalMatrix (UpperTriangular $ Multiplicity $ if deg < dim then Just deg else Nothing)
+    mxl dim deg = mi dim $ MaximalMatrix (LowerTriangular $ Multiplicity $ if deg < dim then Just deg else Nothing)
+    mxa dim deg = mi dim $ MaximalMatrix (MaxAutomaton    $ if deg < dim then Just deg else Nothing)
+
+    interpretations u st = chain [ tew (st n) | n <- [1 .. min u degree] ]
+
+    -- SRS strategy
+    -- try low  dimension with high bits
+    -- try high dimension with low  bits
+    srs = whenSRS $ fastest'
+      [ withMini 8 10 $ tew (mxu 1 1)
+      , chain [ tew (withMini 1 2 $ mxf n) | n <- [1.. min 4 degree] ] ]
+
+    -- fast strategy
+    -- rule shifting using triangular and EDA with implicit bounds
+    mxf :: Int -> TrsStrategy
+    mxf 0 = mxu 1 1
+    mxf 1 = mxu 1 1
+    mxf 2 = mxu 2 2 .<||> mxl 2 2
+    mxf n = mxu n n .<||> mxa 2 2 .<||> withMini 1 2 (mxu n n .<||> mxa n n )
+
+    -- precise strategy
+    -- strategy with increasing bound
+    mxs :: Int -> TrsStrategy
+    mxs 0 = mxu 1 1
+    mxs 1 = mxu 1 1 .<||> mxu 2 1 .<||> mxl 2 1 .<||> mxu 3 1 .<||> mxa 3 1
+    mxs 2 = mxu 2 2 .<||> mxl 2 2 .<||> mxu 3 2 .<||> mxa 3 2
+    mxs 3 = mxu 3 3 .<||> mxl 3 3 .<||> mxu 4 3 .<||> mxa 4 3 .<||> withMini 1 2 (mxu 4 3 .<||> mxa 4 3)
+    mxs n = withMini 1 2 $              mxu n n .<||> mxa n n
 

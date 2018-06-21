@@ -2,7 +2,11 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Tct.Trs.Processor.Matrix.MI
   (
-  jordan'
+  MI (..)
+  , Kind (..)
+  , MaximalMatrix (..)
+  , TriangularBound (..)
+  , jordan'
   , binaryJordan'
   , triangular'
   , almostTriangular'
@@ -81,7 +85,7 @@ data MaximalMatrix
   | Budan                           -- ^ use (incomplete) constraints derived from Budan-Fourier theorem
   | LikeJordan                      -- ^ restrict to maximal matrices which are similar to JNF
   | LikeBinaryJordan                -- ^ restrict to maximal matrices which are similar to JNF; entries are restricted to 0,1
-  | MaxAutomaton                    -- ^ use EDA/IDA on maximal matrix
+  | MaxAutomaton (Maybe Int)        -- ^ use EDA/IDA on maximal matrix
   deriving (Show)
 
 data TriangularBound
@@ -136,6 +140,10 @@ interpret' dim (I.Interpretation ebsi) = I.interpretTerm interpretFun interpretV
 -- | Returns coefficient matrices M1,...,Mn of a matrix interpretation
 matrices :: Interpretation f (LinearInterpretation v k) -> [Matrix k]
 matrices (I.Interpretation m) = concatMap (M.elems . coefficients) $ M.elems m
+
+-- | Returns the maximal matrix of a matrix interpretation.
+maximalMatrix' :: Dim -> Interpretation f (LinearInterpretation v Int) -> Matrix Int
+maximalMatrix' dim mi = foldr (Mat.elementwise max) (Mat.zeros dim dim) (matrices mi)
 
 -- | Returns the maximal (non Id) matrix of a matrix interpretation.
 maxmimalNonIdMatrix :: Dim -> Interpretation f (LinearInterpretation v Int) -> Matrix Int
@@ -207,7 +215,7 @@ abstractInterpretation st dim kind sig = case kind of
   MaximalMatrix Sturm                -> M.map (mk absStdMatrix) masse
   MaximalMatrix SubresultantPRS      -> M.map (mk absStdMatrix) masse
   MaximalMatrix Budan                -> M.map (mk absStdMatrix) masse
-  MaximalMatrix MaxAutomaton         -> M.map (mk absEdaMatrix) masse
+  MaximalMatrix (MaxAutomaton _)     -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absEdaMatrix) restricted
 
   Unrestricted                       -> M.map (mk absStdMatrix) masse
   Automaton _                        -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absEdaMatrix) restricted
@@ -971,7 +979,7 @@ kindConstraints st dim kind inter = case kind of
   MaximalMatrix Sturm                                       -> mm >>= sturmConstraint >> return NoMatrix
   MaximalMatrix SubresultantPRS                             -> mm >>= subresultantPRSConstraint >> return NoMatrix
   MaximalMatrix Budan                                       -> mm >>= budanConstraint >> return NoMatrix
-  MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim Nothing inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
+  MaximalMatrix (MaxAutomaton mDeg)                         -> mm >>= \mx -> automatonConstraints st dim Nothing inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
 
   Automaton mDeg                                            -> automatonConstraints st dim mDeg inter Nothing >> return NoMatrix
   Unrestricted                                              -> return NoMatrix
@@ -1305,15 +1313,15 @@ degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
   height _ []  = 0
   height _ [_] = 0
   height qk (ql:qs)
-    | qk == ql  = maximum $ 0:[ k qk ql (height ql' qs) | ql' <- qs ]
+    | qk == ql  = maximum $ 0:[ k qk ql' (height ql' qs) | ql' <- qs ]
     | otherwise = height qk qs
     where
       k qi qj d
         | qi .>> qj = 1 + d
         | qi .~> qj = d
         | otherwise = 0
-      qi .~> qj = or [ p `hasEdge1` q | p <- qi, q <- qj ]
-      qi .>> qj = or [ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
+      qi .>> qj = or $ [ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
+      qi .~> qj = or $ [       p `hasEdge1` q       | p <- qi, q <- qj ]
 
 
 
@@ -1321,7 +1329,7 @@ degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
 upperbound :: StartTerms F -> Dim -> Kind -> I.Interpretation F (LinearInterpretation ArgPos Int) -> T.Complexity
 upperbound st dim kind li = case kind of
   MaximalMatrix (UpperTriangular Implicit)       -> T.Poly (Just dim)
-  MaximalMatrix (UpperTriangular Multiplicity{}) -> T.Poly (Just $ countNonZeros mm)
+  MaximalMatrix (UpperTriangular Multiplicity{}) -> degM [1..dim] [mm]
   MaximalMatrix (LowerTriangular Implicit)       -> T.Poly (Just dim)
   MaximalMatrix (LowerTriangular Multiplicity{}) -> T.Poly (Just $ countNonZeros mm)
   MaximalMatrix AlmostTriangular{}               -> T.Poly (Just dim) -- TODO: improve bound - take minimal multiplicty wrt. given triangular matrix
@@ -1331,14 +1339,15 @@ upperbound st dim kind li = case kind of
   MaximalMatrix Sturm                            -> T.Poly (Just dim)
   MaximalMatrix SubresultantPRS                  -> T.Poly (Just dim)
   MaximalMatrix Budan                            -> T.Poly (Just dim)
-  MaximalMatrix MaxAutomaton                     -> T.Poly (Just dim)
+  MaximalMatrix (MaxAutomaton Nothing)           -> degM [1..dim] [mm]
+  MaximalMatrix (MaxAutomaton (Just deg))        -> T.Poly (Just deg)
 
   Automaton Nothing                              -> T.Poly (Just dim)
   Automaton (Just deg)                           -> T.Poly (Just deg)
   Unrestricted                                   -> T.Exp  (Just 1)
   where
     li' = restrictInterpretation st li
-    mm  = maxmimalNonIdMatrix dim li'
+    mm  = maximalMatrix' dim li'
 -- TODO: change maximalNonIdMatrix; if M = eye then linear; otherwise count M', where M' = filter eye M
 
 -- dimArg :: T.Argument 'T.Required Int
