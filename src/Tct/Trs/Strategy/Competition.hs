@@ -34,7 +34,7 @@ competitionStrategy :: CombineWith -> TrsStrategy
 competitionStrategy cmb =
   withProblem $ \p ->
     if isRCProblem p
-      then -- timeoutIn 5 decreasingLoops `madd`
+      then timeoutIn 5 decreasingLoops `madd`
            runtime' cmb
       else derivational
 
