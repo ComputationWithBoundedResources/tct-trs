@@ -568,7 +568,7 @@ sturmConstraint m =
                    , Smt.bigAnd [i .< z, ii .> z, iii .>= z, iv .> z]
                    , Smt.bigAnd [i .== z, ii .< z, iii .<= z, iv .<= z]
                    , Smt.bigAnd [i .== z, ii .< z, iii .> z, iv .> z]
-                   , Smt.bigAnd [i .== z, ii .== z, iii .< z, iv .<= z]
+                   --, Smt.bigAnd [i .== z, ii .== z, iii .< z, iv .<= z] --this disjunct would need a squarefree factorization because i = f(1) = 0 and ii = f'(1) = 0
                    --constraints where v is involved are missing
                    ]
        _ -> error "dimension not supported"
