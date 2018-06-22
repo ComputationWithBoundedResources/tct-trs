@@ -4,17 +4,18 @@ module Tct.Trs.Strategy.Derivational
   , derivationalDeclaration
   ) where
 
-import qualified Data.Set               as S (fold)
+import qualified Data.Set                    as S (fold)
 
 import           Tct.Core
-import qualified Tct.Core.Data          as T
+import qualified Tct.Core.Data               as T
 
-import           Tct.Trs.Data.Problem   (signature, trsComponents)
+import           Tct.Trs.Data.Problem        (signature, trsComponents)
 -- import           Tct.Trs.Data.RuleSelector (selAllOf, selStricts)
 import           Tct.Trs.Data
-import           Tct.Trs.Data.Signature (arity, symbols)
-import qualified Tct.Trs.Data.Rules as RS
-import           Tct.Trs.Processors
+import qualified Tct.Trs.Data.Rules          as RS
+import           Tct.Trs.Data.Signature      (arity, symbols)
+import           Tct.Trs.Processor.Matrix.MI (mxida)
+import           Tct.Trs.Processors          hiding (matrices)
 
 -- MS:
 -- decomposition after shifting does not work (as composition basically searches for an interpretation)
@@ -34,8 +35,8 @@ dcfast :: TrsStrategy
 dcfast =
   combine
     [ timeoutIn 25 matchbounds
-    , whenSRS $ withMini $ tew (mx 1 1) .>>> tew (mx 2 2)
-    , interpretations .>>> basics
+    , whenSRS $ withMini $ tew (mx 1 1) .>>> tew (mx 2 2) .>>> empty
+    , interpretations .>>! basics
     , composition ]
   where
 
@@ -47,7 +48,32 @@ dcfast =
   basics          = fastest $ timeoutIn 5 matchbounds : [ mx' d d | d <- [succ ideg .. mdeg] ]
   -- interpretations = tew . fastest $ [ mx d d | d <- [1 .. ideg] ] ++ [ wg d d | d <- [1 .. ideg] ] -- ++ [ whenSRS (withMini $ mx 1 1 <||> mx 2 2) ]
   interpretations = matrices 1 ideg
-  composition     = compose .>>! combine [ interpretations .>>> basics , composition ]
+  composition     = compose .>>! combine [ interpretations .>>! basics , composition ]
+
+  matrices :: Degree -> Degree -> TrsStrategy
+  matrices = shift mxs
+
+  mxs0,mxs1,mxs2,mxs3,mxs4 :: TrsStrategy
+  mxs0 = mx 1 0 .<||> wg 1 0
+  mxs1 = mx 1 1 .<||> mx 2 1 .<||> mx 3 1 .<||> wg 1 1 .<||> wg 2 1
+  mxs2 = mx 2 2 .<||> mx 3 2 .<||> mx 4 2 .<||> ma 2 2 .<||> ma 3 2
+  mxs3 = mx 3 3 .<||> mx 4 3 .<||> wg 3 3 .<||> ma 3 3 .<||> ma 4 3
+  mxs4 = mx 4 4 .<||> wg 4 4 .<||> ma 4 4
+
+  mxs :: Int -> TrsStrategy
+  mxs 0 = mxs0
+  mxs 1 = mxs1
+  mxs 2 = mxs2
+  mxs 3 = mxs3
+  mxs 4 = mxs4
+  mxs n = mx n n
+
+  shift s l u = chain [ tew (s n) | n <- [max 0 (min l u)..max 0 u] ]
+
+  mx  dim deg = matrix'    dim deg Algebraic NoUArgs NoURules (Just selAny)
+  wg  dim deg = weightgap' dim deg Algebraic NoUArgs WgOnAny
+  ma  dim deg = mxida      dim deg           NoUArgs NoURules (Just selAny)
+  mx' dim deg = matrix'    dim deg Algebraic NoUArgs NoURules Nothing
 
 
 iteNonSizeIncreasing :: TrsStrategy -> TrsStrategy -> TrsStrategy
@@ -70,9 +96,6 @@ compose =
 
 type Dimension = Int
 
-mx,mx' :: Dimension -> Degree -> TrsStrategy
-mx dim deg  = matrix' dim deg Algebraic NoUArgs NoURules (Just selAny)
-mx' dim deg = matrix' dim deg Algebraic NoUArgs NoURules Nothing
 
 mxCP :: Dimension -> Degree -> ComplexityPair
 mxCP dim deg = matrixCP' dim deg Algebraic NoUArgs NoURules
