@@ -59,6 +59,8 @@ import qualified Tct.Trs.Encoding.Interpretation as I
 import qualified Tct.Trs.Encoding.UsableRules    as UREnc
 
 
+import Debug.Trace
+
 data MI = MI
   { miKind      :: Kind
   , miDimension :: Int
@@ -1065,6 +1067,7 @@ automatonConstraints st dim mDeg mi@(I.Interpretation m) mM = do
         jrel i j     = jrelV V.! ix2 (i,j)
         hrel i j     = hrelV V.! ix2 (i,j)
 
+      -- FIXME: consider invoking Automaton (Just 0)
       idaConstraints qs mxs (max deg 1) gOne gThree trel irel jrel hrel
 
   where
@@ -1305,7 +1308,7 @@ degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
 
   -- G5
   -- SCC components of G1
-  q5    = reverse $ G.flattenSCC `fmap` G.stronglyConnComp e1
+  q5    = traceShowId $ reverse $ G.flattenSCC `fmap` G.stronglyConnComp e1
   -- walk along SCC components of G1
   -- edges between components (bridges) have weight
   -- (i)  zero if they originate from G1, or
@@ -1320,12 +1323,15 @@ degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
         | qi .>> qj = 1 + d
         | qi .~> qj = d
         | otherwise = 0
-      qi .>> qj = or $ [ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
+      qi .>> qj = or $ [ trace (show $ (p,"hasPath3",q,(p,p,q) `hasPath3` (p,q,q))) $ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
       qi .~> qj = or $ [       p `hasEdge1` q       | p <- qi, q <- qj ]
 
 
 
--- TODO: improve bound by explicitly computing it with IDA criterion
+-- FIXME: 
+-- DC - quadruple.trs -- MaximalMatrix (MaxAutomaton (Just 1)) provides invalid bound O(n)
+-- The maximal matrix looks fine IDA_1 is fullfilled but not IDA_2.
+-- We expect (Just d) if not IDA_d
 upperbound :: StartTerms F -> Dim -> Kind -> I.Interpretation F (LinearInterpretation ArgPos Int) -> T.Complexity
 upperbound st dim kind li = case kind of
   MaximalMatrix (UpperTriangular Implicit)       -> T.Poly (Just dim)
@@ -1340,10 +1346,10 @@ upperbound st dim kind li = case kind of
   MaximalMatrix SubresultantPRS                  -> T.Poly (Just dim)
   MaximalMatrix Budan                            -> T.Poly (Just dim)
   MaximalMatrix (MaxAutomaton Nothing)           -> degM [1..dim] [mm]
-  MaximalMatrix (MaxAutomaton (Just deg))        -> T.Poly (Just deg)
+  MaximalMatrix (MaxAutomaton (Just deg))        -> degM [1..dim] [mm]-- T.Poly (Just deg)
 
-  Automaton Nothing                              -> T.Poly (Just dim)
-  Automaton (Just deg)                           -> T.Poly (Just deg)
+  Automaton Nothing                              -> degM [1..dim] [mm]-- T.Poly (Just dim)
+  Automaton (Just deg)                           -> degM [1..dim] [mm]--T.Poly (Just deg)
   Unrestricted                                   -> T.Exp  (Just 1)
   where
     li' = restrictInterpretation st li
