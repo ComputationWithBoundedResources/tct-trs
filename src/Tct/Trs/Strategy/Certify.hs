@@ -109,8 +109,8 @@ certifyRCI cmb deg =
   withProblem $ \p ->
   try innermostRuleRemoval
   .>>! combineWith cmb
-    [ timeoutIn 8 trivialRCI
-    , timeoutIn 8 matchbounds .<||> interpretations p ]
+    [ timeoutIn 20 trivialRCI
+    , timeoutIn 20 matchbounds .<||> interpretations p ]
   where
 
     trivialRCI = shifts 0 0 .>>> dependencyTuples .>>> try usableRules .>>> shifts 0 0
