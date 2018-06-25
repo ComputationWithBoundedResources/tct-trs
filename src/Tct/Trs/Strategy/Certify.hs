@@ -56,25 +56,29 @@ certifyStrategy cmb deg = withProblem k where
       isIn = Prob.isInnermostProblem prob
 
 matchbounds :: TrsStrategy
-matchbounds = force $ withProblem $ \prob ->
-  when (RS.isLeftLinear $ Prob.allComponents prob) (bounds PerSymbol Match)
+matchbounds = withProblem $ \prob ->
+  when (RS.isLeftLinear $ Prob.allComponents prob) (bounds PerSymbol Match .>>> empty)
 
 shifts :: (?ua :: UsableArgs) => Degree -> Degree -> TrsStrategy
 shifts l u = chain [ tew (intes d) | d <- [(max 0 l) .. u] ]
 
 intes :: (?ua :: UsableArgs) => Degree -> TrsStrategy
 intes 0 = px 0
-intes 1 = mx 1
-intes 2 = mx 2 .<||> px 2
-intes 3 = mx 3 .<||> px 3
-intes n = mx n
+intes 1 =            mx 1 1 .<||> mx 2 1 .<||> ma 2 1
+intes 2 = px 2 .<||> mx 3 2 .<||> ma 3 2
+intes 3 = px 3 .<||> mx 3 3 .<||> ma 3 3
+intes n =            mx n n .<||> ma n n
 
-px,mx :: (?ua :: UsableArgs) => Degree -> TrsStrategy
+px :: (?ua :: UsableArgs) => Degree -> TrsStrategy
+mx, ma :: (?ua :: UsableArgs) => Degree -> Degree -> TrsStrategy
 px d = poly' (Mixed d) Restrict ?ua URules (Just selAny)
-mx d = matrix' d d Triangular ?ua URules (Just selAny)
-
-top :: [TrsStrategy] -> TrsStrategy
-top = best cmpTimeUB
+mx dim deg = matrix' dim deg (if deg < dim then Triangular else Algebraic) ?ua URules (Just selAny)
+ma dim deg = T.processor MI
+  { miKind      = MaximalMatrix (MaxAutomaton $ if deg < dim then Just deg else Nothing)
+  , miDimension = dim
+  , miUArgs     = ?ua
+  , miURules    = URules
+  , miSelector  = Just (selAny) }
 
 combineWith :: CombineWith -> [TrsStrategy] -> TrsStrategy
 combineWith Fastest sts = fastest        [ st .>>> empty | st <- sts ]
