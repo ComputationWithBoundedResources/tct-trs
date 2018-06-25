@@ -97,7 +97,7 @@ certifyRC cmb deg =
     shifts 1 1
     .>>! combineWith cmb
       [ dependencyPairs' WDP .>>> try usableRules .>>> shifts 1 deg
-      ,                                           .>>> shifts 2 deg
+      ,                                                shifts 2 deg
       , force (shifts 2 2)
         .>>! combineWith cmb
           [ dependencyPairs' WDP .>>> try usableRules .>>> shifts 1 deg
@@ -110,7 +110,7 @@ certifyRCI cmb deg =
   try innermostRuleRemoval
   .>>! combineWith cmb
     [ timeoutIn 8 trivialRCI
-    , timeoutIn 8 matchbounds .<||> interpretations ]
+    , timeoutIn 8 matchbounds .<||> interpretations p ]
   where
 
     trivialRCI = shifts 0 0 .>>> dependencyTuples .>>> try usableRules .>>> shifts 0 0
