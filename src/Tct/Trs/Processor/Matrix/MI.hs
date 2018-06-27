@@ -59,8 +59,6 @@ import qualified Tct.Trs.Encoding.Interpretation as I
 import qualified Tct.Trs.Encoding.UsableRules    as UREnc
 
 
-import Debug.Trace
-
 data MI = MI
   { miKind      :: Kind
   , miDimension :: Int
@@ -1308,7 +1306,7 @@ degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
 
   -- G5
   -- SCC components of G1
-  q5    = traceShowId $ reverse $ G.flattenSCC `fmap` G.stronglyConnComp e1
+  q5    = reverse $ G.flattenSCC `fmap` G.stronglyConnComp e1
   -- walk along SCC components of G1
   -- edges between components (bridges) have weight
   -- (i)  zero if they originate from G1, or
@@ -1323,7 +1321,7 @@ degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
         | qi .>> qj = 1 + d
         | qi .~> qj = d
         | otherwise = 0
-      qi .>> qj = or $ [ trace (show $ (p,"hasPath3",q,(p,p,q) `hasPath3` (p,q,q))) $ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
+      qi .>> qj = or $ [ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
       qi .~> qj = or $ [       p `hasEdge1` q       | p <- qi, q <- qj ]
 
 
@@ -1349,7 +1347,7 @@ upperbound st dim kind li = case kind of
   MaximalMatrix (MaxAutomaton (Just deg))        -> degM [1..dim] [mm]-- T.Poly (Just deg)
 
   Automaton Nothing                              -> degM [1..dim] [mm]-- T.Poly (Just dim)
-  Automaton (Just deg)                           -> degM [1..dim] [mm]--T.Poly (Just deg)
+  Automaton (Just deg)                           -> T.Poly (Just deg)
   Unrestricted                                   -> T.Exp  (Just 1)
   where
     li' = restrictInterpretation st li
