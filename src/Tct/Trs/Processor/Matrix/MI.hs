@@ -557,7 +557,7 @@ sturmConstraint m =
                    , Smt.INeg (Smt.IMul p q)
                    , Smt.INeg (Smt.IMul (Smt.IVal 9) r)
                    ]
-               iv = Smt.IAdd (Smt.INeg (Smt.IMul p p)) (Smt.IMul (Smt.IVal 3) q)
+               iv = Smt.IAdd (Smt.INeg (Smt.IMul p p)) (Smt.INeg (Smt.IMul (Smt.IVal 3) q))
                -- TODO: one disjunct is missing as we can't (or can we?) have fractions in our SMT encoding
                sturm3D =
                  Smt.bigOr
