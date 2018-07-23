@@ -190,7 +190,7 @@ raml =  dependencyTuples
 
 
 basics' =
-       tew (try $ ?timeoutRel 15 $ fastest [mx 1 1, wg 1 1])
+       tew (try $ ?timeoutRel 15 $ fastest [mx 1 1, wg 1 1, ax 1 2])
   .>>> tew (try $ ?timeoutRel 15 $ fastest [ax 2 2, eda2])
   .>>> tew (try $ ?timeoutRel 15 $ fastest [eda3])
   .>>> tew (try $                  fastest [ida4])

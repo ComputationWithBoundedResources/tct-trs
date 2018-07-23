@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
 
 {-|
@@ -77,7 +78,6 @@ import qualified Tct.Trs.Encoding.Matrix.Matrix     as EncM
 ----------------------------------------------------------------------
 
 
-
 -- | linear interpretation of a function
 data LinearInterpretation var a =
   LInter { coefficients :: Map.Map var (EncM.Matrix a)
@@ -138,7 +138,6 @@ absEdaMatrix :: fun -> Int -> Int -> EncM.Matrix (MatrixInterpretationEntry fun)
 absEdaMatrix f dim k = EncM.Matrix $ map handlerow [1..dim]
   where
     handlerow i = EncM.Vector $ map (MIVar True f k i) [1..i] ++ map (MIVar True f k i) [succ i..dim]
-
 
 
 -- | generate an abstract interpretation given a matrix kind restriction, a dimension, and a function symbol with arity.
@@ -214,12 +213,9 @@ pprintLInter name indend ppVar (LInter ms vec) =
     elts (EncM.Vector es) = es
 
 
-
 ----------------------------------------------------------------------
 -- instances
 ----------------------------------------------------------------------
-
-
 
 
 instance Functor (LinearInterpretation var) where
@@ -249,7 +245,6 @@ instance PP.Pretty fun => PP.Pretty (MatrixInterpretationEntry fun) where
       f = PP.pretty (varfun v)
   pretty MIConstZero = PP.text "zero"
   pretty MIConstOne = PP.text "one"
-
 
 
 instance PP.Pretty (MatrixKind fun) where
@@ -289,12 +284,6 @@ instance Xml.Xml (LinearInterpretation SomeIndeterminate Int) where
       xcons c = xelm [ Xml.toXml c ]
       xcoeff (v,m) = xmul [ xelm [Xml.toXml m], xvar v]
       xvar (SomeIndeterminate i) = xpol $ Xml.elt "variable" [Xml.int i]
-
-
-
-
-
-
 
 
 -- TODO: implement when other things are understood
