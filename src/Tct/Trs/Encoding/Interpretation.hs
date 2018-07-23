@@ -52,6 +52,7 @@ instance (PP.Pretty f, PP.Pretty c)  => PP.Pretty (Interpretation f c) where
 
 -- | Indicates wether strict oriented rules should be shifted to the weak components or wether all strict rules should be oriented strictly.
 -- In the latter case the complexity problem is already solved.
+-- @All = Just (selAny selStricts)@ but the encoding is cheaper
 data Shift = Shift (ExpressionSelector F V) | All
   deriving Show
 
@@ -197,6 +198,7 @@ orient inter prob absi mselector useUP useUR = do
 -- toTree p prob (T.Fail po)                 = T.NoProgress (T.ProofNode p prob po) (T.Open prob)
 -- toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) certfn (T.Open `fmap` probs)
 
+
 newProblem :: Trs -> InterpretationProof a b -> T.Optional T.Id Trs
 newProblem prob proof = case shift_ proof of
   All     -> T.Null
@@ -252,6 +254,12 @@ xmlProof proof itype =
     , if useURules_ proof
         then Xml.elt "usableRules" [Xml.toXml $ RS.fromList usr] -- usable part
         else Xml.empty
+    -- akin to tct2 we allow interpretations to be the base case of our proof
+    -- though ceTA requires to use ruleShifting; in this case we append the proof for the empty problem
+    , case shift_ proof of
+        -- Tct.Core.Processor.Empty.toXml Emptyproblem == </closed>, but toXml is not used in practice
+        All     -> Xml.elt "complexityProof" [Xml.elt "rIsEmpty" []]
+        Shift _ -> Xml.empty
     ]
     where
       orderingConstraintProof =
@@ -265,5 +273,4 @@ xmlProof proof itype =
         -- , Xml.elt "polynomial" [Xml.toXml p]]
       trs = map fst $ strictTrs_ proof ++ strictDPs_ proof
       usr = (trs ++) . map fst $ weakTrs_ proof ++ weakDPs_ proof
-
 

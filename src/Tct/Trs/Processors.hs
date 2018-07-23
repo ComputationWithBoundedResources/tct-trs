@@ -118,6 +118,10 @@ combineWithArg :: Argument 'Required CombineWith
 combineWithArg = T.flag "combineWith" ["Set race conditions."]
 
 
+-- FIXME: MS: 
+-- Tct.Core.Strategy specifies `infixr 5 .>>>`
+-- no fixity is specified for `.>>!`, hence we have `infixl 9 .>>!`
+-- should be fixed; may break exisitng strategies
 (.>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
 s1 .>>! s2 = s1 .>>> try empty .>>> s2
 

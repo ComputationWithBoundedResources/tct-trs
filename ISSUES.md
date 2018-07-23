@@ -100,3 +100,17 @@ problem. It could be interesting to explore dedicated strategies for
 simplifying, decomposing polynomial interpretations.
 
 
+
+### * better defaults #minor #ui
+
+Derivational complexity is used per default. Should probably be Runtime
+Innermost.
+
+
+
+### * update dependencies to recent ghc/stackage version
+
+Building all packages is getting instable due to package conflicts. Update
+dependencies.
+
+

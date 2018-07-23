@@ -1,4 +1,12 @@
 -- | The competition strategy. Wrapper for default runtime/derivational complexity.
+--
+-- termcomp 2017:
+--  * rc/rci
+--    * add amortized analysis
+-- termcomp 2018:
+--  * certification: 
+--    * compute more precise bounds of MIs
+--    * add automaton based maximal matrix MI
 module Tct.Trs.Strategy.Competition
   ( competition
   , competition'
@@ -34,7 +42,7 @@ competitionStrategy :: CombineWith -> TrsStrategy
 competitionStrategy cmb =
   withProblem $ \p ->
     if isRCProblem p
-      then -- timeoutIn 5 decreasingLoops `madd`
+      then timeoutIn 5 decreasingLoops `madd`
            runtime' cmb
       else derivational
 
