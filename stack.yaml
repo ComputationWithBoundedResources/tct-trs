@@ -67,4 +67,4 @@ extra-deps:
 - vector-0.12.0.1
 - void-0.7.2
 - wl-pprint-text-1.2.0.0
-resolver: ghc-8.4
+resolver: ghc-8.4.1
