@@ -87,6 +87,7 @@ defaultArgs = ArgumentOptions { filePath = ""
                               , smtSolver = Z3
                               , findStrictRules = Nothing
                               , directArgumentFilter = False
+                              , nrOfRules = Nothing
                               }
 
 
@@ -137,6 +138,7 @@ instance T.Processor Ara where
                                             , shift = case araHeuristics p of
                                                         Heuristics -> True
                                                         _ -> False
+                                            , nrOfRules = Just $ length (Prob.strictTrs probTcT) + length (Prob.weakTrs probTcT) + length (Prob.strictDPs probTcT) + length (Prob.weakDPs probTcT)
                                             }
 
                      -- Find out SCCs
