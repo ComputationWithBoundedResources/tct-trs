@@ -1,3 +1,6 @@
+version 3.3
+  - compatibility with ghc-8.5.6
+
 ### 3.2 
 
   * PW: added support for various constraints for matrix interpretation

@@ -2,8 +2,8 @@
 module Tct.Trs.Data.Symbol
   ( Fun (..)
   , AFun (..)
-  , F , fun
-  , V , var
+  , F (..), fun
+  , V (..), var
   ) where
 
 
@@ -27,38 +27,19 @@ data AFun f
   = TrsFun f
   | DpFun f
   | ComFun Int
-  deriving (Eq, Ord)
-
-instance Show f => Show (AFun f) where
-  show (TrsFun f) = show f
-  show (DpFun f)  = show f
-  show (ComFun f) = show f
+  deriving (Eq, Ord, Show, Read)
 
 newtype F = F (AFun BS.ByteString)
-  deriving (Eq, Ord)
-
-instance Show F where
-  -- show (F x) = show x
-  show (F (TrsFun f)) = show $ PP.text (BS.unpack f)
-  show (F (DpFun f))  = show $ PP.text (BS.unpack f) PP.<> PP.char '#'
-  show (F (ComFun i)) = show $ PP.pretty "c_" PP.<> PP.int i
+  deriving (Eq, Ord, Show, Read)
 
 fun  :: String -> F
 fun = F . TrsFun . BS.pack
 
 newtype V = V BS.ByteString
-  deriving (Eq, Ord)
-
-instance Show V where
-  show (V x) = show x
+  deriving (Eq, Ord, Show)
 
 var  :: String -> V
 var = V . BS.pack
-
-instance Read V where
-  readsPrec _ str = let str' = filter (/= '"') str
-                        x = BS.pack $ if take 2 str' == "V " then drop 2 str' else str'
-                    in [(V x, [])]
 
 instance Fun F where
   markFun (F (TrsFun f)) = F (DpFun f)

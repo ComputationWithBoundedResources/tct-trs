@@ -1,11 +1,11 @@
 name:          tct-trs
-version:       3.2.0
+version:       3.3.0
 stability:     experimental
 author:
-  Martin Avanzini, Andreas Kochesser, Georg Moser, Michael Schaper, Maria Schett
+  Martin Avanzini, Michael Schaper, Andreas Kochesser, Georg Moser,  Maria Schett, Manuel Schneckenreither
 maintainer:
   Martin Avanzini <martin.avanzini@uibk.ac.at>,
-  Michael Schaper <michael.schaper@uibk.ac.at>,
+  Michael Schaper <michael.schaper@student.uibk.ac.at>,
 license:       BSD3
 license-file:  LICENSE
 category:      Program Analysis
@@ -25,7 +25,7 @@ source-repository head
 executable tct-trs
   main-is:        Main.hs
   hs-source-dirs: tct-trs
-  build-depends:  base == 4.*, tct-core, tct-trs
+  build-depends:  base >= 4.7 && <5, tct-core, tct-trs
   extensions:     FlexibleInstances, MultiParamTypeClasses
   ghc-options:
     -Wall -threaded -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
@@ -108,33 +108,33 @@ library
     Tct.Trs.Strategy.Runtime
     Tct.Trs.Strategy.Web
   build-depends:
-    array              >= 0.5.0,
-    base               >= 4.0,
-    bytestring         >= 0.10.4,
-    containers         >= 0.5,
-    fgl                >= 5.5.0,
-    filepath           >= 1.3,
-    mtl                >= 2.1,
-    parsec             >= 3.1.0,
-    process            >= 1.1,
-    temporary          >= 1.2.0.0,
-    vector             >= 0.11.0,
+    base >= 4.7 && <5,
+    array,
+    bytestring,
+    containers,
+    fgl,
+    filepath,
+    mtl,
+    parsec,
+    process,
+    temporary,
+    vector,
 
-    term-rewriting     >= 0.0,
-    term-rewriting-xml >= 0.1.0.0,
+    term-rewriting,
+    term-rewriting-xml,
 
-    slogic             >= 0.0,
-    tct-common         >= 3.2.0,
-    tct-core           >= 3.2.0,
+    tct-core  >= 3.3,
+    slogic >= 0.3,
+    tct-common >= 3.3,
 
     -- ARA stuff
-    ara                >= 0.1.1,
-    term-rewriting-ext >= 0.0,
+    ara,
+    term-rewriting-ext,
     pretty
 
 
   ghc-options:
-    -Wall -fno-warn-orphans -fno-spec-constr-count -rtsopts -with-rtsopts=-N
+    -Wall -fno-warn-orphans -fno-spec-constr-count
   extensions:
     ConstraintKinds,
     DataKinds,
