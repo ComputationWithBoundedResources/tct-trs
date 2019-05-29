@@ -67,7 +67,7 @@ defaultArgs = ArgumentOptions { filePath = ""
                               , separateBaseCtr = False
                               , tempFilePath = "/tmp"
                               , helpText = False
-                              , keepFiles = True
+                              , keepFiles = False
                               , printInfTree = False
                               , verbose = False
                               , shift = False
