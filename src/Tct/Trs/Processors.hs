@@ -215,7 +215,7 @@ ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
 
 araBounds :: Degree -> Degree -> Int -> TrsStrategy
-araBounds = ara' NoHeuristics Nothing
+araBounds = ara' Nothing
 
 
 --- * simplifications ------------------------------------------------------------------------------------------------

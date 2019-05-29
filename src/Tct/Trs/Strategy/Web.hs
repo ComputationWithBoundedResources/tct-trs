@@ -80,7 +80,7 @@ custom
       if useDecompose
         then chain [ tew (int d) | d <- [(max 0 l) .. (max l u)] ]
         else int u
-    int d               = matrices d .<||> polys d .<||> ara d
+    int d               = matrices d .<||> polys d .<||> ara (d+1)
 
     matrices d = force $ when useMatrices (mxs d)
     polys    d = force $ when usePolys    (px d)
@@ -91,7 +91,7 @@ custom
 
     mx dm dg = matrix' dm dg    Algebraic  (ua useMatricesUArgs) (ur useMatricesURules) sel
     px dg    = poly' (Mixed dg) Restrict   (ua usePolysUArgs) (ur usePolysURules) sel
-    ax lo up = ara' NoHeuristics (Just 1) lo up 8
+    ax lo up = ara' (Just 1) lo up 8
 
     sel      = if useDecompose then Just selAny else Nothing
 
