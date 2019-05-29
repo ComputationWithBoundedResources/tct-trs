@@ -88,6 +88,7 @@ defaultArgs = ArgumentOptions { filePath = ""
                               , findStrictRules = Nothing
                               , directArgumentFilter = False
                               , nrOfRules = Nothing
+                              , noHeur = False
                               }
 
 

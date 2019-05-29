@@ -27,21 +27,21 @@ data AFun f
   = TrsFun f
   | DpFun f
   | ComFun Int
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show, Read)
 
-instance Show f => Show (AFun f) where
-  show (TrsFun f) = show f
-  show (DpFun f)  = show f
-  show (ComFun f) = show f
+-- instance Show f => Show (AFun f) where
+--   show (TrsFun f) = show f
+--   show (DpFun f)  = show f
+--   show (ComFun f) = show f
 
 newtype F = F (AFun BS.ByteString)
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show, Read)
 
-instance Show F where
-  -- show (F x) = show x
-  show (F (TrsFun f)) = show $ PP.text (BS.unpack f)
-  show (F (DpFun f))  = show $ PP.text (BS.unpack f) PP.<> PP.char '#'
-  show (F (ComFun i)) = show $ PP.pretty "c_" PP.<> PP.int i
+-- instance Show F where
+--   -- show (F x) = show x
+--   show (F (TrsFun f)) = show $ PP.text (BS.unpack f)
+--   show (F (DpFun f))  = show $ PP.text (BS.unpack f) PP.<> PP.char '#'
+--   show (F (ComFun i)) = show $ PP.pretty "c_" PP.<> PP.int i
 
 fun  :: String -> F
 fun = F . TrsFun . BS.pack

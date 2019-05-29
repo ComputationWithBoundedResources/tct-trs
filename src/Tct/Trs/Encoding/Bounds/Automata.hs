@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 ----------------------------------------------------------------------------------
 -- |
@@ -22,12 +22,12 @@ import           Control.Monad.State.Class (MonadState (..))
 import qualified Control.Monad.State.Lazy  as St
 import           Data.IntMap               (IntMap)
 import qualified Data.IntMap               as IM
+import           Data.List                 (nub)
 import           Data.Map                  (Map)
 import qualified Data.Map                  as M
 import           Data.Maybe                (fromMaybe)
 import           Data.Set                  (Set)
 import qualified Data.Set                  as S
-import           Data.List                 (nub)
 
 import qualified Data.Rewriting.Term       as R
 
@@ -57,7 +57,6 @@ ifM b t e = do g <- b
                if g then t else e
 
 
-
 listProduct :: [[a]] -> [[a]]
 listProduct []             = [[]]
 listProduct (xs:xss) = foldl f [] xs
@@ -69,8 +68,6 @@ snub = S.toList . S.fromList
 data Strictness = StrictRule | WeakRule
 
 
-
-
 -- | This datatype represents the /enrichment/ employed.
 data Enrichment =
   Match -- ^ Matchbounds.
@@ -79,32 +76,29 @@ data Enrichment =
   deriving (Enum, Bounded, Eq)
 
 instance Show Enrichment where
-    show Match   = "match"
-    show Roof    = "roof"
-    show Top     = "top"
+    show Match = "match"
+    show Roof  = "roof"
+    show Top   = "top"
 
 data WeakBoundedness = WeakMayExceedBound | WeakMayNotExceedBound
 
 -- TODO:MA: which types should be strict?
-newtype Symbol = Symbol Int deriving (Eq, Ord, Show, Enum)
+newtype Symbol = Symbol Int deriving (Eq, Ord, Show, Enum, Read)
 type Label     = Int
 type LSym      = (Symbol,Label)
 type State     = Int
 
 
-
 data LTerm
   = F LSym [LTerm]
   | S State
-  deriving (Eq, Ord)
-
+  deriving (Eq, Ord, Read, Show)
 
 
 data Rule
   = Collapse LSym [State] State
   | Epsilon State State
   deriving (Eq, Ord, Show)
-
 
 
 -- TODO:MA: sym -> ... in beiden automaten
@@ -125,7 +119,7 @@ data Automaton = Automaton
 
 size :: LTerm -> Int
 size (F _ ts) = 1 + sum (map size ts)
-size (S _) = 0
+size (S _)    = 0
 
 isEpsilonRule :: Rule -> Bool
 isEpsilonRule Epsilon{}  = True
