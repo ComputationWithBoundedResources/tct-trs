@@ -15,7 +15,7 @@ extra-deps:
  - git: https://github.com/ComputationWithBoundedResources/hoca
    commit: HEAD
  - git: https://github.com/ComputationWithBoundedResources/ara-inference
-   commit: HEAD
+   commit: 49a9700fe78d2dce0ff016c35c41dcbeb78cb11b
  - git: https://github.com/ComputationWithBoundedResources/slogic
    commit: HEAD
  - git: https://github.com/ComputationWithBoundedResources/tct-common
