@@ -43,11 +43,9 @@ instance Show ComplexityPair where
 
 -- | Existential type for declarations specifying a Strategy.
 data ComplexityPairDeclaration where
-  CD :: (Trs ~ prob, T.ParsableArgs args, T.ArgsInfo args) =>
-    T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
+  CD :: (Trs ~ prob, T.ParsableArgs args, T.ArgsInfo args) => T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
 
-someComplexityPair :: (Trs ~ prob, T.ParsableArgs args, T.ArgsInfo args) =>
-  T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
+someComplexityPair :: (Trs ~ prob, T.ParsableArgs args, T.ArgsInfo args) => T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
 someComplexityPair = CD
 
 toComplexityPair :: (T.Processor p, IsComplexityPair p) => p -> ComplexityPair

@@ -59,13 +59,13 @@ import qualified Tct.Core.Common.Xml          as Xml
 import           Tct.Trs.Data.DependencyGraph (CDG, DG, DependencyGraph)
 import qualified Tct.Trs.Data.DependencyGraph as DPG
 import           Tct.Trs.Data.ProblemKind
-import           Tct.Trs.Data.RuleSet
 import           Tct.Trs.Data.Rules           (Rules)
 import qualified Tct.Trs.Data.Rules           as RS
+import           Tct.Trs.Data.RuleSet
 
 import           Tct.Trs.Data.Signature       (Signature)
 import qualified Tct.Trs.Data.Signature       as Sig
-import           Tct.Trs.Data.Symbol          (F, V, Fun)
+import           Tct.Trs.Data.Symbol          (F, Fun, V)
 import qualified Tct.Trs.Data.Symbol          as Symb
 
 
@@ -187,6 +187,7 @@ toRewriting p =
         Full      -> RP.Full
         Outermost -> RP.Outermost
     , RP.theory     = Nothing
+    , RP.signature = Nothing
     , RP.rules      = RP.RulesPair
        { RP.strictRules = RS.toList $ strictComponents p
        , RP.weakRules   = RS.toList $ weakComponents p }
@@ -307,10 +308,10 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
         obligation = strat PP.<+> sts where
           strat = case strategy prob of
                     Innermost -> PP.text "innermost"
-                    _ -> PP.empty
+                    _         -> PP.empty
           sts = case startTerms prob of
                  st@AllTerms{} -> PP.text "derivational complexity wrt. signature" PP.<+> PP.set' (alls st)
-                 st@BasicTerms {} -> PP.text "runtime complexity wrt. defined symbols" 
+                 st@BasicTerms {} -> PP.text "runtime complexity wrt. defined symbols"
                                      PP.<+> PP.set' (defineds st) PP.<+> PP.text "and constructors" PP.<+> PP.set' (constructors st)
 
 -- MS: the ceta instance is not complete as it contains a tag <complexityClass> which depends on ProofTree

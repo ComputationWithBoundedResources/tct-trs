@@ -54,7 +54,6 @@ import qualified Tct.Trs.Encoding.Interpretation     as I
 import qualified Tct.Trs.Encoding.UsableRules        as UREnc
 
 
-
 data NaturalPI = NaturalPI
   { shape    :: PI.Shape
   , restrict :: Arg.Restrict -- TODO: MS: combine with Shape
@@ -117,7 +116,6 @@ interpretf ebsi = I.interpretTerm interpretFun interpretVar
     interpretFun f = P.substituteVariables (I.interpretations ebsi `k` f) . M.fromList . zip PI.indeterminates
       where k m g = error ("NaturalPI.interpretf: " ++ show g) `fromMaybe` M.lookup g m
     interpretVar v = P.variable v
-
 
 
 entscheide :: NaturalPI -> Trs -> T.TctM (T.Return NaturalPI)
