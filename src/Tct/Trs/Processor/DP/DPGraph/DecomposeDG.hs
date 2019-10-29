@@ -69,7 +69,7 @@ data DecomposeDGProof
   deriving Show
 
 certfn :: T.Pair T.Certificate -> T.Certificate
-certfn (T.Pair (c1, c2)) = T.unbounded {T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.timeLB = T.timeLB c1 `add` T.timeLB c2}
+certfn (T.Pair (c1, c2)) = zero {T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.timeLB = T.timeLB c1 `add` T.timeLB c2, T.timeBCLB = T.Unknown, T.timeBCUB = T.Unknown}
 
 instance T.Processor DecomposeDG where
   type ProofObject DecomposeDG = ApplicationProof DecomposeDGProof
