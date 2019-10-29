@@ -7,6 +7,8 @@ module Tct.Trs.Processor.AmortisedAnalysis
   ( araDeclaration
   , ara
   , ara'
+  , araBestCase
+  , araBestCaseRelativeRewriting
   , araBestCase'
   , araFull'
   ) where
@@ -61,9 +63,7 @@ data Ara = Ara { minDegree  :: Int            -- ^ Minimal degree to look for
                , isBestCase :: Bool           -- ^ perform best-case analysis
                , mkCompletelyDefined :: Bool  -- ^ make TRS completely defined
                , verboseOutput :: Bool
-               }
-         deriving Show
-
+               } deriving Show
 
 defaultArgs :: ArgumentOptions
 defaultArgs = ArgumentOptions { filePath = ""
@@ -136,7 +136,7 @@ instance T.Processor Ara where
                       , nrOfRules = Just $ length (Prob.strictTrs probTcT) + length (Prob.weakTrs probTcT) + length (Prob.strictDPs probTcT) + length (Prob.weakDPs probTcT)
                       }
                   -- add main function if necessary
-              let isMainFun (RT.Fun f _) = f == fun "main"
+              let isMainFun (RT.Fun f _) = f == mainFunction
                   isMainFun _ = False
               let mainFun = filter (isMainFun . RT.lhs) (RT.allRules $ RT.rules probIn)
               let stricts = RT.strictRules (RT.rules probIn)
@@ -146,11 +146,11 @@ instance T.Processor Ara where
                     let (RT.Fun f ch) = RT.lhs $ last stricts
                     let sigF = fromMaybe (E.throw $ FatalException $ "Could not find signature of " ++ show f) $ find ((== f) . RT.lhsRootSym) (fromJust $ RT.signatures probIn)
                     let mainArgs = map (\nr -> var ("x" ++ show nr)) [1 .. length ch]
-                    let rule = RT.Rule (RT.Fun (fun "main") (map RT.Var mainArgs)) (RT.Fun f (map RT.Var mainArgs))
+                    let rule = RT.Rule (RT.Fun mainFunction (map RT.Var mainArgs)) (RT.Fun f (map RT.Var mainArgs))
                     return $
                       probIn
                         { RT.rules = (RT.rules probIn) {RT.strictRules = RT.strictRules (RT.rules probIn) ++ [rule]}
-                        , RT.signatures = fmap (++ [sigF {RT.lhsRootSym = fun "main"}]) (RT.signatures probIn)
+                        , RT.signatures = fmap (++ [sigF {RT.lhsRootSym = mainFunction}]) (RT.signatures probIn)
                         }
                   else return probIn
                      -- Find out SCCs
@@ -162,17 +162,13 @@ instance T.Processor Ara where
                      -- Solve datatype constraints
               (sigs, cfSigs, _, vals, baseCtrs, _, bigO, (strictRls, weakRls)) <-
                 solveProblem args (== fun "main") (fromJust probSig) cond (signatureMap prove) (costFreeSigs prove)
-              print prob
-              print bigO
-              print args
               let line = PP.text "\n"
                   fromDoc = PP.text . show
               let documentsIT :: [(String, PP.Doc)]
-                  documentsIT = (map (second (\d -> d PP.<$> line))) (map (second $ (PP.vcat . map (fromDoc . prettyInfTreeNodeView)) . reverse) infTrees)
+                  documentsIT = map (second (PP.<$> line) . second (PP.vcat . map (fromDoc . prettyInfTreeNodeView) . reverse)) infTrees
                   documentsITNum =
-                    (map (second (\d -> d PP.<$> line)))
-                      (map (second ((PP.vcat . map (fromDoc . prettyInfTreeNodeView)) . reverse)) $
-                       zip (map fst infTrees) (putValuesInInfTreeView (signatureMap prove) (costFreeSigs prove) vals (map snd infTrees)))
+                    map (second (PP.<$> line) . second ((PP.vcat . map (fromDoc . prettyInfTreeNodeView)) . reverse)) $
+                    zip (map fst infTrees) (putValuesInInfTreeView (signatureMap prove) (costFreeSigs prove) vals (map snd infTrees))
               let strictRules = Prob.strictTrs probTcT
               let strictRules' = RS.filter ((`notElem` strictRls) . convertRule) strictRules
               let weakRulesAdd' = RS.filter ((`elem` strictRls) . convertRule) strictRules
@@ -206,7 +202,6 @@ instance T.Processor Ara where
                      else cert' compl -- only a step in the proof
                   -- TODO: best-case lowerbound vs worst-case lowerbound
                   -- TODO: elaborate to completely defined throws an error
-                  -- TODO: error wrong BC output
                    )
                   (if null weakRls || -- could be dis/enabled (but hides/shows empty processor)
                       isNothing (araRuleShifting p) -- always finished
@@ -312,15 +307,14 @@ araDeclaration :: Maybe Int -> T.Declaration ('[T.Argument 'T.Optional Int
                                                ,T.Argument 'T.Optional Bool
                                                ,T.Argument 'T.Optional Bool
                                                ] T.:-> TrsStrategy)
-araDeclaration orientStrict = T.declare "ara" description (minDim, maxDim, to, bestCase, complDef, verbOut) (araStrategy orientStrict)
+araDeclaration orientStrict = T.declare "ara wc" description (minDim, maxDim, t, bestCase, complDef, verbOut) (araStrategy orientStrict)
   where
     minDim = minDimArg `T.optional` 1
     maxDim = minDimArg `T.optional` 3
-    to = araTimeoutArg `T.optional` 15
+    t = araTimeoutArg `T.optional` 15
     bestCase = araBestCaseArg `T.optional` False
     complDef = araBestCaseCompletelyDefinedArg `T.optional` False
     verbOut = araVerboseOutputArg `T.optional` False
-
 
 ara :: TrsStrategy
 ara = T.deflFun (araDeclaration Nothing)
@@ -328,9 +322,15 @@ ara = T.deflFun (araDeclaration Nothing)
 ara' :: Maybe Int -> Int -> Int -> Int -> TrsStrategy
 ara' oS minDim maxDim t = T.declFun (araDeclaration oS) minDim maxDim t False False False
 
+araBestCase :: TrsStrategy
+araBestCase = araBestCase' Nothing 1 3 15 
+
+araBestCaseRelativeRewriting :: TrsStrategy
+araBestCaseRelativeRewriting = araBestCase' (Just 1) 1 3 15 
+
+
 araBestCase' :: Maybe Int -> Int -> Int -> Int -> TrsStrategy
 araBestCase' oS minDim maxDim t = T.declFun (araDeclaration oS) minDim maxDim t True False False
-
 
 araFull' :: Maybe Int -> Int -> Int -> Int -> Bool -> Bool -> Bool -> TrsStrategy
 araFull' oS = T.declFun (araDeclaration oS) 

@@ -28,6 +28,7 @@ module Tct.Trs.Data.RuleSelector
   , selAnyOf
   , selAllOf
   , selFirstAlternative
+  , preventMainSelection
   -- ** Misc
   , rules
   , dpRules
@@ -38,13 +39,14 @@ module Tct.Trs.Data.RuleSelector
 import qualified Tct.Core.Common.Parser       as P
 import qualified Tct.Core.Data                as T
 
+import Tct.Trs.Data.Symbol (F, mainFunction)
 import           Tct.Trs.Data.DependencyGraph (CDG, DG, DependencyGraph)
 import qualified Tct.Trs.Data.DependencyGraph as DG
 import qualified Tct.Trs.Data.Problem         as Prob
 import qualified Tct.Trs.Data.RuleSet         as Rs
 import           Tct.Trs.Data.Rules           (SelectorExpression (..), Rules)
 import qualified Tct.Trs.Data.Rules           as RS
-
+import qualified Data.Rewriting.Rule          as R
 
 -- | This datatype is used to select a subset of rules recorded in a problem.
 data RuleSelector f v a = RuleSelector
@@ -74,7 +76,6 @@ selectorArg = T.arg "selector" "<selector>" ["Selector Expression."] parser wher
         , ("weaks", selWeaks) ]
         {-, ("first congruence", selFirstCongruence)                      -}
         {-, ("first strict congruence", selFirstStrictCongruence) ]-}
-
 
 
 {-
@@ -109,6 +110,19 @@ selUnion = selCombine (\ n1 n2 -> "union of " ++ n1 ++ " and " ++ n2) RS.union
 -- | Select intersection of selections of given rule-selectors.
 selInter :: (Ord f, Ord v) => RuleSetSelector f v -> RuleSetSelector f v -> RuleSetSelector f v
 selInter= selCombine (\ n1 n2 -> "intersect of " ++ n1 ++ " and " ++ n2) RS.intersect
+
+-- | Select difference of selections of given rule-selectors.
+selDiff :: (Ord f, Ord v) => RuleSetSelector f v -> RuleSetSelector f v -> RuleSetSelector f v
+selDiff = selCombine (\ n1 n2 -> "difference of " ++ n1 ++ " and " ++ n2) RS.difference
+
+-- | Filter selections of given rule-selectors.
+selFilter :: (Ord f, Ord v) => String -> (R.Rule f v -> Bool) -> RuleSetSelector f v -> RuleSetSelector f v
+selFilter predName predicate s = RuleSelector {rsName = "filtered on " ++ predName ++ " of " ++ rsName s, rsSelect = fn}
+  where
+    fn prob = Rs.RuleSet {Rs.sdps = un Rs.sdps, Rs.wdps = un Rs.wdps, Rs.strs = un Rs.strs, Rs.wtrs = un Rs.wtrs}
+      where
+        rs = rsSelect s prob
+        un rfn = RS.filter predicate (rfn rs)
 
 
 -- | Select rewrite rules, i.e., non dependency pair rules.
@@ -255,16 +269,24 @@ selCloseBackward = selCloseWith mkWdg (\n -> n ++ ", backward closed")
 -}
 
 selAnyOf :: (Ord f, Ord v) => RuleSetSelector f v -> ExpressionSelector f v
-selAnyOf s = RuleSelector { rsName = "any " ++ rsName s, rsSelect = f }
-  where f prob = BigOr $ [ SelectDP d | d <- RS.toList $ Rs.sdps rs `RS.union` Rs.wdps rs]
-                         ++ [ SelectTrs r | r <- RS.toList $ Rs.strs rs `RS.union` Rs.wtrs rs]
-          where rs = rsSelect s prob
+selAnyOf s = RuleSelector {rsName = "any " ++ rsName s, rsSelect = f}
+  where
+    f prob = BigOr $ [SelectDP d | d <- RS.toList $ Rs.sdps rs `RS.union` Rs.wdps rs] ++ [SelectTrs r | r <- RS.toList $ Rs.strs rs `RS.union` Rs.wtrs rs]
+      where
+        rs = rsSelect s prob
 
 selAllOf :: (Ord f, Ord v) => RuleSetSelector f v -> ExpressionSelector f v
-selAllOf s = RuleSelector { rsName = "all " ++ rsName s, rsSelect = f }
-  where f prob = BigAnd $ [ SelectDP d | d <- RS.toList $ Rs.sdps rs `RS.union` Rs.wdps rs]
-                         ++ [ SelectTrs r | r <- RS.toList $ Rs.strs rs `RS.union` Rs.wtrs rs]
-          where rs = rsSelect s prob
+selAllOf s = RuleSelector {rsName = "all " ++ rsName s, rsSelect = f}
+  where
+    f prob = BigAnd $ [SelectDP d | d <- RS.toList $ Rs.sdps rs `RS.union` Rs.wdps rs] ++ [SelectTrs r | r <- RS.toList $ Rs.strs rs `RS.union` Rs.wtrs rs]
+      where
+        rs = rsSelect s prob
+                
+preventMainSelection :: (Ord v) => RuleSetSelector F v -> RuleSetSelector F v
+preventMainSelection = selFilter "not main function" (not . isMainFunction)
+
+isMainFunction (R.Rule (R.Fun f _) _) = f == mainFunction
+isMainFunction _ = False
 
 {-
 -- | Conjunction

@@ -69,7 +69,7 @@ data DecomposeDGProof
   deriving Show
 
 certfn :: T.Pair T.Certificate -> T.Certificate
-certfn (T.Pair (c1,c2)) = zero { T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.timeLB = T.timeLB c1 `add` T.timeLB c2 }
+certfn (T.Pair (c1, c2)) = T.unbounded {T.timeUB = T.timeUB c1 `mul` T.timeUB c2, T.timeLB = T.timeLB c1 `add` T.timeLB c2}
 
 instance T.Processor DecomposeDG where
   type ProofObject DecomposeDG = ApplicationProof DecomposeDGProof
@@ -150,7 +150,7 @@ decomposeDGselect = RS.selAllOf (RS.selFromDG f) { RS.rsName = "below first cut 
         snub = S.toList . S.fromList
         cyclic = isCyclicNode cdg
 
-        (selectedStrict,selectedWeak) = allRulesPairFromNodes cdg (snub $ concat $ [ successors cdg n | n <-S.toList cutNodes])
+        (selectedStrict,selectedWeak) = allRulesPairFromNodes cdg (snub $ concat [ successors cdg n | n <-S.toList cutNodes])
 
         cutNodes = S.unions [ cutNodesFrom r (cyclic r) | r <- roots cdg ]
           where

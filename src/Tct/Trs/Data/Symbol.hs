@@ -4,6 +4,7 @@ module Tct.Trs.Data.Symbol
   , AFun (..)
   , F , fun
   , V , var
+  , mainFunction
   ) where
 
 
@@ -34,6 +35,9 @@ newtype F = F (AFun BS.ByteString)
 
 fun  :: String -> F
 fun = F . TrsFun . BS.pack
+
+mainFunction :: F
+mainFunction = fun "main"
 
 newtype V = V BS.ByteString
   deriving (Eq, Ord)

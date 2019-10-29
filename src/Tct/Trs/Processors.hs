@@ -30,6 +30,9 @@ module Tct.Trs.Processors
   , dpsimps
   , decomposeIndependent
   , decomposeIndependentSG
+  , decomposeBestCaseIndependent
+  , decomposeBestCaseAnyStrict
+  , decomposeBestCaseIndependentSG
   , cleanSuffix
   , toDP
   , removeLeaf
@@ -262,6 +265,32 @@ decomposeIndependentSG =
   decompose' (RS.selAllOf RS.selCycleIndependentSG) RelativeAdd
   .>>> try simplifyRHS
   .>>> try cleanSuffix
+
+-- | Using the decomposition processor (c.f. 'Compose.decomposeBy') this transformation
+-- decomposes dependency pairs into two independent sets, in the sense that these DPs
+-- constitute unconnected sub-graphs of the dependency graph. Applies 'cleanSuffix' on the
+-- resulting sub-problems, if applicable.
+decomposeBestCaseIndependent :: TrsStrategy
+decomposeBestCaseIndependent =
+  decomposeBestCase' (RS.selAllOf $ RS.preventMainSelection RS.selIndependentSG) 
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
+
+-- | 
+decomposeBestCaseAnyStrict :: TrsStrategy
+decomposeBestCaseAnyStrict =
+  decomposeBestCase' (RS.selAnyOf $ RS.preventMainSelection RS.selStricts)
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
+
+-- | Similar to 'decomposeIndependent', but in the computation of the independent sets,
+-- dependency pairs above cycles in the dependency graph are not taken into account.
+decomposeBestCaseIndependentSG :: TrsStrategy
+decomposeBestCaseIndependentSG =
+  decomposeBestCase' (RS.selAllOf $ RS.preventMainSelection RS.selCycleIndependentSG) 
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
+
 
 -- | Tries dependency pairs for RC, and dependency pairs with weightgap, otherwise uses dependency tuples for IRC.
 -- Simpifies the resulting DP problem as much as possible.

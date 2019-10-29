@@ -19,11 +19,13 @@ import Tct.Core.Data                 (declFun, deflFun)
 import Tct.Core.Processor.MSum       (madd)
 
 import Tct.Trs.Data
+import Tct.Core.Data.Strategy (cmpTimeBCLB)
 import Tct.Trs.Data.Problem          (isRCProblem)
 import Tct.Trs.Processors
 import Tct.Trs.Strategy.Derivational
 import Tct.Trs.Strategy.Runtime
 
+import Debug.Trace
 
 -- | Declaration for "competition" strategy.
 competitionDeclaration :: Declaration ('[Argument 'Optional CombineWith] :-> TrsStrategy)
@@ -42,7 +44,18 @@ competitionStrategy :: CombineWith -> TrsStrategy
 competitionStrategy cmb =
   withProblem $ \p ->
     if isRCProblem p
-      then -- timeoutIn 5 decreasingLoops `madd`
+           -- best case analysis lower bound
+      then timeoutIn
+             5
+             (exhaustively $
+              best
+                cmpTimeBCLB
+                [ try decomposeBestCaseIndependent .>>> araBestCaseRelativeRewriting
+                , try decomposeBestCaseIndependentSG .>>> araBestCaseRelativeRewriting
+                , try decomposeBestCaseAnyStrict .>>> araBestCaseRelativeRewriting
+                ]) `madd`
+           -- worst case lower bound
+           timeoutIn 5 (decreasingLoops) `madd`
+            -- worst case upper bound
            runtime' cmb
       else derivational
-
