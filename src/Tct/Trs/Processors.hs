@@ -91,14 +91,15 @@ boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
     uArg = nat "to"   ["to degree"]
 
 -- | Arguments for bounded degrees. @:from nat :to nat :timeout nat :bc bool@
-araArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional Bool, Argument 'Optional Bool)
-araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60, bcArg `T.optional` False, cdArg `T.optional` False)
+araArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional Bool, Argument 'Optional Bool, Argument 'Optional Bool)
+araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60, bcArg `T.optional` False, cdArg `T.optional` False, verbOutArg `T.optional` False)
   where
     lArg = nat "from" ["from degree"]
     uArg = nat "to"   ["to degree"]
     tArg = nat "timeout" ["timeout for SMT solver"]
     bcArg = bool "bc" ["perform best-case analysis"]
     cdArg = bool "cd" ["elaborate input to completely defined TRS (useful for best-case analysis)"]
+    verbOutArg = bool "v" ["Verbose output (prints inference trees)"]
 
 
 checkPropArgs :: (Argument 'Optional LogOp,
@@ -216,7 +217,7 @@ polys = shift pxs
 ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
 
-araBounds :: Degree -> Degree -> Int -> Bool -> Bool -> TrsStrategy
+araBounds :: Degree -> Degree -> Int -> Bool -> Bool -> Bool -> TrsStrategy
 araBounds = araFull' Nothing
 
 

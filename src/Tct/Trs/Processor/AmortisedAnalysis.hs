@@ -14,10 +14,11 @@ module Tct.Trs.Processor.AmortisedAnalysis
 import System.Exit
 import           Control.Monad
 import qualified Data.Set                     as S
+import Control.Arrow
 import qualified Control.Exception            as E
 import           Control.Monad.State
 import           Data.Maybe
-import Data.List (nub, sortBy,find)
+import Data.List (groupBy, nub, sortBy,find, intersperse)
 import Data.Function (on)
 
 import qualified Tct.Core.Common.Pretty       as PP
@@ -40,6 +41,8 @@ import qualified Tct.Trs.Data.ProblemKind     as Prob
 import qualified Tct.Trs.Data.Signature       as Sig
 import qualified Tct.Trs.Data.Rules as RS
 
+import Data.Rewriting.ARA.ByInferenceRules.InfTreeNode.Pretty
+import Data.Rewriting.ARA.ByInferenceRules.InfTreeNode.Ops
 import Data.Rewriting.ARA.InferTypes
 import           Data.Rewriting.ARA.ByInferenceRules.Analyzer
 import           Data.Rewriting.ARA.ByInferenceRules.CmdLineArguments
@@ -57,6 +60,7 @@ data Ara = Ara { minDegree  :: Int            -- ^ Minimal degree to look for
                , araRuleShifting :: Maybe Int -- ^ Min nr of strict rules to orient strict.
                , isBestCase :: Bool           -- ^ perform best-case analysis
                , mkCompletelyDefined :: Bool  -- ^ make TRS completely defined
+               , verboseOutput :: Bool
                }
          deriving Show
 
@@ -99,6 +103,7 @@ data AraProof f v = AraProof
                                                    -- of constructors)
   , strictlyTyped :: [RT.Rule F V]
   , weaklyTyped :: [RT.Rule F V]
+  , infTrees :: Maybe ([(String, PP.Doc)], [(String, PP.Doc)]) -- ^ Only used if verbose output is enabled
   } deriving Show
 
 
@@ -130,6 +135,7 @@ instance T.Processor Ara where
                       , lowerboundNoComplDef = not (mkCompletelyDefined p)
                       , nrOfRules = Just $ length (Prob.strictTrs probTcT) + length (Prob.weakTrs probTcT) + length (Prob.strictDPs probTcT) + length (Prob.weakDPs probTcT)
                       }
+                  -- add main function if necessary
               let isMainFun (RT.Fun f _) = f == fun "main"
                   isMainFun _ = False
               let mainFun = filter (isMainFun . RT.lhs) (RT.allRules $ RT.rules probIn)
@@ -149,15 +155,24 @@ instance T.Processor Ara where
                   else return probIn
                      -- Find out SCCs
               let reachability = analyzeReachability prob
-              (prove, _) <- analyzeProblem args reachability prob
+              (prove, infTrees) <- analyzeProblem args reachability prob
                      -- Solve cost constraints
               let cond = conditions prove
               let probSig = RT.signatures (problem prove)
                      -- Solve datatype constraints
-              (sigs, cfSigs, _, _, baseCtrs, _, bigO, (strictRls, weakRls)) <- solveProblem args (fromJust probSig) cond (signatureMap prove) (costFreeSigs prove)
+              (sigs, cfSigs, _, vals, baseCtrs, _, bigO, (strictRls, weakRls)) <-
+                solveProblem args (== fun "main") (fromJust probSig) cond (signatureMap prove) (costFreeSigs prove)
               print prob
               print bigO
               print args
+              let line = PP.text "\n"
+                  fromDoc = PP.text . show
+              let documentsIT :: [(String, PP.Doc)]
+                  documentsIT = (map (second (\d -> d PP.<$> line))) (map (second $ (PP.vcat . map (fromDoc . prettyInfTreeNodeView)) . reverse) infTrees)
+                  documentsITNum =
+                    (map (second (\d -> d PP.<$> line)))
+                      (map (second ((PP.vcat . map (fromDoc . prettyInfTreeNodeView)) . reverse)) $
+                       zip (map fst infTrees) (putValuesInInfTreeView (signatureMap prove) (costFreeSigs prove) vals (map snd infTrees)))
               let strictRules = Prob.strictTrs probTcT
               let strictRules' = RS.filter ((`notElem` strictRls) . convertRule) strictRules
               let weakRulesAdd' = RS.filter ((`elem` strictRls) . convertRule) strictRules
@@ -180,9 +195,12 @@ instance T.Processor Ara where
                   cert'
                     | isBestCase p = certificationBCLB
                     | otherwise = certification
+              let mInfTrees
+                    | verboseOutput p = Just (documentsIT, documentsITNum)
+                    | otherwise = Nothing
               return $
                 T.succeedWith
-                  (Applicable . Order $ AraProof sigs cfSigs baseCtrs strictRls weakRls)
+                  (Applicable . Order $ AraProof sigs cfSigs baseCtrs strictRls weakRls mInfTrees)
                   (if null weakRls
                      then const (cert compl) -- prove done
                      else cert' compl -- only a step in the proof
@@ -274,40 +292,47 @@ araBestCaseCompletelyDefinedArg =
   T.flag "cd"
   [ "Introduce rules s.t. TRS is completely defined. Only useful for best-case analysis! Default is False." ]
 
+araVerboseOutputArg :: T.Argument 'T.Required Bool
+araVerboseOutputArg =
+  T.flag "v"
+  [ "Verbose output (prints inference trees)." ]
+
 
 description :: [String]
 description = [ unwords
   [ "This processor implements the amortised resource analysis."] ]
 
-araStrategy :: Maybe Int -> Int -> Int -> Int -> Bool -> Bool -> TrsStrategy
-araStrategy oS minD maxD to bc cd = T.Apply (Ara minD maxD to oS bc cd) 
+araStrategy :: Maybe Int -> Int -> Int -> Int -> Bool -> Bool -> Bool -> TrsStrategy
+araStrategy oS minD maxD to bc cd verbOut = T.Apply (Ara minD maxD to oS bc cd verbOut) 
 
 araDeclaration :: Maybe Int -> T.Declaration ('[T.Argument 'T.Optional Int
                                                ,T.Argument 'T.Optional Int
                                                ,T.Argument 'T.Optional Int
                                                ,T.Argument 'T.Optional Bool
                                                ,T.Argument 'T.Optional Bool
+                                               ,T.Argument 'T.Optional Bool
                                                ] T.:-> TrsStrategy)
-araDeclaration orientStrict = T.declare "ara" description (minDim, maxDim, to, bestCase, complDef) (araStrategy orientStrict)
+araDeclaration orientStrict = T.declare "ara" description (minDim, maxDim, to, bestCase, complDef, verbOut) (araStrategy orientStrict)
   where
     minDim = minDimArg `T.optional` 1
     maxDim = minDimArg `T.optional` 3
     to = araTimeoutArg `T.optional` 15
     bestCase = araBestCaseArg `T.optional` False
     complDef = araBestCaseCompletelyDefinedArg `T.optional` False
+    verbOut = araVerboseOutputArg `T.optional` False
 
 
 ara :: TrsStrategy
 ara = T.deflFun (araDeclaration Nothing)
 
 ara' :: Maybe Int -> Int -> Int -> Int -> TrsStrategy
-ara' oS minDim maxDim t = T.declFun (araDeclaration oS) minDim maxDim t False False
+ara' oS minDim maxDim t = T.declFun (araDeclaration oS) minDim maxDim t False False False
 
 araBestCase' :: Maybe Int -> Int -> Int -> Int -> TrsStrategy
-araBestCase' oS minDim maxDim t = T.declFun (araDeclaration oS) minDim maxDim t True False
+araBestCase' oS minDim maxDim t = T.declFun (araDeclaration oS) minDim maxDim t True False False
 
 
-araFull' :: Maybe Int -> Int -> Int -> Int -> Bool -> Bool -> TrsStrategy
+araFull' :: Maybe Int -> Int -> Int -> Int -> Bool -> Bool -> Bool -> TrsStrategy
 araFull' oS = T.declFun (araDeclaration oS) 
 
 
@@ -315,12 +340,10 @@ araFull' oS = T.declFun (araDeclaration oS)
 --------------------------------------------------------------------------------
 
 instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
-  pretty proof =
+  pretty proof
     -- Signatures
-    PP.text "Signatures used:" PP.<$>
-    PP.text "----------------" PP.<$>
-    PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted $ signatures proof)) PP.<$>
-    PP.line PP.<$>
+   =
+    PP.text "Signatures used:" PP.<$> PP.text "----------------" PP.<$> PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted $ signatures proof)) PP.<$> PP.line PP.<$>
     PP.text "Cost-free Signatures used:" PP.<$>
     PP.text "--------------------------" PP.<$>
     PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted $ cfSignatures proof)) PP.<$>
@@ -328,18 +351,28 @@ instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
     PP.text "Base Constructor Signatures used:" PP.<$>
     PP.text "---------------------------------" PP.<$>
     PP.vcat (fmap (PP.text . show . prettyAraSignature') (sorted' $ baseCtrSignatures proof)) PP.<$>
-    if null (strictlyTyped proof ++ weaklyTyped proof)
-    then PP.empty
-    else PP.line PP.<$>
-         PP.text "Following Still Strict Rules were Typed as:" PP.<$>
-         PP.text "-------------------------------------------" PP.<$>
-         PP.nest 2 (PP.text "1. Strict:" PP.<$>
-                    PP.vcat (fmap PP.pretty (strictlyTyped proof))) PP.<$>
-         PP.nest 2 (PP.text "2. Weak:" PP.<$>
-                    PP.vcat (fmap PP.pretty (weaklyTyped proof)))
-
-    where sorted = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
-          sorted' = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
+    (if null (strictlyTyped proof ++ weaklyTyped proof)
+       then PP.empty
+       else PP.line PP.<$> PP.text "Following Still Strict Rules were Typed as:" PP.<$> PP.text "-------------------------------------------" PP.<$>
+            PP.nest 2 (PP.text "1. Strict:" PP.<$> PP.vcat (fmap PP.pretty (strictlyTyped proof))) PP.<$>
+            PP.nest 2 (PP.text "2. Weak:" PP.<$> PP.vcat (fmap PP.pretty (weaklyTyped proof)))) PP.<$>
+    case infTrees proof of
+      Nothing -> PP.empty
+      Just (vars, nums) ->
+        PP.empty PP.<$> PP.empty PP.<$> PP.text "Inference Trees:" PP.<$$> PP.text "----------------" PP.<$>
+        PP.indent 2 (foldl (PP.<$>) PP.empty (map printInfTrees (grpBy fst vars))) PP.<$>
+        PP.text "Inference Trees (with filled in numbers):" PP.<$>
+        PP.text "-----------------------------------------" PP.<$>
+        PP.indent 2 (foldl (PP.<$>) PP.empty (map printInfTrees (grpBy fst nums)))
+    where
+      sorted = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
+      sorted' = nub . sortBy (compare `on` fst4 . RT.lhsRootSym)
+      grpBy f = groupBy ((==) `on` f) -- . sortBy (compare `on` f)
+      printInfTrees xs = line PP.<$> PP.text n PP.<$> PP.text (replicate (length n) '-') PP.<$> foldl (PP.<$>) PP.empty docs
+        where
+          n = fst $ head xs
+          docs = map snd xs
+      line = PP.text "\n"
 
 instance Xml.Xml (AraProof f v) where
   toXml _ = Xml.empty
