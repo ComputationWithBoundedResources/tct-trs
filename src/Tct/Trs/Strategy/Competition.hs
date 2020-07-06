@@ -28,8 +28,6 @@ import           Tct.Trs.Processors
 import           Tct.Trs.Strategy.Derivational
 import           Tct.Trs.Strategy.Runtime
 
-import           Debug.Trace
-
 -- | Declaration for "competition" strategy.
 competitionDeclaration
   :: Declaration ('[Argument 'Optional CombineWith] :-> TrsStrategy)
