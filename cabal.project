@@ -1,0 +1,10 @@
+packages:
+ ./*.cabal
+ ../tct-core,
+ ../term-rewriting-xml,
+ ../slogic,
+ ../tct-common,
+ ../ara,
+ ../term-rewriting-ext,
+ ../term-rewriting-applicative,
+ ../hoca
