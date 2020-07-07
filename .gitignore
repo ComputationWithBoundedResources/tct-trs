@@ -5,3 +5,4 @@ cabal.sandbox.config
 /TAGS
 .gitignore
 /tct-trs/TAGS
+dist-newstyle/
