@@ -6,3 +6,4 @@ cabal.sandbox.config
 .gitignore
 /tct-trs/TAGS
 /stack.yaml.lock
+dist-newstyle
