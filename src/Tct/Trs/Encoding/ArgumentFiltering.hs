@@ -33,7 +33,7 @@ import qualified Tct.Common.SMT         as SMT
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem   as Prob
 import qualified Tct.Trs.Data.Signature as Sig
-import qualified Tct.Trs.Data.Trs       as Trs
+import qualified Tct.Trs.Data.Rules     as RS (map)
 
 
 data Filtering
@@ -62,8 +62,8 @@ filterRule af (R.Rule l r) = R.Rule (filterTerm l) (filterTerm r)
         where ts' = fst . unzip . filter ((`IS.member` is) . snd) $ zip ts [1..]
     filterTerm v = v
 
-filterTrs :: (Ord f, Ord v) => ArgumentFiltering f -> Trs f v -> Trs f v
-filterTrs af trs = filterRule af `Trs.map` trs
+filterTrs :: (Ord f, Ord v) => ArgumentFiltering f -> Rules f v -> Rules f v
+filterTrs af trs = filterRule af `RS.map` trs
 
 
 instance PP.Pretty f => PP.Pretty (ArgumentFiltering f) where

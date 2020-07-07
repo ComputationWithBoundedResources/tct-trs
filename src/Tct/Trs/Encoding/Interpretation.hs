@@ -2,12 +2,6 @@
 module Tct.Trs.Encoding.Interpretation
   where
 
--- TODO: MS remove Greedy Components
--- we do not really gain anything from the greedy algorithm of the interpretations;
--- a) they do not work well together with parallel invocations
--- b) experiments (rc and certify) do not show really any improvement over NoGreedy (even when applied sequentially)
--- c) there is a (rare case) where there encoding of Greedy would change; namely if all strict trs rules are shifted to the weak; we get besser uargs
-
 import Data.Maybe (fromMaybe)
 import           Control.Monad                      (liftM)
 import qualified Data.Foldable                      as F
@@ -29,7 +23,7 @@ import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem               as Prob
 import qualified Tct.Trs.Data.RuleSelector          as RS
 import qualified Tct.Trs.Data.Signature             as Sig
-import qualified Tct.Trs.Data.Trs                   as Trs
+import qualified Tct.Trs.Data.Rules                 as RS
 import qualified Tct.Trs.Encoding.ArgumentFiltering as AFEnc
 import qualified Tct.Trs.Encoding.UsablePositions   as UPEnc
 import qualified Tct.Trs.Encoding.UsableRules       as UREnc
@@ -58,6 +52,7 @@ instance (PP.Pretty f, PP.Pretty c)  => PP.Pretty (Interpretation f c) where
 
 -- | Indicates wether strict oriented rules should be shifted to the weak components or wether all strict rules should be oriented strictly.
 -- In the latter case the complexity problem is already solved.
+-- @All = Just (selAny selStricts)@ but the encoding is cheaper
 data Shift = Shift (ExpressionSelector F V) | All
   deriving Show
 
@@ -75,9 +70,12 @@ data InterpretationProof a b = InterpretationProof
   , weakTrs_   :: [(R.Rule F V, (b, b))]
   } deriving Show
 
+instance Monad m => SMT.Decode m (InterpretationProof a b) (InterpretationProof a b) where
+  decode = return
+
 -- MS: formally this is not so nice as in tct2; some extra work would be necessary
 -- on the other hand we now have an abstract orient function for interpretations
--- see Tct.Trs.Method.Poly.NaturalPI for an example
+-- see Tct.RS.Method.Poly.NaturalPI for an example
 class AbstractInterpretation i where
   type (A i) :: *
   type (B i) :: *
@@ -85,24 +83,24 @@ class AbstractInterpretation i where
 
   encode      :: i -> A i -> SMT.SmtSolverSt Int (B i)
 
-  setMonotone :: i -> B i -> [Int] -> (SMT.Formula Int) 
-  setInFilter :: i -> B i -> (Int -> SMT.Formula Int) -> (SMT.Formula Int)
+  setMonotone :: i -> B i -> [Int] -> SMT.Formula Int
+  setInFilter :: i -> B i -> (Int -> SMT.Formula Int) -> SMT.Formula Int
 
   interpret   :: i -> Interpretation F (B i) -> R.Term F V -> C i
 
-  addConstant :: i -> C i -> (SMT.IExpr Int) -> C i
-  gte         :: i -> C i -> C i -> (SMT.Formula Int)
+  addConstant :: i -> C i -> SMT.IExpr Int -> C i
+  gte         :: i -> C i -> C i -> SMT.Formula Int
 
-type ForceAny = [R.Rule F V] -> (SMT.Formula Int) 
+type ForceAny = [R.Rule F V] -> SMT.Formula Int
 
 
 orient :: AbstractInterpretation i => i
-  -> TrsProblem
+  -> Trs
   -> Interpretation F (A i)
   -> Shift
   -> Bool -- TODO: MS: Use Types
   -> Bool
-  -> SMT.SmtSolverSt Int (InterpretationProof a b , (Interpretation F (B i), Maybe (UREnc.UsableEncoder F Int)), ForceAny)
+  -> SMT.SmtSolverSt Int (InterpretationProof () (), Interpretation F (B i), Maybe (UREnc.UsableEncoder F Int))
 orient inter prob absi mselector useUP useUR = do
   SMT.setLogic SMT.QF_NIA
 
@@ -152,7 +150,6 @@ orient inter prob absi mselector useUP useUR = do
     sOrderConstraints = SMT.bigAnd [ usable r .=> sOrder r | r <- srules ]
       where sOrder r = interpretf (R.lhs r) .>=. (interpretf (R.rhs r) .+. strict r)
 
-    -- MS: TODO: the greedy component should work on the expression selector; so we could express eg selAnyOf $ selRules `inter` selStricts 
     forceAny rs
       | null rs   = SMT.bot
       | otherwise = SMT.bigOr [ usable r .&& strict r .> zero | r <- rs ]
@@ -162,10 +159,10 @@ orient inter prob absi mselector useUP useUR = do
           All       -> SMT.bigAnd [ usable r .=> strict r .> zero | r <- srules ]
           Shift sel -> orientSelected (RS.rsSelect sel prob)
 
-    orientSelected (Trs.SelectDP r)  = strict r .> zero
-    orientSelected (Trs.SelectTrs r) = strict r .> zero
-    orientSelected (Trs.BigAnd es)   = SMT.bigAnd (orientSelected `fmap` es)
-    orientSelected (Trs.BigOr es)    = SMT.bigOr (orientSelected `fmap` es)
+    orientSelected (RS.SelectDP r)  = strict r .> zero
+    orientSelected (RS.SelectTrs r) = strict r .> zero
+    orientSelected (RS.BigAnd es)   = SMT.bigAnd (orientSelected `fmap` es)
+    orientSelected (RS.BigOr es)    = SMT.bigOr (orientSelected `fmap` es)
 
   SMT.assert wOrderConstraints
   SMT.assert sOrderConstraints
@@ -174,18 +171,18 @@ orient inter prob absi mselector useUP useUR = do
   SMT.assert usableRulesConstraints
   SMT.assert filteringConstraints
 
-  return (proof usablePositions, (ebsi, usenc), forceAny)
+  return (proof usablePositions, ebsi, usenc)
 
   where
     trs    = Prob.allComponents prob
-    rules  = Trs.toList trs
-    srules = Trs.toList (Prob.strictComponents prob)
-    wrules = Trs.toList (Prob.weakComponents prob)
+    rules  = RS.toList trs
+    srules = RS.toList (Prob.strictComponents prob)
+    wrules = RS.toList (Prob.weakComponents prob)
 
     allowUR = useUR && Prob.isRCProblem prob && Prob.isInnermostProblem prob
     allowAF = allowUR
 
-    proof uposs = InterpretationProof 
+    proof uposs = InterpretationProof
       { sig_       = Prob.signature prob
       , inter_     = Interpretation M.empty
       , uargs_     = uposs
@@ -201,19 +198,20 @@ orient inter prob absi mselector useUP useUR = do
 -- toTree p prob (T.Fail po)                 = T.NoProgress (T.ProofNode p prob po) (T.Open prob)
 -- toTree p prob (T.Success probs po certfn) = T.Progress (T.ProofNode p prob po) certfn (T.Open `fmap` probs)
 
-newProblem :: TrsProblem -> InterpretationProof a b -> T.Optional T.Id TrsProblem
+
+newProblem :: Trs -> InterpretationProof a b -> T.Optional T.Id Trs
 newProblem prob proof = case shift_ proof of
   All     -> T.Null
   Shift _ -> T.Opt . T.Id $ newProblem' prob proof
 
 newProblem' :: Problem F V -> InterpretationProof a b -> Problem F V
 newProblem' prob proof = Prob.sanitiseDPGraph $  prob
-    { Prob.strictDPs = Prob.strictDPs prob `Trs.difference` sDPs
-    , Prob.strictTrs = Prob.strictTrs prob `Trs.difference` sTrs
-    , Prob.weakDPs   = Prob.weakDPs prob `Trs.union` sDPs
-    , Prob.weakTrs   = Prob.weakTrs prob `Trs.union` sTrs }
+    { Prob.strictDPs = Prob.strictDPs prob `RS.difference` sDPs
+    , Prob.strictTrs = Prob.strictTrs prob `RS.difference` sTrs
+    , Prob.weakDPs   = Prob.weakDPs prob `RS.union` sDPs
+    , Prob.weakTrs   = Prob.weakTrs prob `RS.union` sTrs }
   where
-    rules = Trs.fromList . fst . unzip
+    rules = RS.fromList . fst . unzip
     sDPs = rules (strictDPs_ proof)
     sTrs = rules (strictTrs_ proof)
 
@@ -251,11 +249,17 @@ xmlProof :: Xml.Xml a => InterpretationProof a b -> Xml.XmlContent -> Xml.XmlCon
 xmlProof proof itype =
   Xml.elt "ruleShifting"
     [ orderingConstraintProof
-    , Xml.elt "trs" [Xml.toXml $ Trs.fromList trs]          -- strict part
+    , Xml.elt "trs" [Xml.toXml $ RS.fromList trs]          -- strict part
     -- ceta complains if usableRules are set for non-innermost; even if all rules are given
-    , if useURules_ proof 
-        then Xml.elt "usableRules" [Xml.toXml $ Trs.fromList usr] -- usable part
+    , if useURules_ proof
+        then Xml.elt "usableRules" [Xml.toXml $ RS.fromList usr] -- usable part
         else Xml.empty
+    -- akin to tct2 we allow interpretations to be the base case of our proof
+    -- though ceTA requires to use ruleShifting; in this case we append the proof for the empty problem
+    , case shift_ proof of
+        -- Tct.Core.Processor.Empty.toXml Emptyproblem == </closed>, but toXml is not used in practice
+        All     -> Xml.elt "complexityProof" [Xml.elt "rIsEmpty" []]
+        Shift _ -> Xml.empty
     ]
     where
       orderingConstraintProof =
@@ -269,5 +273,4 @@ xmlProof proof itype =
         -- , Xml.elt "polynomial" [Xml.toXml p]]
       trs = map fst $ strictTrs_ proof ++ strictDPs_ proof
       usr = (trs ++) . map fst $ weakTrs_ proof ++ weakDPs_ proof
-
 

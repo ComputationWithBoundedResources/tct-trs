@@ -13,20 +13,18 @@ module Tct.Trs.Data.ComplexityPair
   ) where
 
 
-import           Data.Typeable
-
 import qualified Tct.Core.Data             as T
 
 import           Tct.Trs.Data.Problem
 import           Tct.Trs.Data.RuleSelector (ExpressionSelector)
-import           Tct.Trs.Data.Trs          (Trs)
+import           Tct.Trs.Data.Rules        (Rules)
 import           Tct.Trs.Data.Symbol       (F, V)
 
 
 data ComplexityPairProof = ComplexityPairProof
-  { result       :: T.ProofTree TrsProblem
-  , removableDPs :: Trs F V
-  , removableTrs :: Trs F V }
+  { result       :: T.ProofTree Trs
+  , removableDPs :: Rules F V
+  , removableTrs :: Rules F V }
   deriving Show
 
 -- MS: TODO: a complexity pair should just return a proof tree
@@ -39,17 +37,16 @@ class IsComplexityPair p where
 -- | A 'ComplexityPair' is a processor that can returns 'ComplexityPairProof'.
 data ComplexityPair where
   ComplexityPair :: (T.Processor p, IsComplexityPair p) => p -> ComplexityPair
-  deriving Typeable
 
 instance Show ComplexityPair where
   show (ComplexityPair p) = show p
 
 -- | Existential type for declarations specifying a Strategy.
 data ComplexityPairDeclaration where
-  CD :: (TrsProblem ~ prob, T.ParsableArgs args, T.ArgsInfo args) =>
+  CD :: (Trs ~ prob, T.ParsableArgs args, T.ArgsInfo args) =>
     T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
 
-someComplexityPair :: (TrsProblem ~ prob, T.ParsableArgs args, T.ArgsInfo args) =>
+someComplexityPair :: (Trs ~ prob, T.ParsableArgs args, T.ArgsInfo args) =>
   T.Declaration (args T.:-> ComplexityPair) -> ComplexityPairDeclaration
 someComplexityPair = CD
 

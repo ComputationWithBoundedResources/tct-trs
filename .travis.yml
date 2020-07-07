@@ -1,29 +1,32 @@
-language: haskell
+sudo: false
 
-env:
-  matrix:
-    - GHC_VERSION=7.8.4  CABAL_VERSION=1.20
-    - GHC_VERSION=7.10.1 CABAL_VERSION=1.22
+language: c
+
+cache:
+  directories:
+  - $HOME/.stack/
+
+addons:
+  apt:
+    sources:
+    - hvr-ghc
+    packages:
+    - ghc-7.10.2
+
+matrix:
+  fast_finish: true
+  include:
+    - env: GHCVER=7.10.2 STACK_YAML=stack.yaml
 
 before_install:
-  - sudo apt-add-repository -y ppa:hvr/ghc
-  - sudo apt-get update
-  - sudo apt-get install -y ghc-$GHC_VERSION cabal-install-$CABAL_VERSION
-  - export PATH=/opt/ghc/$GHC_VERSION/bin:/opt/cabal/$CABAL_VERSION/bin:$PATH
-  - cabal update
-  - git clone https://github.com/ComputationWithBoundedResources/slogic
-  - git clone https://github.com/ComputationWithBoundedResources/tct-core
-  - git clone https://github.com/ComputationWithBoundedResources/tct-common
-  - git clone https://github.com/ComputationWithBoundedResources/term-rewriting-xml
-  - cabal install **/*.cabal
-
-install:
-  - cabal update
-  - cabal install --only-dependencies --enable-tests
+  - mkdir -p ~/.local/bin
+  - export PATH=$HOME/.local/bin:$PATH
+  - travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.4.0/stack-0.1.4.0-x86_64-linux.tar.gz | tar xz -C ~/.local/bin
+  - export PATH=/opt/ghc/$GHCVER/bin:$PATH
 
 script:
- - cabal configure
- - cabal build
- - cabal check
- - cabal sdist
+  - stack --no-terminal --skip-ghc-check build
 
+branches:
+  only:
+    - master

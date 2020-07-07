@@ -25,7 +25,7 @@ import qualified Tct.Common.SMT                 as SMT
 import           Tct.Trs.Data
 import qualified Tct.Trs.Data.Problem           as Prob
 import qualified Tct.Trs.Data.ProblemKind       as Prob
-import qualified Tct.Trs.Data.Trs               as Trs
+import qualified Tct.Trs.Data.Rules             as RS
 import qualified Tct.Trs.Data.Signature         as Sig
 
 
@@ -59,16 +59,16 @@ usableEncoder prob = UsableEncoder initialfs `liftM` mapping
         st               -> Prob.defineds st
 
 -- | Lifts usable symbols to usable rules.
-usable :: Ord f => UsableEncoder f w -> R.Rule f v -> (SMT.Formula w)
+usable :: Ord f => UsableEncoder f w -> R.Rule f v -> SMT.Formula w
 usable (UsableEncoder _ m) = usable' . R.root . R.lhs
   where
     usable' (Right f) = SMT.top `fromMaybe` M.lookup f m
     usable' _         = SMT.top
 
 -- | The actual encoding.
-validUsableRules :: (Ord f, Ord v) => Trs f v -> (R.Rule f v -> SMT.Formula w) -> (f -> Int -> SMT.Formula w) -> SMT.Formula w
+validUsableRules :: (Ord f, Ord v) => Rules f v -> (R.Rule f v -> SMT.Formula w) -> (f -> Int -> SMT.Formula w) -> SMT.Formula w
 validUsableRules trs usable' inFilter' =
-  memo $ SMT.bigAndM [ usableM r `SMT.impliesM` omega (R.rhs r) | r <- Trs.toList trs ]
+  memo $ SMT.bigAndM [ usableM r `SMT.impliesM` omega (R.rhs r) | r <- RS.toList trs ]
   where
     memo          = fst . runIdentity . SMT.memo
     usableM       = return . usable'
@@ -77,6 +77,6 @@ validUsableRules trs usable' inFilter' =
       case t of
         R.Var _    -> return SMT.top
         R.Fun f ts ->
-          SMT.bigAndM [ usableM rl | rl <- Trs.toList $ Trs.filter (\r -> R.root (R.lhs r) == Right f) trs ]
+          SMT.bigAndM [ usableM rl | rl <- RS.toList $ RS.filter (\r -> R.root (R.lhs r) == Right f) trs ]
           `SMT.bandM` SMT.bigAndM [ inFilterM f i `SMT.impliesM` omega ti | (i,ti) <- zip [1..] ts]
 

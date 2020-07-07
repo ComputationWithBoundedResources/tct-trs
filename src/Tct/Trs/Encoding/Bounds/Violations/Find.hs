@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------------------
 -- |
--- Module      :  Tct.Method.Bounds.Violations.Find
+-- Module      :  Tct.Processor.Bounds.Violations.Find
 -- Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>,
 --                Georg Moser <georg.moser@uibk.ac.at>,
 --                Andreas Schnabl <andreas.schnabl@uibk.ac.at>
@@ -68,7 +68,7 @@ reachableFromLifted a t qs = runMemoAction reachableFromLiftedM
                                           S.empty  [(l, args) | (l,argss) <- bstepUL a f q , args <- S.toList argss]
           labeledSubterms fl subproblems = do ltis <- mapM reachLiftS subproblems
                                               return $ S.fromList [F fl lts | lts <- listProduct $ map S.toList ltis]
-              
+
           -- identifyVars (T.Var _) = T.Var (Var.canonical 0)
           identifyVars = T.map id (const (0::Int))
           -- TODO: MS what happens here

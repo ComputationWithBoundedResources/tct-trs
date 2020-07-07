@@ -1,13 +1,22 @@
--- | This module provides the custom strategy for the web interface.
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-module Tct.Trs.Strategy.Web where
+-- | This module provides strategies for the web interface.
+module Tct.Trs.Strategy.Web
+  ( webCustomDeclaration
+  , webAutomaticDeclaration
+  ) where
 
-import           Tct.Core
-import           Tct.Trs.Processors
 
-webDeclaration = strategy "web"
-  ( --degreeArg
-  ba "matchbounds"
+import Tct.Core
+import Tct.Trs.Data.Problem         (isInnermostProblem)
+import Tct.Trs.Processors           hiding (matrices, polys)
+import Tct.Trs.Strategy.Competition (competition')
+
+
+webAutomaticDeclaration = strategy "webAutomatic" () (competition' Fastest)
+
+webCustomDeclaration = strategy "webCustom"
+  ( degreeArg `optional` 2
+  , ba "matchbounds"
   , ba "matrices"
   , ba "matricesusableargs"
   , ba "matricesusablerules"
@@ -17,14 +26,17 @@ webDeclaration = strategy "web"
   , ba "toi"
   , ba "compose"
   , ba "dp"
-  , ba "dpusetuples"
+  , ba "dptuples"
   , ba "dpsimps"
-  ) web
+  , ba "dpdecompose"
+  ) custom
 
-ba s = bool s ["Wether to use " ++ s ++ "."]
+-- ba :: String -> Argument 'Optional Bool
+ba s = bool s ["Wether to use " ++ s ++ "."] `optional` True
 
-web
+custom
   -- deg
+  deg
   -- base
   useMatchbounds
   useMatrices
@@ -40,37 +52,43 @@ web
   useDP
   useTuples
   useDPSimps
+  useDPDecompose
 
   =
-
-  let deg = 3 in 
 
   when useToi (try toInnermost)
   .>>>
   if useDP
-    then basics 0 deg .<||> (tDP .>>> basics 0 deg)
+    then (basics 0 deg .>>> abort) .<||> (asDP .>>> onDP .>>> basics 0 deg .>>> abort)
     else basics 0 deg
 
   where
 
-  tDP =
-    if useTuples then dependencyTuples else dependencyPairs
-    .>>> try (when useDPSimps dpsimps)
+  asDP = withProblem $ \prob ->
+    if useTuples && isInnermostProblem prob
+       then dependencyTuples
+       else dependencyPairs
+  onDP =
+     try (when useDPSimps dpsimps)
+    .>>> te (when useDPDecompose (force decomposeDG') .>>> try (when useDPSimps dpsimps))
 
-  basics l u = matchbounds .<||> interpretations
+  basics l u = mbounds .<||> interpretations
     where
-    matchbounds         = when useMatchbounds $ bounds Minimal Match .<||> bounds PerSymbol Match
-    interpretations =
+    mbounds         = force $ when useMatchbounds matchbounds
+    interpretations = force $
       if useDecompose
-        then force $ chain [ tew (int d) | d <- [(max 0 l) .. (max l u)] ]
+        then chain [ tew (int d) | d <- [(max 0 l) .. (max l u)] ]
         else int u
-    int d               = when useMatrices (mxs d) .<||> when usePolys (px d)
+    int d               = matrices d .<||> polys d
+
+    matrices d = force $ when useMatrices (mxs d)
+    polys    d = force $ when usePolys    (px d)
 
     ua b = if b then UArgs else NoUArgs
     ur b = if b then URules else NoURules
 
-    mx dm dg = matrix' dm dg    Algebraic  (ua useMatricesUArgs) (ur useMatricesURules) sel NoGreedy
-    px dg    = poly' (Mixed dg) NoRestrict (ua usePolysUArgs) (ur usePolysURules) sel NoGreedy
+    mx dm dg = matrix' dm dg    Algebraic  (ua useMatricesUArgs) (ur useMatricesURules) sel
+    px dg    = poly' (Mixed dg) Restrict   (ua usePolysUArgs) (ur usePolysURules) sel
     sel      = if useDecompose then Just selAny else Nothing
 
     mxs 0 = mx 1 0

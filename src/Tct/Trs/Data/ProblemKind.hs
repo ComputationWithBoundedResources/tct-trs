@@ -1,5 +1,5 @@
 -- | This module provides flags for the problem type.
-module Tct.Trs.Data.ProblemKind 
+module Tct.Trs.Data.ProblemKind
   (
     StartTerms (..)
   , isStartTerm

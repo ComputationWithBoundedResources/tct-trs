@@ -1,21 +1,49 @@
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports -fno-warn-missing-signatures #-}
+
 module Main (main) where
 
-import Tct.Trs.Config
-import Tct.Trs.Interactive
+import Tct.Core
+import Tct.Core.Interactive
 
-import qualified Tct.Core.Data as T
-import Tct.Trs.Data
-import Tct.Core.Data.Types (Declared (..))
-import Tct.Trs.Declarations
+import Tct.Trs
+import Tct.Trs.Processor.Matrix.MI (eda')
 
-instance Declared TrsProblem TrsProblem where
-  decls = T.SD mystrat : trsDeclarations
-
-mystrat :: T.Declaration ('[] T.:-> T.Strategy prob prob)
-mystrat = T.strategy "xxx" () T.abort
+instance Declared Trs Trs where decls = ds
 
 
 main :: IO ()
-main = trs trsConfig
-  -- `setSolver` ("z3",[])
+main = runTrs trsConfig -- `setSolver` ("z3",[])
+
+ds =
+  trsDeclarations ++
+  [ SD $ strategy "Cpolys"    args $ over pxs
+  , SD $ strategy "Cmatrices" args $ over mxs
+  , SD $ strategy "Cints"     args $ over ixs
+  , SD $ strategy "Cara" () $ ara' NoHeuristics Nothing 1 3 60
+  ]
+
+args = (degreeArg `optional` 1, degreeArg `optional` 3)
+
+px sha     = poly'   sha      NoRestrict UArgs URules Nothing
+mx dim deg = matrix' dim deg  Algebraic  UArgs URules Nothing
+
+
+-- MS: apply EDA alternatively
+mxs 0 = mx 1 0
+mxs 1 = mx 1 1 .<||> mx 2 1
+mxs n = mx n n .<||> eda' n
+
+-- MS: there was a bug in PI that restricted constants of constructors to 1
+pxs 0 = px (Mixed 0)
+pxs 1 = px StronglyLinear .<||> px Linear
+pxs 2 = px Quadratic      .<||> px (Mixed 2)
+pxs n = px (Mixed n)
+
+ixs 0 = mxs 0
+ixs 1 = mxs 1 .<||> px StronglyLinear
+ixs 2 = mxs 2 .<||> pxs 2
+ixs 3 = mxs 3 .<||> pxs 3
+ixs n = mxs n
+
+over f lb ub = fastest [ wait (max 0 (pred n)) (f n) | n <- [lb..ub] ]
+
