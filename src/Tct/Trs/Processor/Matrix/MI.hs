@@ -1,13 +1,24 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Tct.Trs.Processor.Matrix.MI
   (
-  jordan'
+  MI (..)
+  , Kind (..)
+  , MaximalMatrix (..)
+  , TriangularBound (..)
+  , jordan'
   , binaryJordan'
   , triangular'
   , almostTriangular'
   , algebraic'
+  , catDirectImplicit'
+  , sturm'
+  , subresultantPRS'
+  , budan'
   , eda'
   , ida'
+  , mxeda
+  , mxida
   ) where
 
 import qualified Data.Foldable                   as F (toList)
@@ -16,13 +27,13 @@ import qualified Data.List                       as L (partition, transpose)
 import qualified Data.Map                        as M
 import qualified Data.Set                        as S
 import qualified Data.Vector                     as V
+import qualified Data.Graph                      as G
 
 import           SLogic.Logic.Matrix             (Matrix)
 import qualified SLogic.Logic.Matrix             as Mat
-import           SLogic.Smt                      ((.&&), (.*), (.+), (.<=), (.<=>), (.==), (.=>), (.>), (.>=))
+import           SLogic.Smt                      ((.&&), (.*), (.+), (.<), (.<=), (.<=>), (.==), (.=>), (.>), (.>=))
 import qualified SLogic.Smt                      as Smt
 
-import           Tct.Core.Common.Error           (throwError)
 import qualified Tct.Core.Common.Pretty          as PP
 import qualified Tct.Core.Common.SemiRing        as SR
 import qualified Tct.Core.Common.Xml             as Xml
@@ -41,10 +52,12 @@ import qualified Tct.Trs.Data.Arguments          as Arg
 import qualified Tct.Trs.Data.Problem            as Prob
 import           Tct.Trs.Data.ProblemKind        (StartTerms (..))
 import qualified Tct.Trs.Data.Rules              as RS
+import qualified Tct.Trs.Data.RuleSelector       as RS
 import qualified Tct.Trs.Data.Signature          as Sig
 import           Tct.Trs.Encoding.Interpretation (Interpretation)
 import qualified Tct.Trs.Encoding.Interpretation as I
 import qualified Tct.Trs.Encoding.UsableRules    as UREnc
+
 
 data MI = MI
   { miKind      :: Kind
@@ -54,7 +67,7 @@ data MI = MI
   , miSelector  :: Maybe (ExpressionSelector F V)
   } deriving (Show)
 
--- |
+
 data Kind
   = MaximalMatrix MaximalMatrix -- ^ use maximal matrices
   | Automaton (Maybe Int)       -- ^ use automaton
@@ -63,12 +76,16 @@ data Kind
 
 -- | shape restrictions for maximum matrix
 data MaximalMatrix
-  = UpperTriangular TriangularBound          -- ^ restrict to triangular maximal matrices
-  | LowerTriangular TriangularBound          -- ^ restrict to triangular maximal matrices
-  | AlmostTriangular Int -- ^ restrict to almost triangular maximal matrices, ie if mat^k is triangular for some k
-  | LikeJordan           -- ^ restrict to maximal matrices which are similar to JNF
-  | LikeBinaryJordan           -- ^ restrict to maximal matrices which are similar to JNF
-  | MaxAutomaton
+  = UpperTriangular TriangularBound -- ^ restrict to upper triangular maximal matrices
+  | LowerTriangular TriangularBound -- ^ restrict to lower triangular maximal matrices
+  | AlmostTriangular Int            -- ^ restrict to almost triangular maximal matrices, ie if mat^k is triangular for some k
+  | CaTDirectImplicit               -- ^ use constraints also implemented in the tool CaT
+  | Sturm                           -- ^ use constraints derived from Sturm's Theorem
+  | SubresultantPRS                 -- ^ use constraints derived from Subresultant PRS algorithm
+  | Budan                           -- ^ use (incomplete) constraints derived from Budan-Fourier theorem
+  | LikeJordan                      -- ^ restrict to maximal matrices which are similar to JNF
+  | LikeBinaryJordan                -- ^ restrict to maximal matrices which are similar to JNF; entries are restricted to 0,1
+  | MaxAutomaton (Maybe Int)        -- ^ use EDA/IDA on maximal matrix
   deriving (Show)
 
 data TriangularBound
@@ -123,6 +140,10 @@ interpret' dim (I.Interpretation ebsi) = I.interpretTerm interpretFun interpretV
 -- | Returns coefficient matrices M1,...,Mn of a matrix interpretation
 matrices :: Interpretation f (LinearInterpretation v k) -> [Matrix k]
 matrices (I.Interpretation m) = concatMap (M.elems . coefficients) $ M.elems m
+
+-- | Returns the maximal matrix of a matrix interpretation.
+maximalMatrix' :: Dim -> Interpretation f (LinearInterpretation v Int) -> Matrix Int
+maximalMatrix' dim mi = foldr (Mat.elementwise max) (Mat.zeros dim dim) (matrices mi)
 
 -- | Returns the maximal (non Id) matrix of a matrix interpretation.
 maxmimalNonIdMatrix :: Dim -> Interpretation f (LinearInterpretation v Int) -> Matrix Int
@@ -189,8 +210,12 @@ abstractInterpretation st dim kind sig = case kind of
   MaximalMatrix (LowerTriangular _)  -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absLTriMatrix) restricted
   MaximalMatrix (AlmostTriangular _) -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absMaxMatrix) restricted
   MaximalMatrix LikeJordan           -> M.map (mk absStdMatrix) masse
-  MaximalMatrix LikeBinaryJordan           -> M.map (mk absBinaryStdMatrix) masse
-  MaximalMatrix MaxAutomaton         -> M.map (mk absEdaMatrix) masse
+  MaximalMatrix LikeBinaryJordan     -> M.map (mk absBinaryStdMatrix) masse
+  MaximalMatrix CaTDirectImplicit    -> M.map (mk absStdMatrix) masse
+  MaximalMatrix Sturm                -> M.map (mk absStdMatrix) masse
+  MaximalMatrix SubresultantPRS      -> M.map (mk absStdMatrix) masse
+  MaximalMatrix Budan                -> M.map (mk absStdMatrix) masse
+  MaximalMatrix (MaxAutomaton _)     -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absEdaMatrix) restricted
 
   Unrestricted                       -> M.map (mk absStdMatrix) masse
   Automaton _                        -> M.map (mk absStdMatrix) notrestricted `M.union` M.map (mk absEdaMatrix) restricted
@@ -311,6 +336,555 @@ diagNonZerosConstraint dim deg inter = Smt.assert $
 -- traceConstraint :: Int -> Matrix IExpr -> Formula
 -- traceConstraint deg m =  Smt.num deg .>= Smt.bigAdd (Mat.getDiagonal m)
 
+-- | constraints based on
+-- |   Revisiting Matrix Interpretations for Polynomial Derivational Complexity of Term Rewriting [Neurauter, Zankl, Middeldorp],
+-- |   methods (A) and (B)
+-- | corresponds to CaT strategies "direct" and "implicit"; supports dimensions 2 and 3
+catDirectImplicitConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+catDirectImplicitConstraint m =
+  let dim = Mat.nrows m
+  in case dim of
+       1 ->
+         Smt.assert (Mat.getEntry (1, 1) m .<= Smt.IVal 1) >> return (MMatrix m)
+       2 -> Smt.assert direct >> return (MMatrix m)
+         where direct -- "CaT direct": Revisiting Matrix Interpretations for Polynomial Derivational Complexity of Term Rewriting [Neurauter, Zankl, Middeldorp] (A)
+                =
+                 Smt.bigAnd
+                   [ Smt.bigAdd
+                       [ Smt.IVal 2
+                       , Smt.INeg (Mat.getEntry (1, 1) m)
+                       , Smt.INeg (Mat.getEntry (2, 2) m)
+                       ] .>=
+                     Smt.IVal 0
+                   , Smt.bigAdd
+                       [ Smt.IMul
+                           (Mat.getEntry (1, 1) m)
+                           (Mat.getEntry (2, 2) m)
+                       , Smt.INeg
+                           (Smt.IMul
+                              (Mat.getEntry (1, 2) m)
+                              (Mat.getEntry (2, 1) m))
+                       , Smt.INeg (Mat.getEntry (1, 1) m)
+                       , Smt.INeg (Mat.getEntry (2, 2) m)
+                       , Smt.IVal 1
+                       ] .>=
+                     Smt.IVal 0
+                   ]
+       3 -> Smt.assert implicit >> return (MMatrix m)
+         where p =
+                 Smt.bigAdd
+                   [ Mat.getEntry (1, 1) m
+                   , Mat.getEntry (2, 2) m
+                   , Mat.getEntry (3, 3) m
+                   ]
+               q =
+                 Smt.bigAdd
+                   [ Smt.IMul (Mat.getEntry (1, 2) m) (Mat.getEntry (2, 1) m)
+                   , Smt.IMul (Mat.getEntry (1, 3) m) (Mat.getEntry (3, 1) m)
+                   , Smt.IMul (Mat.getEntry (2, 3) m) (Mat.getEntry (3, 2) m)
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (2, 2) m))
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (3, 3) m))
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (2, 2) m) (Mat.getEntry (3, 3) m))
+                   ]
+               r =
+                 Smt.bigAdd
+                   [ Smt.bigMul
+                       [ Mat.getEntry (1, 1) m
+                       , Mat.getEntry (2, 2) m
+                       , Mat.getEntry (3, 3) m
+                       ]
+                   , Smt.bigMul
+                       [ Mat.getEntry (1, 2) m
+                       , Mat.getEntry (2, 3) m
+                       , Mat.getEntry (3, 1) m
+                       ]
+                   , Smt.bigMul
+                       [ Mat.getEntry (1, 3) m
+                       , Mat.getEntry (2, 1) m
+                       , Mat.getEntry (3, 2) m
+                       ]
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 3) m
+                          , Mat.getEntry (2, 2) m
+                          , Mat.getEntry (3, 1) m
+                          ])
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 2) m
+                          , Mat.getEntry (2, 1) m
+                          , Mat.getEntry (3, 3) m
+                          ])
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 1) m
+                          , Mat.getEntry (2, 3) m
+                          , Mat.getEntry (3, 2) m
+                          ])
+                   ]
+               discriminant =
+                 Smt.bigAdd
+                   [ Smt.bigMul [p, p, q, q]
+                   , Smt.INeg (Smt.bigMul [Smt.IVal 4, q, q, q])
+                   , Smt.INeg (Smt.bigMul [Smt.IVal 4, p, p, p, r])
+                   , Smt.INeg (Smt.bigMul [Smt.IVal 27, r, r])
+                   , Smt.bigMul [Smt.IVal 18, p, q, r]
+                   ]
+               chiAtOne = Smt.bigAdd [Smt.INeg (Smt.IVal 1), p, q, r]
+               chiAtMinusOne = Smt.bigAdd [Smt.IVal 1, p, Smt.INeg q, r]
+               chiPrimeGeqZero =
+                 Smt.Or
+                   (Smt.IAdd (Smt.IMul p p) (Smt.INeg (Smt.IMul (Smt.IVal 3) q)) .<=
+                    Smt.IVal 0)
+                   (Smt.bigAnd
+                      [ Smt.INeg (Smt.IVal 3) .<= p
+                      , p .<= Smt.IVal 3
+                      , Smt.INeg (Smt.IAdd q (Smt.IVal 3)) .<=
+                        Smt.IMul (Smt.IVal 2) p
+                      , Smt.IMul (Smt.IVal 2) p .<= Smt.IAdd q (Smt.IVal 3)
+                      ])
+               implicit -- "CaT implicit": Revisiting Matrix Interpretations for Polynomial Derivational Complexity of Term Rewriting [Neurauter, Zankl, Middeldorp] (B)
+                =
+                 Smt.Or
+                   (Smt.bigAnd
+                      [ discriminant .< Smt.IVal 0
+                      , chiAtMinusOne .<= Smt.IVal 0
+                      , chiAtOne .>= Smt.IVal 0
+                      ])
+                   (Smt.bigAnd
+                      [ chiAtMinusOne .<= Smt.IVal 0
+                      , chiAtOne .>= Smt.IVal 0
+                      , chiPrimeGeqZero
+                      ])
+       _ -> error "dimension not supported" -- TODO: use factor method (C)
+
+-- | constraints based on Sturm's Theorem; supports dimensions 2 and 3
+sturmConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+sturmConstraint m =
+  let dim = Mat.nrows m
+  in case dim of
+       1 ->
+         Smt.assert (Mat.getEntry (1, 1) m .<= Smt.IVal 1) >> return (MMatrix m)
+       2 -> Smt.assert sturm2D >> return (MMatrix m)
+         where sturm2D =
+                 Smt.bigAnd
+                   [ Smt.bigAdd
+                       [ Smt.IVal 1
+                       , Smt.INeg (Mat.getEntry (1, 1) m)
+                       , Smt.INeg (Mat.getEntry (2, 2) m)
+                       , Smt.IMul
+                           (Mat.getEntry (1, 1) m)
+                           (Mat.getEntry (2, 2) m)
+                       , Smt.INeg
+                           (Smt.IMul
+                              (Mat.getEntry (1, 2) m)
+                              (Mat.getEntry (2, 1) m))
+                       ] .>=
+                     Smt.IVal 0
+                   , Smt.bigAdd
+                       [ Smt.IVal 2
+                       , Smt.INeg (Mat.getEntry (1, 1) m)
+                       , Smt.INeg (Mat.getEntry (2, 2) m)
+                       ] .>=
+                     Smt.IVal 0
+                   ]
+       3 -> Smt.assert sturm3D >> return (MMatrix m)
+         where p =
+                 Smt.bigAdd
+                   [ Mat.getEntry (1, 1) m
+                   , Mat.getEntry (2, 2) m
+                   , Mat.getEntry (3, 3) m
+                   ]
+               q =
+                 Smt.bigAdd
+                   [ Smt.IMul (Mat.getEntry (1, 2) m) (Mat.getEntry (2, 1) m)
+                   , Smt.IMul (Mat.getEntry (1, 3) m) (Mat.getEntry (3, 1) m)
+                   , Smt.IMul (Mat.getEntry (2, 3) m) (Mat.getEntry (3, 2) m)
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (2, 2) m))
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (3, 3) m))
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (2, 2) m) (Mat.getEntry (3, 3) m))
+                   ]
+               r =
+                 Smt.bigAdd
+                   [ Smt.bigMul
+                       [ Mat.getEntry (1, 1) m
+                       , Mat.getEntry (2, 2) m
+                       , Mat.getEntry (3, 3) m
+                       ]
+                   , Smt.bigMul
+                       [ Mat.getEntry (1, 2) m
+                       , Mat.getEntry (2, 3) m
+                       , Mat.getEntry (3, 1) m
+                       ]
+                   , Smt.bigMul
+                       [ Mat.getEntry (1, 3) m
+                       , Mat.getEntry (2, 1) m
+                       , Mat.getEntry (3, 2) m
+                       ]
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 3) m
+                          , Mat.getEntry (2, 2) m
+                          , Mat.getEntry (3, 1) m
+                          ])
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 2) m
+                          , Mat.getEntry (2, 1) m
+                          , Mat.getEntry (3, 3) m
+                          ])
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 1) m
+                          , Mat.getEntry (2, 3) m
+                          , Mat.getEntry (3, 2) m
+                          ])
+                   ]
+               z = Smt.IVal 0
+               i = Smt.bigAdd [p, q, r, Smt.INeg (Smt.IVal 1)]
+               ii =
+                 Smt.bigAdd [Smt.IMul (Smt.IVal 2) p, q, Smt.INeg (Smt.IVal 3)]
+               iii =
+                 Smt.bigAdd
+                   [ Smt.INeg (Smt.bigMul [Smt.IVal 2, p, p])
+                   , Smt.INeg (Smt.IMul (Smt.IVal 6) q)
+                   , Smt.INeg (Smt.IMul p q)
+                   , Smt.INeg (Smt.IMul (Smt.IVal 9) r)
+                   ]
+               iv = Smt.IAdd (Smt.INeg (Smt.IMul p p)) (Smt.INeg (Smt.IMul (Smt.IVal 3) q))
+               -- TODO: one disjunct is missing as we can't (or can we?) have fractions in our SMT encoding
+               sturm3D =
+                 Smt.bigOr
+                   [ Smt.bigAnd [i .< z, ii .<= z, iii .<= z, iv .<= z]
+                   , Smt.bigAnd [i .< z, ii .<= z, iii .> z, iv .> z]
+                   , Smt.bigAnd [i .< z, ii .> z, iii .>= z, iv .> z]
+                   , Smt.bigAnd [i .== z, ii .< z, iii .<= z, iv .<= z]
+                   , Smt.bigAnd [i .== z, ii .< z, iii .> z, iv .> z]
+                   --, Smt.bigAnd [i .== z, ii .== z, iii .< z, iv .<= z] --this disjunct would need a squarefree factorization because i = f(1) = 0 and ii = f'(1) = 0
+                   --constraints where v is involved are missing
+                   ]
+       _ -> error "dimension not supported"
+
+-- | constraints based on the Subresultant PRS algorithm; supports dimensions 2 and 3
+subresultantPRSConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+subresultantPRSConstraint m =
+ let dim = Mat.nrows m
+ in case dim of
+      1 -> Smt.assert (Mat.getEntry (1, 1) m .<= Smt.IVal 1) >> return (MMatrix m)
+      2 -> Smt.assert subresultant2D >> return (MMatrix m) -- the subresultant algorithm constraint has additional disjuncts for the 2D case
+        where subresultant2D =
+                Smt.bigOr
+                  [ Smt.bigAnd
+                    [ Smt.bigAdd
+                        [ Smt.IVal 1
+                        , Smt.INeg (Mat.getEntry (1, 1) m)
+                        , Smt.INeg (Mat.getEntry (2, 2) m)
+                        , Smt.IMul
+                            (Mat.getEntry (1, 1) m)
+                            (Mat.getEntry (2, 2) m)
+                        , Smt.INeg
+                            (Smt.IMul
+                               (Mat.getEntry (1, 2) m)
+                               (Mat.getEntry (2, 1) m))
+                        ] .>=
+                      Smt.IVal 0
+                    , Smt.bigAdd
+                        [ Smt.IVal 2
+                        , Smt.INeg (Mat.getEntry (1, 1) m)
+                        , Smt.INeg (Mat.getEntry (2, 2) m)
+                        ] .>=
+                      Smt.IVal 0
+                    ]
+                  , Smt.bigAnd
+                      [ Smt.bigAdd
+                          [ Smt.IMul
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                          , Smt.bigMul
+                              [ Smt.IVal 4
+                              , Mat.getEntry (1, 2) m
+                              , Mat.getEntry (2, 1) m
+                              ]
+                          ] .<
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IMul
+                              (Mat.getEntry (1, 1) m)
+                              (Mat.getEntry (2, 2) m)
+                          , Smt.INeg
+                              (Smt.IMul
+                                 (Mat.getEntry (1, 2) m)
+                                 (Mat.getEntry (2, 1) m))
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          , Smt.IVal 1
+                          ] .>
+                        Smt.IVal 0
+                      ]
+                  , Smt.bigAnd
+                      [ Smt.bigAdd
+                          [ Smt.IMul
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                          , Smt.bigMul
+                              [ Smt.IVal 4
+                              , Mat.getEntry (1, 2) m
+                              , Mat.getEntry (2, 1) m
+                              ]
+                          ] .==
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IVal 2
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          ] .<
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IMul
+                              (Mat.getEntry (1, 1) m)
+                              (Mat.getEntry (2, 2) m)
+                          , Smt.INeg
+                              (Smt.IMul
+                                 (Mat.getEntry (1, 2) m)
+                                 (Mat.getEntry (2, 1) m))
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          , Smt.IVal 1
+                          ] .==
+                        Smt.IVal 0
+                      ]
+                  , Smt.bigAnd
+                      [ Smt.bigAdd
+                          [ Smt.IMul
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                              (Smt.IAdd
+                                 (Mat.getEntry (1, 1) m)
+                                 (Smt.INeg (Mat.getEntry (2, 2) m)))
+                          , Smt.bigMul
+                              [ Smt.IVal 4
+                              , Mat.getEntry (1, 2) m
+                              , Mat.getEntry (2, 1) m
+                              ]
+                          ] .==
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IVal 2
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          ] .<=
+                        Smt.IVal 0
+                      , Smt.bigAdd
+                          [ Smt.IMul
+                              (Mat.getEntry (1, 1) m)
+                              (Mat.getEntry (2, 2) m)
+                          , Smt.INeg
+                              (Smt.IMul
+                                 (Mat.getEntry (1, 2) m)
+                                 (Mat.getEntry (2, 1) m))
+                          , Smt.INeg (Mat.getEntry (1, 1) m)
+                          , Smt.INeg (Mat.getEntry (2, 2) m)
+                          , Smt.IVal 1
+                          ] .<
+                        Smt.IVal 0
+                      ]
+                  ]
+      3 -> Smt.assert subresultant3D >> return (MMatrix m)
+        where p =
+                Smt.bigAdd
+                  [ Mat.getEntry (1, 1) m
+                  , Mat.getEntry (2, 2) m
+                  , Mat.getEntry (3, 3) m
+                  ]
+              q =
+                Smt.bigAdd
+                  [ Smt.IMul (Mat.getEntry (1, 2) m) (Mat.getEntry (2, 1) m)
+                  , Smt.IMul (Mat.getEntry (1, 3) m) (Mat.getEntry (3, 1) m)
+                  , Smt.IMul (Mat.getEntry (2, 3) m) (Mat.getEntry (3, 2) m)
+                  , Smt.INeg
+                      (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (2, 2) m))
+                  , Smt.INeg
+                      (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (3, 3) m))
+                  , Smt.INeg
+                      (Smt.IMul (Mat.getEntry (2, 2) m) (Mat.getEntry (3, 3) m))
+                  ]
+              r =
+                Smt.bigAdd
+                  [ Smt.bigMul
+                      [ Mat.getEntry (1, 1) m
+                      , Mat.getEntry (2, 2) m
+                      , Mat.getEntry (3, 3) m
+                      ]
+                  , Smt.bigMul
+                      [ Mat.getEntry (1, 2) m
+                      , Mat.getEntry (2, 3) m
+                      , Mat.getEntry (3, 1) m
+                      ]
+                  , Smt.bigMul
+                      [ Mat.getEntry (1, 3) m
+                      , Mat.getEntry (2, 1) m
+                      , Mat.getEntry (3, 2) m
+                      ]
+                  , Smt.INeg
+                      (Smt.bigMul
+                         [ Mat.getEntry (1, 3) m
+                         , Mat.getEntry (2, 2) m
+                         , Mat.getEntry (3, 1) m
+                         ])
+                  , Smt.INeg
+                      (Smt.bigMul
+                         [ Mat.getEntry (1, 2) m
+                         , Mat.getEntry (2, 1) m
+                         , Mat.getEntry (3, 3) m
+                         ])
+                  , Smt.INeg
+                      (Smt.bigMul
+                         [ Mat.getEntry (1, 1) m
+                         , Mat.getEntry (2, 3) m
+                         , Mat.getEntry (3, 2) m
+                         ])
+                  ]
+              z = Smt.IVal 0
+              e =
+                Smt.bigAdd
+                  [ Smt.bigMul [Smt.IVal 3, p, q]
+                  , Smt.IMul (Smt.IVal 6) p
+                  , Smt.IMul (Smt.IVal 8) q
+                  , Smt.INeg (Smt.IMul (Smt.IVal 9) r)
+                  , Smt.INeg (Smt.IVal 4)
+                  ]
+              f =
+                Smt.bigAdd
+                  [ Smt.INeg (Smt.bigMul [Smt.IVal 3, p, p, q, q])
+                  , Smt.bigMul [Smt.IVal 8, p, q, q]
+                  , Smt.bigMul [Smt.IVal 18, p, q, r]
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 12, p, r])
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 4, q, q, q])
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 4, q, q])
+                  , Smt.INeg (Smt.bigMul [Smt.IVal 27, r, r])
+                  , Smt.IMul (Smt.IVal 8) r
+                  ]
+              i = Smt.bigAdd [p, q, r, Smt.IVal 1]
+              ii =
+                Smt.bigAdd [Smt.IMul (Smt.IVal 2) p, q, Smt.INeg (Smt.IVal 3)]
+              iii =
+                Smt.bigAdd
+                  [ Smt.IMul (Smt.IVal 6) p
+                  , Smt.INeg (Smt.IMul (Smt.IVal 6) q)
+                  , Smt.INeg (Smt.IVal 4)
+                  ]
+              subresultant3D =
+                Smt.bigOr
+                  [ Smt.bigAnd [i .== z, ii .< z, e .> z, iii .< z, f .== z]
+                  , Smt.bigAnd [i .> z, ii .< z, e .> z, iii .< z, f .> z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .== z, iii .< z, f .> z]
+                  , Smt.bigAnd [i .< z, ii .<= z, e .<= z, iii .>= z, f .== z]
+                  , Smt.bigAnd [i .< z, e .> z, iii .< z, f .== z]
+                  , Smt.bigAnd [i .< z, ii .> z, e .== z, iii .< z, f .== z]
+                  , Smt.bigAnd [i .== z, ii .< z, e .<= z, iii .>= z, f .== z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .< z, iii .>= z, f .== z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .> z, iii .<= z, f .< z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .> z, iii .> z]
+                  , Smt.bigAnd [i .== z, ii .== z, e .>= z, iii .>= z, f .>= z]
+                  , Smt.bigAnd [i .== z, ii .> z, e .< z, iii .< z]
+                  , Smt.bigAnd [i .== z, ii .> z, e .< z, f .< z]
+                  , Smt.bigAnd [i .>= z, ii .> z, e .>= z, iii .>= z]
+                  , Smt.bigAnd [i .== z, ii .> z, e .>= z, iii .< z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .< z, e .<= z, iii .>= z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .< z, iii .>= z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .== z, iii .>= z, f .<= z]
+                  , Smt.bigAnd [i .> z, ii .== z, e .> z, iii .>= z]
+                  , Smt.bigAnd [i .> z, ii .> z, e .< z, iii .>= z, f .< z]
+                  , Smt.bigAnd [i .> z, ii .< z, e .== z, iii .< z]
+                  , Smt.bigAnd [i .> z, e .< z, iii .< z]
+                  ]
+      _ -> error "dimension not supported"
+
+-- | constraints based on Budan-Fourier theorem; these constraints are for dimension 3 but can easily be extended to other dimensions
+budanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+budanConstraint m =
+  let dim = Mat.nrows m
+  in case dim of
+       3 -> Smt.assert noRootsGreaterOne >> return (MMatrix m)
+         where p =
+                 Smt.bigAdd
+                   [ Mat.getEntry (1, 1) m
+                   , Mat.getEntry (2, 2) m
+                   , Mat.getEntry (3, 3) m
+                   ]
+               q =
+                 Smt.bigAdd
+                   [ Smt.IMul (Mat.getEntry (1, 2) m) (Mat.getEntry (2, 1) m)
+                   , Smt.IMul (Mat.getEntry (1, 3) m) (Mat.getEntry (3, 1) m)
+                   , Smt.IMul (Mat.getEntry (2, 3) m) (Mat.getEntry (3, 2) m)
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (2, 2) m))
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (1, 1) m) (Mat.getEntry (3, 3) m))
+                   , Smt.INeg
+                       (Smt.IMul (Mat.getEntry (2, 2) m) (Mat.getEntry (3, 3) m))
+                   ]
+               r =
+                 Smt.bigAdd
+                   [ Smt.bigMul
+                       [ Mat.getEntry (1, 1) m
+                       , Mat.getEntry (2, 2) m
+                       , Mat.getEntry (3, 3) m
+                       ]
+                   , Smt.bigMul
+                       [ Mat.getEntry (1, 2) m
+                       , Mat.getEntry (2, 3) m
+                       , Mat.getEntry (3, 1) m
+                       ]
+                   , Smt.bigMul
+                       [ Mat.getEntry (1, 3) m
+                       , Mat.getEntry (2, 1) m
+                       , Mat.getEntry (3, 2) m
+                       ]
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 3) m
+                          , Mat.getEntry (2, 2) m
+                          , Mat.getEntry (3, 1) m
+                          ])
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 2) m
+                          , Mat.getEntry (2, 1) m
+                          , Mat.getEntry (3, 3) m
+                          ])
+                   , Smt.INeg
+                       (Smt.bigMul
+                          [ Mat.getEntry (1, 1) m
+                          , Mat.getEntry (2, 3) m
+                          , Mat.getEntry (3, 2) m
+                          ])
+                   ]
+               noRootsGreaterOne =
+                 Smt.bigAnd
+                   [ Smt.IAdd p (Smt.INeg $ Smt.IVal 3) .<= Smt.IVal 0
+                   , Smt.bigAdd
+                       [Smt.IMul (Smt.IVal 2) p, q, Smt.INeg $ Smt.IVal 3] .<=
+                     Smt.IVal 0
+                   , Smt.bigAdd [p, q, r, Smt.INeg $ Smt.IVal 1] .<= Smt.IVal 0
+                   ]
+       _ -> error "dimension not supported"
+
 -- maximalMatrix :: (Smt.AAdditive a, Smt.Order a, Smt.Ite a, Smt.Boolean (Smt.B a)) => Int -> Interpretation f (LinearInterpretation v a) -> Matrix a
 maximalMatrix :: Int -> Interpretation f (LinearInterpretation v IExpr) -> Matrix IExpr
 maximalMatrix dim li = case matrices li of
@@ -339,13 +913,11 @@ almostTriangularConstraint :: Int -> Matrix IExpr -> SmtM (KindMatrices IExpr)
 almostTriangularConstraint pot m = Smt.assert (Smt.bany triangularConstraint mxs) >> return (AlmostTriangularMatrices mxs)
   where mxs = take (max 1 pot) (iterate (.*m) m)
 
--- almostTriangularConstraint' :: Int -> Int -> Matrix IExpr -> SmtM ()
--- almostTriangularConstraint' pot deg m = Smt.assert $ Smt.bany (\mx -> triangularConstraint mx .&& traceConstraint deg mx) $ take (max 1 pot) (iterate (.*m) m)
-
 -- | For a given maximal matrix finds a similar matrix in Jordan Normal Form. That is find P,J such that M = PJP-, J
 -- in JNF and PP- = I.
-likeJordanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
-likeJordanConstraint m = do
+-- When we restrict to natural numbers then P,P- are permutation matrices; hence we can restrict to 0,1 entries.
+likeJordanConstraint' :: SmtM IExpr -> Matrix IExpr -> SmtM (KindMatrices IExpr)
+likeJordanConstraint' varM m = do
   p <- someMatrix
   q <- someMatrix
   j <- someJordanMatrix
@@ -361,36 +933,21 @@ likeJordanConstraint m = do
           | i == j      = Smt.snvarM'
           | succ i == j = Smt.snvarM'
           | otherwise   = return Smt.zero
-    someMatrix = sequenceA $ Mat.fromList dim dim (repeat Smt.ivarM')
+    someMatrix = sequenceA $ Mat.fromList dim dim (repeat varM)
     m1 .==. m2 = Smt.bigAnd $ Mat.elementwise (.==) m1 m2
     idm = Mat.matrix dim dim $ \(i,j) -> if i == j then Smt.one else Smt.zero
     dim = Mat.nrows m
 
+likeJordanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
+likeJordanConstraint = likeJordanConstraint' Smt.nvarM'
+
+-- like 'likeJordanConstraint' but restricted to 0,1 entries
 likeBinaryJordanConstraint :: Matrix IExpr -> SmtM (KindMatrices IExpr)
-likeBinaryJordanConstraint m = do
-  p <- someMatrix
-  q <- someMatrix
-  j <- someJordanMatrix
-  Smt.assert $ (p.*q)    .==. idm
-  Smt.assert $ (p.*m.*q) .==. j
-  return $ LikeJordanMatrices (p,m,q,j)
-  where
-    someJordanMatrix  = someJordanMatrixM >>= \mx -> Smt.assert (Smt.bigAnd [ block (mx Mat.!.) i | i <- [1..pred dim] ]) >> return mx
-      where
-        block mx i = let j = succ i in mx (i,j) .== Smt.one .=> mx (i,i) .== mx (j,j)
-        someJordanMatrixM = sequenceA $ Mat.matrix dim dim k
-        k (i,j)
-          | i == j      = Smt.snvarM'
-          | succ i == j = Smt.snvarM'
-          | otherwise   = return Smt.zero
-    someMatrix = sequenceA $ Mat.fromList dim dim (repeat Smt.snvarM')
-    m1 .==. m2 = Smt.bigAnd $ Mat.elementwise (.==) m1 m2
-    idm = Mat.matrix dim dim $ \(i,j) -> if i == j then Smt.one else Smt.zero
-    dim = Mat.nrows m
+likeBinaryJordanConstraint = likeJordanConstraint' Smt.snvarM'
 
 -- | Kind related matrices for proof output.
-data KindMatrices a =
-  NoMatrix
+data KindMatrices a
+  = NoMatrix
   | MMatrix (Matrix a)
   | AlmostTriangularMatrices [Matrix a]
   | LikeJordanMatrices (Matrix a, Matrix a, Matrix a, Matrix a)
@@ -417,8 +974,12 @@ kindConstraints st dim kind inter = case kind of
 
   MaximalMatrix (AlmostTriangular pot)                      -> mm >>= almostTriangularConstraint pot
   MaximalMatrix LikeJordan                                  -> mm >>= likeJordanConstraint
-  MaximalMatrix LikeBinaryJordan                                  -> mm >>= likeBinaryJordanConstraint
-  MaximalMatrix MaxAutomaton                                -> mm >>= \mx -> automatonConstraints st dim Nothing inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
+  MaximalMatrix LikeBinaryJordan                            -> mm >>= likeBinaryJordanConstraint
+  MaximalMatrix CaTDirectImplicit                           -> mm >>= catDirectImplicitConstraint >> return NoMatrix
+  MaximalMatrix Sturm                                       -> mm >>= sturmConstraint >> return NoMatrix
+  MaximalMatrix SubresultantPRS                             -> mm >>= subresultantPRSConstraint >> return NoMatrix
+  MaximalMatrix Budan                                       -> mm >>= budanConstraint >> return NoMatrix
+  MaximalMatrix (MaxAutomaton mDeg)                         -> mm >>= \mx -> automatonConstraints st dim Nothing inter (Just mx) >> return (MMatrix mx) -- TODO: provide special instances
 
   Automaton mDeg                                            -> automatonConstraints st dim mDeg inter Nothing >> return NoMatrix
   Unrestricted                                              -> return NoMatrix
@@ -504,6 +1065,7 @@ automatonConstraints st dim mDeg mi@(I.Interpretation m) mM = do
         jrel i j     = jrelV V.! ix2 (i,j)
         hrel i j     = hrelV V.! ix2 (i,j)
 
+      -- FIXME: consider invoking Automaton (Just 0)
       idaConstraints qs mxs (max deg 1) gOne gThree trel irel jrel hrel
 
   where
@@ -706,23 +1268,90 @@ certification st mi order cert = case cert of
 countNonZeros :: Num c => Matrix c -> c
 countNonZeros = sum . fmap signum . F.toList . Mat.getDiagonal
 
+
+-- computes the degree of an automaton
+-- cf. A. Weber and H. Seidl, On the degree of ambiguity of finite automata
+--
+-- For deg(M) = d, we have bound O(n^{d+1}).
+--
+-- * assumes not(EDA) or equivalently polynomial growth product matrix components
+-- * does not trim the automaton
+-- * returns O(n) if all matrices are zero-marices
+-- * for maximalautomaton should be certifiable
+--
+-- TODO: test against CeTA and EDA/IDA
+degM :: [Q] -> [Matrix Int] -> T.Complexity
+degM [] _   = T.Poly (Just 0)
+degM _  []  = T.Poly (Just 0)
+degM q1 mxs = T.Poly $ Just $ succ $ maximum $ 0:[ height qi q5 | qi <- q5 ]
+  where
+
+  a .~ b = \m -> Mat.entry a b m > 0
+  edges qs k     = [ (p, p, succs) | p <- qs, let succs = [ q | q <- qs, k p q ] ]
+  fromEdges qs k = G.graphFromEdges $ edges qs k
+
+  -- G1
+  -- graph of the automaton
+  (g1,_,v1) = G.graphFromEdges e1
+  e1 = edges q1 to
+    where to p q = any ( p .~ q ) mxs
+  p `hasEdge1` q = ((\a b -> (a,b) `elem` G.edges g1) <$> v1 p <*> v1 q) == Just True
+
+  -- G3
+  -- graph of the triple product automaton
+  q3 = [ (i,j,k) | i <- q1, j <- q1, k <- q1 ]
+  (g3,_,v3) = fromEdges q3 to
+    where to (i,j,k) (x,y,z) = any (\m -> (i .~ x) m && (j .~ y) m && (k .~ z) m) mxs
+  p `hasPath3` q = (G.path g3 <$> v3 p <*> v3 q) == Just True
+
+  -- G5
+  -- SCC components of G1
+  q5    = reverse $ G.flattenSCC `fmap` G.stronglyConnComp e1
+  -- walk along SCC components of G1
+  -- edges between components (bridges) have weight
+  -- (i)  zero if they originate from G1, or
+  -- (ii) one  if they they originate from G3 (ie compy with IDA)
+  height _ []  = 0
+  height _ [_] = 0
+  height qk (ql:qs)
+    | qk == ql  = maximum $ 0:[ k qk ql' (height ql' qs) | ql' <- qs ]
+    | otherwise = height qk qs
+    where
+      k qi qj d
+        | qi .>> qj = 1 + d
+        | qi .~> qj = d
+        | otherwise = 0
+      qi .>> qj = or $ [ (p,p,q) `hasPath3` (p,q,q) | p <- qi, q <- qj ]
+      qi .~> qj = or $ [       p `hasEdge1` q       | p <- qi, q <- qj ]
+
+
+
+-- FIXME: 
+-- DC - quadruple.trs -- MaximalMatrix (MaxAutomaton (Just 1)) provides invalid bound O(n)
+-- The maximal matrix looks fine IDA_1 is fullfilled but not IDA_2.
+-- We expect (Just d) if not IDA_d
 upperbound :: StartTerms F -> Dim -> Kind -> I.Interpretation F (LinearInterpretation ArgPos Int) -> T.Complexity
 upperbound st dim kind li = case kind of
   MaximalMatrix (UpperTriangular Implicit)       -> T.Poly (Just dim)
-  MaximalMatrix (UpperTriangular Multiplicity{}) -> T.Poly (Just $ countNonZeros mm)
+  MaximalMatrix (UpperTriangular Multiplicity{}) -> degM [1..dim] [mm]
   MaximalMatrix (LowerTriangular Implicit)       -> T.Poly (Just dim)
   MaximalMatrix (LowerTriangular Multiplicity{}) -> T.Poly (Just $ countNonZeros mm)
   MaximalMatrix AlmostTriangular{}               -> T.Poly (Just dim) -- TODO: improve bound - take minimal multiplicty wrt. given triangular matrix
   MaximalMatrix LikeJordan                       -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
-  MaximalMatrix LikeBinaryJordan                       -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
-  MaximalMatrix MaxAutomaton                     -> T.Poly (Just dim)
+  MaximalMatrix LikeBinaryJordan                 -> T.Poly (Just dim) -- TODO: improve bound - take biggest jordan block
+  MaximalMatrix CaTDirectImplicit                -> T.Poly (Just dim)
+  MaximalMatrix Sturm                            -> T.Poly (Just dim)
+  MaximalMatrix SubresultantPRS                  -> T.Poly (Just dim)
+  MaximalMatrix Budan                            -> T.Poly (Just dim)
+  MaximalMatrix (MaxAutomaton Nothing)           -> degM [1..dim] [mm]
+  MaximalMatrix (MaxAutomaton (Just deg))        -> degM [1..dim] [mm]-- T.Poly (Just deg)
 
-  Automaton Nothing                              -> T.Poly (Just dim)
+  Automaton Nothing                              -> degM [1..dim] [mm]-- T.Poly (Just dim)
   Automaton (Just deg)                           -> T.Poly (Just deg)
   Unrestricted                                   -> T.Exp  (Just 1)
   where
     li' = restrictInterpretation st li
-    mm  = maxmimalNonIdMatrix dim li'
+    mm  = maximalMatrix' dim li'
 -- TODO: change maximalNonIdMatrix; if M = eye then linear; otherwise count M', where M' = filter eye M
 
 -- dimArg :: T.Argument 'T.Required Int
@@ -754,13 +1383,37 @@ upperbound st dim kind li = case kind of
 mkmi :: Int -> Kind -> TrsStrategy
 mkmi dim kind = T.processor MI{miKind=kind, miDimension=dim,miUArgs=NoUArgs,miURules=NoURules,miSelector=Nothing}
 
-
 jordan'           = \dim     -> mkmi dim (MaximalMatrix LikeJordan)
 binaryJordan'     = \dim     -> mkmi dim (MaximalMatrix LikeBinaryJordan)
 almostTriangular' = \dim     -> mkmi dim (MaximalMatrix $ AlmostTriangular 1)
 triangular'       = \dim     -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity Nothing))
 algebraic'        = \dim deg -> mkmi dim (MaximalMatrix $ UpperTriangular (Multiplicity (Just deg)))
+catDirectImplicit' = \dim    -> mkmi dim (MaximalMatrix CaTDirectImplicit)
+sturm'            = \dim     -> mkmi dim (MaximalMatrix Sturm)
+subresultantPRS'  = \dim     -> mkmi dim (MaximalMatrix SubresultantPRS)
+budan'            = \dim     -> mkmi dim (MaximalMatrix Budan)
 
-eda' = \dim     -> mkmi dim (Automaton Nothing)
-ida' = \dim deg -> mkmi dim (Automaton (Just deg))
+eda' = \dim     -> mkmi' dim (Automaton Nothing)
+ida' = \dim deg -> mkmi' dim (Automaton (Just deg))
 
+
+mkmi' dim kind =
+  T.processor MI{ miKind=kind
+                , miDimension=dim
+                , miUArgs=UArgs
+                , miURules=URules
+                , miSelector=Just (RS.selAnyOf RS.selStricts)
+                }
+
+mxida dim deg uargs urules sel =
+  T.processor MI
+    { miKind      = Automaton $ if deg' < dim' then Just deg' else Nothing
+    , miDimension = dim'
+    , miUArgs     = uargs
+    , miURules    = urules
+    , miSelector  = sel }
+  where
+    dim' = max 1 dim
+    deg' = max 0 deg
+
+mxeda dim = mxida dim dim

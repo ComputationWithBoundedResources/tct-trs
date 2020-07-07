@@ -32,24 +32,24 @@ module Tct.Trs.Data.Rules
   ) where
 
 
-import qualified Data.Foldable          as F
-import qualified Data.Set               as S
-import qualified Data.Map               as M
-import qualified Data.List              as L
+import qualified Data.Foldable               as F
+import qualified Data.List                   as L
+import qualified Data.Map                    as M
+import qualified Data.Set                    as S
 
-import           Prelude                hiding (concat, filter, map, null)
+import           Prelude                     hiding (concat, filter, map, null)
 
-import qualified Tct.Core.Common.Pretty as PP
-import qualified Tct.Core.Common.Xml    as Xml
+import qualified Tct.Core.Common.Pretty      as PP
+import qualified Tct.Core.Common.Xml         as Xml
 
-import           Data.Rewriting.Rule    (Rule)
-import qualified Data.Rewriting.Rule    as R
-import qualified Data.Rewriting.Rules   as R (lhss)
-import qualified Data.Rewriting.Term    as T
 import qualified Data.Rewriting.CriticalPair as CP
+import           Data.Rewriting.Rule         (Rule)
+import qualified Data.Rewriting.Rule         as R
+import qualified Data.Rewriting.Rules        as R (lhss)
+import qualified Data.Rewriting.Term         as T
 
-import qualified Tct.Trs.Data.Rewriting as R
-import qualified Tct.Trs.Data.Signature as Sig
+import qualified Tct.Trs.Data.Rewriting      as R
+import qualified Tct.Trs.Data.Signature      as Sig
 
 
 type RuleSet f v = S.Set (Rule f v)
@@ -91,8 +91,8 @@ definedSymbols :: Ord f => Rules f v -> S.Set f
 definedSymbols (RulesT rs) = S.foldr ofRule S.empty rs
   where
     ofRule (R.Rule l _) = ofTerm l
-    ofTerm (T.Fun f _)  = (f `S.insert`)
-    ofTerm _            = id
+    ofTerm (T.Fun f _) = (f `S.insert`)
+    ofTerm _           = id
 
 -- constructorSymbols :: Ord f => Rules f v -> S.Set f
 -- constructorSymbols trs = funs trs `S.difference` definedSymbols trs

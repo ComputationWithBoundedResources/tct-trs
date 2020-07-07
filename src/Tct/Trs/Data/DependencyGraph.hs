@@ -1,3 +1,4 @@
+{-# LANGUAGE OverlappingInstances #-}
 module Tct.Trs.Data.DependencyGraph
   ( module Gr
   -- * dependency graph
@@ -31,7 +32,7 @@ module Tct.Trs.Data.DependencyGraph
 import           Control.Monad.State.Strict
 import           Data.Function               (on)
 import qualified Data.List                   as L
-import           Data.Maybe                  (fromMaybe, isNothing, isJust)
+import           Data.Maybe                  (fromMaybe, isJust, isNothing)
 import           Data.Monoid
 
 import qualified Data.Rewriting.Rule         as R (Rule (..))
@@ -47,9 +48,9 @@ import qualified Tct.Common.Graph            as Gr (empty)
 
 import qualified Tct.Trs.Data.ProblemKind    as Prob
 import qualified Tct.Trs.Data.Rewriting      as R
+import qualified Tct.Trs.Data.Rules          as RS
 import qualified Tct.Trs.Data.RuleSet        as Rs
 import qualified Tct.Trs.Data.Symbol         as Symb
-import qualified Tct.Trs.Data.Rules          as RS
 
 
 --- * dependency graph -----------------------------------------------------------------------------------------------
@@ -96,7 +97,6 @@ withRulesPair = foldl k ([],[])
 withRulesPair' :: [(n, DGNode f v)] -> ([n], [R.Rule f v], [R.Rule f v])
 withRulesPair' = foldl k ([],[],[])
   where k (ns,srs,wrs) (n,nl) = if isStrict nl then (n:ns,theRule nl:srs, wrs) else (n:ns,srs,theRule nl:wrs)
-
 
 
 --- ** estimated dependency graph -------------------------------------------------------------------------------------
@@ -181,7 +181,6 @@ allRulesFromNodes gr = concatMap (allRulesFromNode gr)
 allRulesPairFromNodes :: CDG f v -> [NodeId] -> ([R.Rule f v], [R.Rule f v])
 allRulesPairFromNodes cdg = foldl k ([],[]) . allRulesFromNodes cdg
   where k (srs,wrs) nl = if isStrict nl then (theRule nl:srs, wrs) else (srs,theRule nl:wrs)
-
 
 
 congruence :: CDG f v -> NodeId -> [NodeId]

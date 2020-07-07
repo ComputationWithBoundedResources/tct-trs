@@ -5,6 +5,8 @@ module Tct.Trs.Processors
   , Degree
   , degreeArg
   , boundedArgs
+  , araArgs
+  , checkPropArgs
   , timeoutArg
   , CombineWith (..)
   , combineWithArg
@@ -24,6 +26,7 @@ module Tct.Trs.Processors
   , matrices
   , polys
   , ints
+  , araBounds
   , dpsimps
   , decomposeIndependent
   , decomposeIndependentSG
@@ -43,9 +46,14 @@ import qualified Tct.Trs.Data.RuleSelector                       as RS
 import qualified Tct.Trs.Data.RuleSet                            as Prob
 import qualified Tct.Trs.Data.Rules as RS
 
+-- MS: FIXME:
+-- naming of arguments/methods gets increasingly more difficult
+-- should they be imported qualified?
+import Tct.Trs.Processor.AmortisedAnalysis as M
 import           Tct.Trs.Processor.Bounds                           as M
 import           Tct.Trs.Processor.Decompose                        as M
 import           Tct.Trs.Processor.ComplexityPair                   as M
+import           Tct.Trs.Processor.DecreasingLoops                  as M
 import           Tct.Trs.Processor.DP.DependencyPairs               as M
 import           Tct.Trs.Processor.DP.DPGraph.DecomposeDG           as M
 import           Tct.Trs.Processor.DP.DPGraph.PathAnalysis          as M
@@ -64,6 +72,9 @@ import           Tct.Trs.Processor.Poly.NaturalPI                   as M
 import           Tct.Trs.Processor.ToInnermost                      as M
 import           Tct.Trs.Processor.WithCertification                as M
 
+-- processor for checking properties
+import Tct.Trs.Processor.CheckProperty as M
+
 -- TODO: MS: move to strategies?
 
 type Degree = Int
@@ -79,6 +90,22 @@ boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
     lArg = nat "from" ["from degree"]
     uArg = nat "to"   ["to degree"]
 
+-- | Arguments for bounded degrees. @:form nat :to nat@
+araArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional T.Nat)
+araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60)
+  where
+    lArg = nat "from" ["from degree"]
+    uArg = nat "to"   ["to degree"]
+    tArg = nat "timeout" ["timeout for SMT solver"]
+
+
+checkPropArgs :: (Argument 'Optional LogOp,
+                  Argument 'Optional (Maybe LL), Argument 'Optional (Maybe Ctr))
+checkPropArgs = ( checkPropLogOpArg `T.optional` AND
+                , checkPropLLArg    `T.optional` Nothing
+                , checkPropCtrArg   `T.optional` Nothing)
+
+
 -- | Argument for timeout. @:timeout nat@
 timeoutArg :: Argument 'Required T.Nat
 timeoutArg = nat "timeout" ["set a timeout"]
@@ -91,6 +118,10 @@ combineWithArg :: Argument 'Required CombineWith
 combineWithArg = T.flag "combineWith" ["Set race conditions."]
 
 
+-- FIXME: MS: 
+-- Tct.Core.Strategy specifies `infixr 5 .>>>`
+-- no fixity is specified for `.>>!`, hence we have `infixl 9 .>>!`
+-- should be fixed; may break exisitng strategies
 (.>>!) :: TrsStrategy -> TrsStrategy -> TrsStrategy
 s1 .>>! s2 = s1 .>>> try empty .>>> s2
 
@@ -182,6 +213,9 @@ polys = shift pxs
 -- | Applies a selection of interpretations, depending on the given lower and uppper bound.
 ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
+
+araBounds :: Degree -> Degree -> Int -> TrsStrategy
+araBounds = ara' NoHeuristics Nothing
 
 
 --- * simplifications ------------------------------------------------------------------------------------------------

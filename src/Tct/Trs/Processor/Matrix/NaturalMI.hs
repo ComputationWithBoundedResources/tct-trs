@@ -347,7 +347,6 @@ dConstraints dim rel done dtwo gtwo _ =
     exactness   = SMT.bigAnd [ if x == y then SMT.top else SMT.bnot (done i x y .&& dtwo i x y) | i <- toD, x <- toD, y <- toD ]
 
 
-
 hConstraints :: Int
              -> Int
              -> (Int -> Int -> SMT.Formula w)
@@ -464,8 +463,6 @@ mxKind kind dim deg  st = case (kind, st) of
   where
     cs = ProbK.constructors st
     md = let d = max 0 deg in if d < dim then Just d else Nothing
-
-
 
 
 {- | build constraints for an interpretation depending on the matrix kind -}
@@ -602,8 +599,6 @@ entscheide p@NaturalMI{miDimension=dim} prob = do
 
           isUsable Nothing _ = True
           isUsable (Just fs) (RR.Rule lhs _) = either (const False) (`Set.member` UREnc.runUsableSymbols fs) (RT.root lhs)
-
-
 
 
 -- entscheide1 ::
@@ -802,7 +797,6 @@ setStronglyLinear dim (MI.LInter vmmap cs) poss = MI.LInter (foldr k vmmap poss)
   where k pos = Map.adjust (const $ EncM.identityMatrix dim) (toEnum pos)
 
 
-
 instance CD.Processor NaturalMI where
   type ProofObject NaturalMI = PC.ApplicationProof NaturalMIProof
   type In  NaturalMI         = Prob.Trs
@@ -813,7 +807,6 @@ instance CD.Processor NaturalMI where
   execute p prob
     | Prob.isTrivial prob = CD.abortWith (PC.Closed :: PC.ApplicationProof NaturalMIProof)
     | otherwise           = entscheide p prob
-
 
 
 ----------------------------------------------------------------------
