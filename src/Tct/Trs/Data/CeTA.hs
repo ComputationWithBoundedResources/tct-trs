@@ -20,13 +20,9 @@ import           System.Exit
 import           System.IO            (hClose)
 import           System.IO.Temp       (openTempFile)
 import           System.Process       (readProcessWithExitCode)
-
-import           Tct.Core.Common.Xml  as Xml
-
-
-import           Control.Applicative
 import qualified Data.Foldable        as F
 
+import           Tct.Core.Common.Xml  as Xml
 import qualified Tct.Core.Data        as T
 
 import qualified Tct.Common.CeTA      as C
@@ -124,8 +120,8 @@ proofIO tmpDir prover allowPartial p =
         return $ case code of
           ExitFailure i -> Left $ "Error(" ++ show i ++ "," ++ stderr ++ ")"
           ExitSuccess   -> case lines stdout of
-            "CERTIFIED <complexityProof>" :_ -> Right p
-            _                                -> Left stdout
+            "CERTIFIED" :_ -> Right p
+            _              -> Left stdout
   where
     args = if allowPartial == PartialProof then ("--allow-assumptions":) else id
     withFile = E.bracket (openTempFile tmpDir "ceta") (hClose . snd) . uncurry

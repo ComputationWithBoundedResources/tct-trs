@@ -2,13 +2,13 @@
 module Tct.Trs.Data.Rewriting where
 
 
-import           Control.Applicative
 import           Control.Arrow               ((&&&))
 import           Control.Monad.State.Strict
 import           Data.Maybe
 import qualified Data.Set                    as S
 import           Data.Traversable            as F
 
+import qualified Data.Rewriting.Context      as C
 import           Data.Rewriting.CriticalPair (CP (..))
 import qualified Data.Rewriting.CriticalPair as R
 import           Data.Rewriting.Rule         (Rule)
@@ -139,3 +139,59 @@ icapM lhss (T.Fun f ts) = do
 --
 --     isQNF t = all isNothing [ t `S.match` q | q <- qsLhss ]
 --
+
+
+--- * narrowing ------------------------------------------------------------------------------------------------------
+-- MS: copied from hoca
+
+data NarrowedRule f v1 v2 = NarrowedRule
+  { narrowedRule  :: Rule f v1
+  , narrowCtxt    :: C.Ctxt f v1
+  , narrowSubterm :: Term f v1
+  , narrowings    :: [Narrowing f v1 v2]
+  } deriving (Show)
+
+data Narrowing f v1 v2 = Narrowing
+  { narrowingMgu :: S.Subst f (Either v1 v2)
+  , narrowedWith :: Rule f v2
+  , narrowing    :: Rule f (Either v1 v2)
+  } deriving (Show)
+
+
+-- | @(C,s) `elem` contexts t@ if and only if @t = C[s]@.
+contexts :: T.Term f v -> [(C.Ctxt f v, T.Term f v)]
+contexts = walk id
+  where
+    walk c s@(T.Var _) = [(c C.Hole,s)]
+    walk c s@(T.Fun f ss) =
+      (c C.Hole, s) : concatMap (\ (ls,si,rs) -> walk (\ ctxt -> c (C.Ctxt f ls ctxt rs)) si) (parts [] ss)
+
+    parts _ [] = []
+    parts ls (t:rs) = (ls,t,rs) : parts (ls ++ [t]) rs
+
+renameCtx :: (v1 -> v2) -> C.Ctxt f v1 -> C.Ctxt f v2
+renameCtx _ C.Hole = C.Hole
+renameCtx fn (C.Ctxt f ts1 c ts2) = C.Ctxt f (map (T.rename fn) ts1) (renameCtx fn c) (map (T.rename fn) ts2)
+
+narrow :: (Eq f, Ord v1, Ord v2) => Rule f v1 -> [Rule f v2] -> [NarrowedRule f v1 v2]
+narrow rl rs = catMaybes [ narrowAt ci ri | (ci,ri) <- contexts (R.rhs rl), T.isFun ri ]
+  where
+    narrowAt ci ri = do
+      let ns = mapMaybe (narrowWith ci ri) rs
+      guard (not (null ns))
+      return NarrowedRule {
+        narrowedRule = rl
+        , narrowCtxt = ci
+        , narrowSubterm = ri
+        , narrowings = ns }
+
+    narrowWith ci ri rli = do
+        mgu <- S.unify (T.rename Left ri) (T.rename Right (R.lhs rli))
+        let ci'  = renameCtx Left ci
+            lhs' = S.apply mgu (T.rename Left (R.lhs rl))
+            rhs' = S.applyCtxt mgu ci' `C.apply` S.apply mgu (T.rename Right (R.rhs rli))
+        return
+          Narrowing
+            { narrowingMgu = mgu
+            , narrowedWith = rli
+            , narrowing = R.Rule lhs' rhs' }

@@ -6,11 +6,11 @@ The configuration is meant to work with 'Tct.Core.Main.tct3'
   * sets default strategies
   * provides the @--complexity <rc|rci|dc|dci>@ argument to set the complexity problem
     * this argument overrides the complexity problem returned by the parser
-  * provides @--ceta <total|partial>@ argument to set the complexity problem
+  * provides @--ceta <total|partial>@ argument to set the certification problem
 -}
 module Tct.Trs.Config
   (
-  trs
+  runTrs
   -- * Problem parser
   , parserIO
   , parser
@@ -27,9 +27,9 @@ module Tct.Trs.Config
   ) where
 
 
-import           Control.Applicative
 import           System.FilePath            (takeExtension)
 
+import           Tct.Core.Common.Options
 import qualified Tct.Core.Common.Pretty     as PP
 import qualified Tct.Core.Common.Xml        as Xml (putXml)
 import qualified Tct.Core.Data              as T
@@ -41,33 +41,33 @@ import qualified Data.Rewriting.Problem.Xml as R
 
 import           Tct.Trs.Data.CeTA
 import           Tct.Trs.Data.Problem
-import           Tct.Trs.Declarations        (trsDeclarations,competition)
+import           Tct.Trs.Strategy.Competition (competition)
 
 
-trs :: TrsConfig -> IO ()
-trs = tct3WithOptions trsUpdate trsOptions
+-- | run trs module with predefined command line arguments.
+runTrs :: T.Declared Trs Trs => TrsConfig -> IO ()
+runTrs = runTctWithOptions trsUpdate trsOptions
 
--- | Parses a TrsProblem. Uses the @xml@ format if the file extension is @xml@, otherwise the @WST@ format.
-parserIO :: FilePath -> IO (Either String TrsProblem)
+-- | Parses a Trs. Uses the @xml@ format if the file extension is @xml@, otherwise the @WST@ format.
+parserIO :: FilePath -> IO (Either String Trs)
 parserIO fn
   | takeExtension fn == ".xml" = fromRewriting <$> R.xmlFileToProblem fn
   | otherwise                  = parser <$> readFile fn
 
 -- | @WST@ format parser from 'Data.Rewriting'.
-parser :: String -> Either String TrsProblem
+parser :: String -> Either String Trs
 parser s = case R.fromString s of
   Left e  -> Left (show e)
   Right p -> fromRewriting p
 
 
 -- | The Tct configuration type for Trs.
-type TrsConfig = TctConfig TrsProblem
+type TrsConfig = TctConfig Trs
 
 -- | Default Tct configuration for Trs.
 -- Sets the @xml@ / @wst@ parser. Sets a list of default strategies.
-trsConfig :: TrsConfig
+trsConfig :: T.Declared Trs Trs => TrsConfig
 trsConfig = defaultTctConfig parserIO
-  `addStrategies` trsDeclarations
   `withDefaultStrategy` competition
   `appendGHCiScript`
     [ ":module +Tct.Trs.Processors"
@@ -141,13 +141,14 @@ trsUpdate cfg (TrsOptions ccM cpM) = setParseProblem $ setPutProof cfg
       (Just DCI) -> toDC . toInnermost
       (Just RC)  -> toRC . toFull
       (Just RCI) -> toRC . toInnermost
-    proofing cp pt = case cp of
-      Nothing  -> putProof cfg pt
-      Just cp' -> case pt of
+    proofing cp = case cp of
+      Nothing  -> putProof cfg
+      Just cp' -> Right $ \pt -> case pt of
         T.Failure r -> PP.putPretty r
         pt'         -> case prover pt' of
           Left s    -> print s
           Right xml -> Xml.putXml xml
           where
             prover = if cp' == TotalProof then totalProof else partialProof
+
 

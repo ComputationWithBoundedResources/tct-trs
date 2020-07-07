@@ -2,17 +2,15 @@
 module Tct.Trs.Data.Symbol
   ( Fun (..)
   , AFun (..)
-  , F , fun
-  , V , var
+  , F (..), fun
+  , V (..), var
   ) where
 
 
 import qualified Data.ByteString.Char8  as BS
-import           Data.Typeable
 
 import qualified Tct.Core.Common.Pretty as PP
 import qualified Tct.Core.Common.Xml    as Xml
-
 
 -- | Abstract function interface.
 class Fun f where
@@ -29,28 +27,28 @@ data AFun f
   = TrsFun f
   | DpFun f
   | ComFun Int
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show, Read)
 
 newtype F = F (AFun BS.ByteString)
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show, Read)
 
-fun  :: String -> F 
+fun  :: String -> F
 fun = F . TrsFun . BS.pack
 
 newtype V = V BS.ByteString
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show)
 
 var  :: String -> V
 var = V . BS.pack
 
 instance Fun F where
-  markFun (F (TrsFun f))       = F (DpFun f)
-  markFun _                    = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
+  markFun (F (TrsFun f)) = F (DpFun f)
+  markFun _              = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
 
   compoundFun                  = F . ComFun
 
-  isMarkedFun (F (DpFun _))    = True
-  isMarkedFun _                = False
+  isMarkedFun (F (DpFun _)) = True
+  isMarkedFun _             = False
 
   isCompoundFun (F (ComFun _)) = True
   isCompoundFun _              = False

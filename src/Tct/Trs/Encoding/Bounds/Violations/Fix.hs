@@ -1,14 +1,14 @@
 ----------------------------------------------------------------------------------
 -- |
--- Module      :  Tct.Method.Bounds.Violations.Fix
--- Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>, 
---                Georg Moser <georg.moser@uibk.ac.at>, 
+-- Module      :  Tct.Processor.Bounds.Violations.Fix
+-- Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>,
+--                Georg Moser <georg.moser@uibk.ac.at>,
 --                Andreas Schnabl <andreas.schnabl@uibk.ac.at>
 -- License     :  LGPL (see COPYING)
--- Maintainer  :  Martin Avanzini <martin.avanzini@uibk.ac.at>, 
+-- Maintainer  :  Martin Avanzini <martin.avanzini@uibk.ac.at>,
 --                Andreas Schnabl <andreas.schnabl@uibk.ac.at>
 -- Stability   :  unstable
--- Portability :  unportable      
+-- Portability :  unportable
 --
 -- This module implements fixing of compatibility violations, as employed in
 -- the bound processor.
@@ -106,7 +106,7 @@ rule4 (Reach (F f ts) q) =
     do a <- State.get
        qss <- Trans.lift $ mapM (reachableStates a) ts
        (revargs,problems) <- foldM mk ([],[]) $ zip ts qss
-       return $ requireAll $ (Add $ Collapse f (reverse revargs) q) : problems -- MA:TODO verify 
+       return $ requireAll $ (Add $ Collapse f (reverse revargs) q) : problems -- MA:TODO verify
     where mk (args,probs) (ti, qs) | Set.null qs = do qi <- mkFreshState
                                                       return (qi : args, Reach ti qi : probs)
                                    | otherwise   = return (selectSt qs : args, probs)

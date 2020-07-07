@@ -2,7 +2,7 @@ module Tct.Trs.Data.Problem
   (
   -- * problem
     Problem (..)
-  , TrsProblem
+  , Trs
 
   , dependencyGraph
   , congruenceGraph
@@ -16,6 +16,7 @@ module Tct.Trs.Data.Problem
 
   -- * construction
   , fromRewriting
+  , toRewriting
 
   -- * updates
   , sanitiseDPGraph
@@ -47,7 +48,6 @@ module Tct.Trs.Data.Problem
 
 import           Control.Applicative          ((<|>))
 import qualified Data.Set                     as S
-import           Data.Typeable
 
 import qualified Data.Rewriting.Problem       as RP
 import qualified Data.Rewriting.Rule          as R (Rule (..))
@@ -60,8 +60,8 @@ import           Tct.Trs.Data.DependencyGraph (CDG, DG, DependencyGraph)
 import qualified Tct.Trs.Data.DependencyGraph as DPG
 import           Tct.Trs.Data.ProblemKind
 import           Tct.Trs.Data.RuleSet
-import           Tct.Trs.Data.Trs             (Trs)
-import qualified Tct.Trs.Data.Trs             as Trs
+import           Tct.Trs.Data.Rules           (Rules)
+import qualified Tct.Trs.Data.Rules           as RS
 
 import           Tct.Trs.Data.Signature       (Signature)
 import qualified Tct.Trs.Data.Signature       as Sig
@@ -88,13 +88,13 @@ data Problem f v = Problem
   , strategy   :: Strategy
   , signature  :: Signature f
 
-  , strictDPs  :: Trs f v
-  , strictTrs  :: Trs f v
-  , weakDPs    :: Trs f v
-  , weakTrs    :: Trs f v
+  , strictDPs  :: Rules f v
+  , strictTrs  :: Rules f v
+  , weakDPs    :: Rules f v
+  , weakTrs    :: Rules f v
 
   , dpGraph    :: DependencyGraph f v
-  } deriving (Show, Eq, Typeable)
+  } deriving (Show, Eq)
 
 
 -- | Returns the dependency graph of the problem.
@@ -105,18 +105,18 @@ dependencyGraph = DPG.dependencyGraph . dpGraph
 congruenceGraph :: Problem f v -> CDG f v
 congruenceGraph = DPG.congruenceGraph . dpGraph
 
-strictComponents, weakComponents, allComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
-strictComponents prob = strictDPs prob `Trs.concat` strictTrs prob
-weakComponents prob   = weakDPs prob `Trs.concat` weakTrs prob
-allComponents prob    = strictComponents prob `Trs.concat` weakComponents prob
+strictComponents, weakComponents, allComponents :: (Ord f, Ord v) => Problem f v -> Rules f v
+strictComponents prob = strictDPs prob `RS.concat` strictTrs prob
+weakComponents prob   = weakDPs prob `RS.concat` weakTrs prob
+allComponents prob    = strictComponents prob `RS.concat` weakComponents prob
 
-dpComponents, trsComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
-dpComponents prob  = strictDPs prob `Trs.concat` weakDPs prob
-trsComponents prob = strictTrs prob `Trs.concat` weakTrs prob
+dpComponents, trsComponents :: (Ord f, Ord v) => Problem f v -> Rules f v
+dpComponents prob  = strictDPs prob `RS.concat` weakDPs prob
+trsComponents prob = strictTrs prob `RS.concat` weakTrs prob
 
 -- | Returns all rules a reduction wrt to the start terms can start with.
-startComponents :: (Ord f, Ord v) => Problem f v -> Trs f v
-startComponents prob = Trs.filter (isStartTerm (startTerms prob) . R.lhs) (allComponents prob)
+startComponents :: (Ord f, Ord v) => Problem f v -> Rules f v
+startComponents prob = RS.filter (isStartTerm (startTerms prob) . R.lhs) (allComponents prob)
 
 -- | Returns all rules.
 ruleSet :: Problem f v -> RuleSet f v
@@ -133,7 +133,7 @@ ruleSet prob = RuleSet
 -- it would be no problem to keep the symbol type and variable type abstract; provided one defines a suitable class
 -- yet it gets annoying when defining processors / strategies
 
-type TrsProblem = Problem F V
+type Trs = Problem F V
 
 -- TODO: MS: add sanity check of symbols;
 -- we use a wrapper for distinguishing dp/com symbols; but pretty printing can still fail if a symbols c_1 or f# exists
@@ -142,10 +142,10 @@ type TrsProblem = Problem F V
 -- NOTE: MS: the tpdb contains non-wellformed examples; with free vars on the rhs
 -- the current implementation is not designed to deal with them; we catch them in 'fromRewriting'
 
--- | Transforms a 'Data.Rewriting.Problem' into a 'TrsProblem'.
-fromRewriting :: RP.Problem String String -> Either String TrsProblem
+-- | Transforms a 'Data.Rewriting.Problem' into a 'Trs'.
+fromRewriting :: RP.Problem String String -> Either String Trs
 fromRewriting prob =
-  if Trs.isWellformed sTrs && Trs.isWellformed wTrs
+  if RS.isWellformed sTrs && RS.isWellformed wTrs
     then
       Right Problem
         { startTerms   = case RP.startTerms prob of
@@ -157,9 +157,9 @@ fromRewriting prob =
             RP.Outermost -> Outermost
         , signature  = sig
 
-        , strictDPs  = Trs.empty
+        , strictDPs  = RS.empty
         , strictTrs  = sTrs
-        , weakDPs    = Trs.empty
+        , weakDPs    = RS.empty
         , weakTrs    = wTrs
 
         , dpGraph = DPG.empty }
@@ -167,13 +167,33 @@ fromRewriting prob =
       Left "problem not wellformed."
   where
     toFun (R.Rule l r) = let k = R.map Symb.fun Symb.var in R.Rule (k l) (k r)
-    sTrs = Trs.fromList . map toFun $ RP.strictRules (RP.rules prob)
-    wTrs = Trs.fromList . map toFun $ RP.weakRules (RP.rules prob)
-    trs  = sTrs `Trs.union` wTrs
+    sTrs = RS.fromList . map toFun $ RP.strictRules (RP.rules prob)
+    wTrs = RS.fromList . map toFun $ RP.weakRules (RP.rules prob)
+    trs  = sTrs `RS.union` wTrs
 
-    sig  = Trs.signature trs
+    sig  = RS.signature trs
     defs = Sig.defineds sig
     cons = Sig.constructors sig
+
+-- | The counterpart of 'fromRewriting'.
+--
+-- NOTE: In general 'fromRewriting . toRewriting = id' and 'toRewriting . fromRewriting = id' does not hold.
+toRewriting :: (Ord f, Ord v) => Problem f v -> RP.Problem f v
+toRewriting p =
+  RP.Problem
+    { RP.startTerms = if isRCProblem p then RP.BasicTerms else RP.AllTerms
+    , RP.strategy   = case strategy p of
+        Innermost -> RP.Innermost
+        Full      -> RP.Full
+        Outermost -> RP.Outermost
+    , RP.theory     = Nothing
+    , RP.rules      = RP.RulesPair
+       { RP.strictRules = RS.toList $ strictComponents p
+       , RP.weakRules   = RS.toList $ weakComponents p }
+    , RP.variables  = S.toList $ RS.vars rs
+    , RP.symbols    = S.toList $ RS.funs rs
+    , RP.comment    = Nothing }
+  where rs = allComponents p
 
 
 --- ** updates  ------------------------------------------------------------------------------------------------------
@@ -219,16 +239,16 @@ toRC prob = case startTerms prob of
 
 progressUsingSize :: Problem f v -> Problem f v -> Bool
 progressUsingSize p1 p2 =
-  Trs.size (strictDPs p1) /= Trs.size (strictDPs p2)
-  || Trs.size (strictTrs p1) /= Trs.size (strictTrs p2)
-  || Trs.size (weakDPs p1) /= Trs.size (weakDPs p2)
-  || Trs.size (weakTrs p1) /= Trs.size (weakTrs p2)
+  RS.size (strictDPs p1) /= RS.size (strictDPs p2)
+  || RS.size (strictTrs p1) /= RS.size (strictTrs p2)
+  || RS.size (weakDPs p1) /= RS.size (weakDPs p2)
+  || RS.size (weakTrs p1) /= RS.size (weakTrs p2)
 
 isDPProblem :: Problem f v -> Bool
-isDPProblem prob = not $ Trs.null (strictDPs prob) && Trs.null (weakDPs prob)
+isDPProblem prob = not $ RS.null (strictDPs prob) && RS.null (weakDPs prob)
 
 isDTProblem :: Problem f v -> Bool
-isDTProblem prob = isDPProblem prob && Trs.null (strictTrs prob)
+isDTProblem prob = isDPProblem prob && RS.null (strictTrs prob)
 
 isRCProblem, isDCProblem :: Problem f v -> Bool
 isRCProblem prob = case startTerms prob of
@@ -246,7 +266,7 @@ isDPProblem' :: Problem f v -> Maybe String
 isDPProblem' prob = note (not $ isDPProblem  prob) " not a DP problem"
 
 isDTProblem' :: Problem f v -> Maybe String
-isDTProblem' prob = isDPProblem' prob <|> note (not $ Trs.null (strictTrs prob)) " contains strict rules"
+isDTProblem' prob = isDPProblem' prob <|> note (not $ RS.null (strictTrs prob)) " contains strict rules"
 
 isRCProblem', isDCProblem' :: Problem f v -> Maybe String
 isRCProblem' prob = note (not $ isRCProblem  prob) " not a RC problem"
@@ -260,10 +280,10 @@ isInnermostProblem' prob = note (not $ isInnermostProblem prob) "not an innermos
 
 -- | A problem is trivial, if the strict DP/TRS components are empty.
 isTrivial :: (Ord f, Ord v) => Problem f v -> Bool
-isTrivial prob = Trs.null (strictComponents prob)
+isTrivial prob = RS.null (strictComponents prob)
 
 noWeakComponents :: (Ord f, Ord v) =>  Problem f v -> Bool
-noWeakComponents = Trs.null . weakComponents
+noWeakComponents = RS.null . weakComponents
 
 noWeakComponents' :: (Ord f, Ord v) => Problem f v -> Maybe String
 noWeakComponents' prob = note (not $ noWeakComponents prob) " contains weak components "
@@ -274,20 +294,24 @@ noWeakComponents' prob = note (not $ noWeakComponents prob) " contains weak comp
 
 instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (Problem f v) where
   pretty prob = PP.vcat
-    [ PP.text "Strict DP Rules:"
-    , PP.indent 2 $ PP.pretty (strictDPs prob)
-    , PP.text "Strict TRS Rules:"
-    , PP.indent 2 $ PP.pretty (strictTrs prob)
-    , PP.text "Weak DP Rules:"
-    , PP.indent 2 $ PP.pretty (weakDPs prob)
-    , PP.text "Weak TRS Rules:"
-    , PP.indent 2 $ PP.pretty (weakTrs prob)
-    , PP.text "Signature:"
-    , PP.indent 2 $ PP.pretty (signature prob)
-    , PP.text "Obligation:"
-    , PP.indent 2 $ PP.pretty (strategy prob)
-    , PP.indent 2 $ PP.pretty (startTerms prob) ]
-
+    [ ppRules [ (n,PP.pretty rs) | (n,a) <- [ ("Strict DPs",strictDPs)
+                                            , ("Strict TRS", strictTrs)
+                                            , ("Weak DPs", weakDPs)
+                                            , ("Weak TRS", weakTrs)]
+                                 , let rs = a prob
+                                 , not (RS.null rs)]
+    , ppBlock "Signature" (PP.pretty (signature prob))
+    , ppBlock "Obligation" obligation ] where
+        ppBlock n e = PP.nest 4 (PP.text "-" PP.<+> PP.text n PP.<> PP.char ':' PP.<$$> e)
+        ppRules = PP.vcat . map (uncurry ppBlock)
+        obligation = strat PP.<+> sts where
+          strat = case strategy prob of
+                    Innermost -> PP.text "innermost"
+                    _ -> PP.empty
+          sts = case startTerms prob of
+                 st@AllTerms{} -> PP.text "derivational complexity wrt. signature" PP.<+> PP.set' (alls st)
+                 st@BasicTerms {} -> PP.text "runtime complexity wrt. defined symbols" 
+                                     PP.<+> PP.set' (defineds st) PP.<+> PP.text "and constructors" PP.<+> PP.set' (constructors st)
 
 -- MS: the ceta instance is not complete as it contains a tag <complexityClass> which depends on ProofTree
 -- furthermore CeTA (2.2) only supports polynomial bounds; so we add the tag manually in the output

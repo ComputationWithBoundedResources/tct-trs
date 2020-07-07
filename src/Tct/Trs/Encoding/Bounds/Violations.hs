@@ -2,7 +2,7 @@
 
 ----------------------------------------------------------------------------------
 -- |
--- Module      :  Tct.Method.Bounds.Violations
+-- Module      :  Tct.Processor.Bounds.Violations
 -- Copyright   :  (c) Martin Avanzini <martin.avanzini@uibk.ac.at>,
 --                Georg Moser <georg.moser@uibk.ac.at>,
 --                Andreas Schnabl <andreas.schnabl@uibk.ac.at>
@@ -22,7 +22,7 @@ import qualified Data.Set                                as S
 
 import qualified Data.Rewriting.Rule                     as R
 
-import qualified Tct.Trs.Data.Trs                        as Trs
+import qualified Tct.Trs.Data.Rules                      as RS
 import           Tct.Trs.Encoding.Bounds.Automata
 import           Tct.Trs.Encoding.Bounds.Violations.Find
 import           Tct.Trs.Encoding.Bounds.Violations.Fix
@@ -34,9 +34,9 @@ makeRuleCompatible r !e !str !wb !ml !a
   | otherwise       = Left $ foldl fixViolation a violations
   where violations = S.toList $ findViolations a e str wb ml r
 
-compatibleAutomaton :: Ord v => Trs.Trs Symbol v -> Trs.Trs Symbol v -> Enrichment -> Automaton -> Automaton
+compatibleAutomaton :: Ord v => RS.Rules Symbol v -> RS.Rules Symbol v -> Enrichment -> Automaton -> Automaton
 compatibleAutomaton strict weak e a = eitherVal (iter a (1 :: Int))
-  where 
+  where
     iter a' !i = case r of
       Left  a'' -> iter a'' (i + 1)
       Right a'' -> Right a''
@@ -48,7 +48,7 @@ compatibleAutomaton strict weak e a = eitherVal (iter a (1 :: Int))
 
     eitherVal (Left v)  = v
     eitherVal (Right v) = v
-    srs = Trs.toList strict
-    wrs = Trs.toList weak
-    wb = if Trs.isCollapsing strict then WeakMayExceedBound else WeakMayNotExceedBound
+    srs = RS.toList strict
+    wrs = RS.toList weak
+    wb = if RS.isCollapsing strict then WeakMayExceedBound else WeakMayNotExceedBound
 

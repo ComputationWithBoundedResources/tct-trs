@@ -1,3 +1,7 @@
 .cabal-sandbox/
 dist/
 cabal.sandbox.config
+/.stack-work
+/TAGS
+.gitignore
+/tct-trs/TAGS
