@@ -8,12 +8,9 @@ module Tct.Trs.Processor.AmortisedAnalysis
   ( araDeclaration
   , ara
   , ara'
-
-  , Heuristics (..)
-  , heuristicsArg
   ) where
 
-
+import System.Exit
 import           Control.Monad
 import qualified Data.Set                     as S
 import qualified Control.Exception            as E
@@ -55,10 +52,7 @@ import           Data.Rewriting.ARA.Exception
 import           Data.Rewriting.ARA.Exception.Pretty                       ()
 
 
-data Ara = Ara { araHeuristics :: Heuristics -- ^ Use heuristics. TODO: Heuristics
-                                           -- not yet functional as type inference
-                                           -- only infers a single datatype.
-               , minDegree  :: Int         -- ^ Minimal degree to look for
+data Ara = Ara { minDegree  :: Int         -- ^ Minimal degree to look for
                , maxDegree  :: Int         -- ^ Maximal degree to look for
                , araTimeout :: Int         -- ^ Timeout
                , araRuleShifting :: Maybe Int -- ^ Min nr of strict rules to
@@ -93,9 +87,6 @@ defaultArgs = ArgumentOptions { filePath = ""
                               , noHeur = False
                               }
 
-
-data Heuristics = Heuristics | NoHeuristics deriving (Bounded, Enum, Eq, Show)
-
 type DT = String
 
 data AraProof f v = AraProof
@@ -126,8 +117,10 @@ instance T.Processor Ara where
     where maybeApplicable = -- Prob.isRCProblem' probTcT <|>    -- check left linearity
                             Prob.isInnermostProblem' probTcT -- check innermost
                             -- <|> RS.isConstructorTrs' sig trs -- not needed
+          defSyms = S.toList (Sig.defineds (Prob.signature probTcT))
 
-          prob = inferTypesAndSignature (convertProblem probTcT)
+
+          prob = inferTypesAndSignature defSyms (convertProblem probTcT)
 
           araFun :: T.TctM (T.Return Ara)
           araFun =
@@ -138,9 +131,6 @@ instance T.Processor Ara where
                                             , maxVectorLength = maxDegree p
                                             , timeout = Just $ araTimeout p
                                             , findStrictRules = araRuleShifting p
-                                            , shift = case araHeuristics p of
-                                                        Heuristics -> True
-                                                        _ -> False
                                             , nrOfRules = Just $ length (Prob.strictTrs probTcT) + length (Prob.weakTrs probTcT) + length (Prob.strictDPs probTcT) + length (Prob.weakDPs probTcT)
                                             }
 
@@ -153,8 +143,7 @@ instance T.Processor Ara where
                      let probSig = RT.signatures (problem prove)
 
                      -- check if it lowerbound problem
-                     when (lowerbound args) $
-                       E.throw $ FatalException "Lowerbound analysis not yet implemented!"
+                     when (lowerbound args) $ E.throw $ FatalException "Lowerbound analysis not yet implemented!"
 
                      -- Solve datatype constraints
                      (sigs, cfSigs, valsNs, vals, baseCtrs, cfBaseCtrs, bigO, (strictRls,weakRls)) <-
@@ -197,9 +186,7 @@ instance T.Processor Ara where
                         else T.Opt $ T.toId newProb')
 
 
-                 ) (\(e :: ProgException) ->
-                       return $
-                       T.abortWith (Applicable (Incompatible :: OrientationProof (AraProof F V))))
+                 ) (\(e :: ProgException) -> return $ T.abortWith (Applicable (Incompatible :: OrientationProof (AraProof F V))))
 
 certification :: T.Complexity -> T.Optional T.Id T.Certificate -> T.Certificate
 certification comp cert = case cert of
@@ -275,10 +262,6 @@ convertTerm (R.Fun f ch) = RT.Fun (fromF f) (fmap convertTerm ch)
 
 -- instances
 
-heuristicsArg :: T.Argument 'T.Required Heuristics
-heuristicsArg = T.flag "Whether to use heuristics or not."
-  [ "WARNING: Not yet functional, as type inference not yet implemented." ]
-
 minDimArg :: T.Argument 'T.Required Int
 minDimArg = T.flag "minimum Degree"
   [ "Minimum degree to be looked for (minimal length of vectors in signatures).",
@@ -305,18 +288,16 @@ description :: [String]
 description = [ unwords
   [ "This processor implements the amortised resource analysis."] ]
 
-araStrategy :: Maybe Int -> Heuristics -> Int -> Int -> Int -> TrsStrategy
-araStrategy oS h minD maxD to = T.Apply (Ara h minD maxD to oS)
+araStrategy :: Maybe Int -> Int -> Int -> Int -> TrsStrategy
+araStrategy oS minD maxD to = T.Apply (Ara minD maxD to oS)
 
-araDeclaration :: Maybe Int -> T.Declaration ('[T.Argument 'T.Optional Heuristics
-                                  ,T.Argument 'T.Optional Int
-                                  ,T.Argument 'T.Optional Int
-                                  ,T.Argument 'T.Optional Int
-                                  ] T.:-> TrsStrategy)
+araDeclaration :: Maybe Int -> T.Declaration ('[T.Argument 'T.Optional Int
+                                               ,T.Argument 'T.Optional Int
+                                               ,T.Argument 'T.Optional Int
+                                               ] T.:-> TrsStrategy)
 araDeclaration orientStrict =
-  T.declare "ara" description (hArg,minDim,maxDim,to) (araStrategy orientStrict)
-  where hArg = heuristicsArg `T.optional` NoHeuristics
-        minDim = minDimArg `T.optional` 1
+  T.declare "ara" description (minDim,maxDim,to) (araStrategy orientStrict)
+  where minDim = minDimArg `T.optional` 1
         maxDim = minDimArg `T.optional` 3
         to = araTimeoutArg `T.optional` 15
 
@@ -324,8 +305,8 @@ araDeclaration orientStrict =
 ara :: TrsStrategy
 ara = T.deflFun (araDeclaration Nothing)
 
-ara' :: Heuristics -> Maybe Int -> Int -> Int -> Int ->  TrsStrategy
-ara' h oS = T.declFun (araDeclaration oS) h
+ara' :: Maybe Int -> Int -> Int -> Int ->  TrsStrategy
+ara' oS = T.declFun (araDeclaration oS) 
 
 
 --- * proofdata

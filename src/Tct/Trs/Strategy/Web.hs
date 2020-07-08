@@ -6,10 +6,10 @@ module Tct.Trs.Strategy.Web
   ) where
 
 
-import Tct.Core
-import Tct.Trs.Data.Problem         (isInnermostProblem)
-import Tct.Trs.Processors           hiding (matrices, polys)
-import Tct.Trs.Strategy.Competition (competition')
+import           Tct.Core
+import           Tct.Trs.Data.Problem         (isInnermostProblem)
+import           Tct.Trs.Processors           hiding (matrices, polys)
+import           Tct.Trs.Strategy.Competition (competition')
 
 
 webAutomaticDeclaration = strategy "webAutomatic" () (competition' Fastest)
@@ -29,6 +29,7 @@ webCustomDeclaration = strategy "webCustom"
   , ba "dptuples"
   , ba "dpsimps"
   , ba "dpdecompose"
+  , ba "ara"
   ) custom
 
 -- ba :: String -> Argument 'Optional Bool
@@ -53,7 +54,7 @@ custom
   useTuples
   useDPSimps
   useDPDecompose
-
+  useAra
   =
 
   when useToi (try toInnermost)
@@ -79,16 +80,19 @@ custom
       if useDecompose
         then chain [ tew (int d) | d <- [(max 0 l) .. (max l u)] ]
         else int u
-    int d               = matrices d .<||> polys d
+    int d               = matrices d .<||> polys d .<||> ara (d+1)
 
     matrices d = force $ when useMatrices (mxs d)
     polys    d = force $ when usePolys    (px d)
+    ara d = force $ when useAra (ax 1 d)
 
     ua b = if b then UArgs else NoUArgs
     ur b = if b then URules else NoURules
 
     mx dm dg = matrix' dm dg    Algebraic  (ua useMatricesUArgs) (ur useMatricesURules) sel
     px dg    = poly' (Mixed dg) Restrict   (ua usePolysUArgs) (ur usePolysURules) sel
+    ax lo up = ara' (Just 1) lo up 8
+
     sel      = if useDecompose then Just selAny else Nothing
 
     mxs 0 = mx 1 0

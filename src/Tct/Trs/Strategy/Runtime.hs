@@ -46,13 +46,16 @@ px n = poly' (Mixed n) Restrict ?ua ?ur ?sel
 pxCP 1 = polyCP' Linear Restrict ?ua ?ur
 pxCP n = polyCP' (Mixed n) Restrict ?ua ?ur
 
+-- mx _ = ax 1 
+-- px = ax 1 
+
 wgOnUsable dim deg = weightgap' dim deg Algebraic ?ua WgOnTrs
 wg dim deg         = weightgap' dim deg Algebraic ?ua WgOnAny
 
 ax, axLeaf :: Int -> Int -> TrsStrategy
-ax lo up = ara' NoHeuristics (Just 1) lo up 8
-axLeaf lo up = ara' NoHeuristics Nothing lo up 5
-axHeur lo up = ara' Heuristics Nothing lo up 3
+ax lo up = ara' (Just 1) lo up 8
+axLeaf lo up = ara' Nothing lo up 5
+axHeur lo up = ara' Nothing lo up 3
 
 --- * rc -------------------------------------------------------------------------------------------------------------
 
