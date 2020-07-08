@@ -285,6 +285,6 @@ rulesDefining a (f,l) = fromMaybe [] look
                  return $ M.toList m2
 
 symbols :: Automaton -> Set LSym
-symbols a = IM.foldWithKey f S.empty (fwd a)
+symbols a = IM.foldrWithKey f S.empty (fwd a)
   where f fn m s = S.fromList [(toEnum fn,l) | l <- IM.keys m] `S.union` s
 

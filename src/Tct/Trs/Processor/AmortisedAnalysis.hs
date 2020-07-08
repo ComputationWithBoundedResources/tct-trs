@@ -1,6 +1,7 @@
 {-# LANGUAGE ParallelListComp    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DerivingStrategies #-}
 -- Implementation details can be found in the technical report '@tba@'.
 -- | This module provides the \AmortisedAnalysis\ processor.
 module Tct.Trs.Processor.AmortisedAnalysis
@@ -17,6 +18,7 @@ import           Control.Monad.State
 import           Data.Maybe
 import Data.List (nub, sortBy)
 import Data.Function (on)
+import qualified Data.ByteString.Char8  as BS
 
 import qualified Tct.Core.Common.Pretty       as PP
 import qualified Tct.Core.Common.Xml          as Xml
@@ -88,20 +90,20 @@ defaultArgs = ArgumentOptions { filePath = ""
 type DT = String
 
 data AraProof f v = AraProof
-  { signatures        :: [ASignatureSig F DT]      -- ^ Signatures used for the
+  { signatures        :: [ASignatureSig f DT]      -- ^ Signatures used for the
                                                    -- proof
-  , cfSignatures      :: [ASignatureSig F DT]      -- ^ Cost-free signatures used
+  , cfSignatures      :: [ASignatureSig f DT]      -- ^ Cost-free signatures used
                                                    -- for the proof
   , baseCtrSignatures :: [ASignatureSig String DT] -- ^ Base constructors used for
                                                    -- the proof (cf. Superposition
                                                    -- of constructors)
-  , strictlyTyped :: [RT.Rule F V]
-  , weaklyTyped :: [RT.Rule F V]
+  , strictlyTyped :: [RT.Rule f v]
+  , weaklyTyped :: [RT.Rule f v]
   } deriving Show
 
 
 instance T.Processor Ara where
-  type ProofObject Ara = ApplicationProof (OrientationProof (AraProof F V))
+  type ProofObject Ara = ApplicationProof (OrientationProof (AraProof F' V'))
   type In  Ara         = Prob.Trs
   type Out Ara         = Prob.Trs
   type Forking Ara     = T.Optional T.Id
@@ -169,9 +171,10 @@ instance T.Processor Ara where
                      let compl :: T.Complexity
                          compl = T.Poly (Just bigO)
 
+                     let proof = AraProof sigs cfSigs baseCtrs strictRls weakRls 
                      return $
                        T.succeedWith
-                       (Applicable . Order $ AraProof sigs cfSigs baseCtrs strictRls weakRls)
+                       (Applicable $ Order proof)
                        (if null weakRls
                         then const (T.timeUBCert compl) -- prove done
                         else certification compl)       -- only a step in the proof
@@ -191,7 +194,38 @@ certification comp cert = case cert of
   T.Opt (T.Id c) -> T.updateTimeUBCert c (`SR.add` comp)
 
 
-convertProblem :: Prob.Problem F V -> RT.Problem F V F dt dt F
+-- MS: use newtype wrapper for custom instances
+newtype V' = V' BS.ByteString
+  deriving (Eq, Ord)
+
+instance Show V'      where show (V' x) = show x
+instance PP.Pretty V' where pretty = PP.pretty . show
+
+instance Read V' where
+  readsPrec _ str = let str' = filter (/= '"') str
+                        x = BS.pack $ if take 2 str' == "V " then drop 2 str' else str'
+                    in [(V' x, [])]
+
+newtype F' = F' (AFun BS.ByteString)
+  deriving (Eq, Ord, Read)
+
+
+instance Show F' where
+  show (F' (TrsFun f)) = show $ PP.text (BS.unpack f)
+  show (F' (DpFun f))  = show $ PP.text (BS.unpack f) PP.<> PP.char '#'
+  show (F' (ComFun i)) = show $ PP.pretty "c_" PP.<> PP.int i
+
+instance PP.Pretty F' where pretty = PP.pretty . show
+
+fromF :: F -> F'
+fromF (F f) = (F' f)
+
+fromV :: V -> V'
+fromV (V v) = (V' v)
+
+--
+
+-- convertProblem :: Prob.Problem F V -> RT.Problem F V F dt dt F
 convertProblem inProb =
   RT.Problem { RT.startTerms = convertStartTerms $ Prob.startTerms inProb
              , RT.strategy = convertStrategy $ Prob.strategy inProb
@@ -203,9 +237,9 @@ convertProblem inProb =
                             RS.toList (Prob.strictDPs inProb))
                           (fmap convertRule $ RS.toList (Prob.weakTrs inProb) ++
                             RS.toList (Prob.weakDPs inProb))
-             , RT.variables = S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
+             , RT.variables = fmap fromV $  S.toList $ RS.vars (Prob.strictTrs inProb `RS.union`
                                                   Prob.weakTrs inProb)
-             , RT.symbols = S.toList (Sig.defineds (Prob.signature inProb)) ++
+             , RT.symbols = fmap fromF $ S.toList (Sig.defineds (Prob.signature inProb)) ++
                             S.toList (Sig.constructors (Prob.signature inProb))
              , RT.comment = Nothing
              }
@@ -217,11 +251,13 @@ convertStrategy :: Strategy -> RT.Strategy
 convertStrategy Prob.Innermost = RT.Innermost
 convertStrategy Prob.Full = RT.Full
 convertStrategy Prob.Outermost = RT.Outermost
-convertRule :: R.Rule F V -> RT.Rule F V
+
+convertRule :: R.Rule F V -> RT.Rule F' V'
 convertRule (R.Rule lhs rhs) = RT.Rule (convertTerm lhs) (convertTerm rhs)
-convertTerm :: R.Term F V -> RT.Term F V
-convertTerm (R.Var v) = RT.Var v
-convertTerm (R.Fun f ch) = RT.Fun f (fmap convertTerm ch)
+
+convertTerm :: R.Term F V -> RT.Term F' V'
+convertTerm (R.Var v)    = RT.Var (fromV v)
+convertTerm (R.Fun f ch) = RT.Fun (fromF f) (fmap convertTerm ch)
 
 
 -- instances
@@ -276,7 +312,7 @@ ara' oS = T.declFun (araDeclaration oS)
 --- * proofdata
 --------------------------------------------------------------------------------
 
-instance (Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
+instance (Show f, Ord f, PP.Pretty f, PP.Pretty v) => PP.Pretty (AraProof f v) where
   pretty proof =
     -- Signatures
     PP.text "Signatures used:" PP.<$>
