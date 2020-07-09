@@ -106,7 +106,7 @@ data CC = DC | DCI | RC | RCI deriving Eq
 instance Show CC where
   show cc = case cc of { DC -> "dc"; DCI -> "dci"; RC -> "rc"; RCI -> "rci" }
 
-readCC :: Monad m => String -> m CC
+readCC :: MonadFail m => String -> m CC
 readCC cc
   | cc == show DC  = return DC
   | cc == show DCI = return DCI
@@ -119,7 +119,7 @@ data CP = TotalProof | PartialProof deriving Eq
 instance Show CP where
   show cc = case cc of { TotalProof -> "total"; PartialProof -> "partial" }
 
-readCP :: Monad m => String -> m CP
+readCP :: MonadFail m => String -> m CP
 readCP cp
   | cp == show TotalProof   = return TotalProof
   | cp == show PartialProof = return PartialProof

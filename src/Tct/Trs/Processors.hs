@@ -30,6 +30,9 @@ module Tct.Trs.Processors
   , dpsimps
   , decomposeIndependent
   , decomposeIndependentSG
+  , decomposeBestCaseIndependent
+  , decomposeBestCaseAnyStrict
+  , decomposeBestCaseIndependentSG
   , cleanSuffix
   , toDP
   , removeLeaf
@@ -90,13 +93,16 @@ boundedArgs = (lArg `T.optional` 1, uArg `T.optional` 1)
     lArg = nat "from" ["from degree"]
     uArg = nat "to"   ["to degree"]
 
--- | Arguments for bounded degrees. @:form nat :to nat@
-araArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional T.Nat)
-araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60)
+-- | Arguments for bounded degrees. @:from nat :to nat :timeout nat :bc bool@
+araArgs :: (Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional T.Nat, Argument 'Optional Bool, Argument 'Optional Bool, Argument 'Optional Bool)
+araArgs = (lArg `T.optional` 1, uArg `T.optional` 3, tArg `T.optional` 60, bcArg `T.optional` False, cdArg `T.optional` False, verbOutArg `T.optional` False)
   where
     lArg = nat "from" ["from degree"]
     uArg = nat "to"   ["to degree"]
     tArg = nat "timeout" ["timeout for SMT solver"]
+    bcArg = bool "bc" ["perform best-case analysis"]
+    cdArg = bool "cd" ["elaborate input to completely defined TRS (useful for best-case analysis)"]
+    verbOutArg = bool "v" ["Verbose output (prints inference trees)"]
 
 
 checkPropArgs :: (Argument 'Optional LogOp,
@@ -214,8 +220,8 @@ polys = shift pxs
 ints :: Degree -> Degree -> TrsStrategy
 ints = shift ixs
 
-araBounds :: Degree -> Degree -> Int -> TrsStrategy
-araBounds = ara' Nothing
+araBounds :: Degree -> Degree -> Int -> Bool -> Bool -> Bool -> TrsStrategy
+araBounds = araFull' Nothing
 
 
 --- * simplifications ------------------------------------------------------------------------------------------------
@@ -259,6 +265,32 @@ decomposeIndependentSG =
   decompose' (RS.selAllOf RS.selCycleIndependentSG) RelativeAdd
   .>>> try simplifyRHS
   .>>> try cleanSuffix
+
+-- | Using the decomposition processor (c.f. 'Compose.decomposeBy') this transformation
+-- decomposes dependency pairs into two independent sets, in the sense that these DPs
+-- constitute unconnected sub-graphs of the dependency graph. Applies 'cleanSuffix' on the
+-- resulting sub-problems, if applicable.
+decomposeBestCaseIndependent :: TrsStrategy
+decomposeBestCaseIndependent =
+  decomposeBestCase' (RS.selAllOf $ RS.preventMainSelection RS.selIndependentSG) 
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
+
+-- | 
+decomposeBestCaseAnyStrict :: TrsStrategy
+decomposeBestCaseAnyStrict =
+  decomposeBestCase' (RS.selAnyOf $ RS.preventMainSelection RS.selStricts)
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
+
+-- | Similar to 'decomposeIndependent', but in the computation of the independent sets,
+-- dependency pairs above cycles in the dependency graph are not taken into account.
+decomposeBestCaseIndependentSG :: TrsStrategy
+decomposeBestCaseIndependentSG =
+  decomposeBestCase' (RS.selAllOf $ RS.preventMainSelection RS.selCycleIndependentSG) 
+  .>>> try simplifyRHS
+  .>>> try cleanSuffix
+
 
 -- | Tries dependency pairs for RC, and dependency pairs with weightgap, otherwise uses dependency tuples for IRC.
 -- Simpifies the resulting DP problem as much as possible.

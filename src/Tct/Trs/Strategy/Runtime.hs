@@ -273,7 +273,7 @@ rc =
     where
       loopFrom i prob
         | RS.null (Prob.strictTrs prob) = dpi
-        | otherwise                      = tew (is i) .>>! withProblem (loopFrom $ succ i)
+        | otherwise                     = tew (is i) .>>! withProblem (loopFrom $ succ i)
       is i =
         let ?sel = Just selAnyRule in
         mx i i

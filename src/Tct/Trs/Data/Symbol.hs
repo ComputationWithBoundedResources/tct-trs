@@ -1,16 +1,20 @@
 -- | This module provides the type function symbols and variables.
 module Tct.Trs.Data.Symbol
-  ( Fun (..)
-  , AFun (..)
-  , F (..), fun
-  , V (..), var
-  ) where
+  ( Fun(..)
+  , AFun(..)
+  , F
+  , fun
+  , V
+  , var
+  , mainFunction
+  )
+where
 
 
-import qualified Data.ByteString.Char8  as BS
+import qualified Data.ByteString.Char8         as BS
 
-import qualified Tct.Core.Common.Pretty as PP
-import qualified Tct.Core.Common.Xml    as Xml
+import qualified Tct.Core.Common.Pretty        as PP
+import qualified Tct.Core.Common.Xml           as Xml
 
 -- | Abstract function interface.
 class Fun f where
@@ -29,34 +33,35 @@ data AFun f
   | ComFun Int
   deriving (Eq, Ord, Show, Read)
 
--- instance Show f => Show (AFun f) where
---   show (TrsFun f) = show f
---   show (DpFun f)  = show f
---   show (ComFun f) = show f
-
 newtype F = F (AFun BS.ByteString)
   deriving (Eq, Ord, Show, Read)
 
--- instance Show F where
---   -- show (F x) = show x
---   show (F (TrsFun f)) = show $ PP.text (BS.unpack f)
---   show (F (DpFun f))  = show $ PP.text (BS.unpack f) PP.<> PP.char '#'
---   show (F (ComFun i)) = show $ PP.pretty "c_" PP.<> PP.int i
-
-fun  :: String -> F
+fun :: String -> F
 fun = F . TrsFun . BS.pack
 
-newtype V = V BS.ByteString
-  deriving (Eq, Ord, Show)
+mainFunction :: F
+mainFunction = fun "main"
 
-var  :: String -> V
+newtype V = V BS.ByteString
+  deriving (Eq, Ord)
+
+instance Show V where
+  show (V x) = show x
+
+var :: String -> V
 var = V . BS.pack
+
+instance Read V where
+  readsPrec _ str =
+    let str' = filter (/= '"') str
+        x    = BS.pack $ if take 2 str' == "V " then drop 2 str' else str'
+    in  [(V x, [])]
 
 instance Fun F where
   markFun (F (TrsFun f)) = F (DpFun f)
-  markFun _              = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
+  markFun _ = error "Tct.Trs.Data.Problem.markFun: not a trs symbol"
 
-  compoundFun                  = F . ComFun
+  compoundFun = F . ComFun
 
   isMarkedFun (F (DpFun _)) = True
   isMarkedFun _             = False
@@ -72,7 +77,7 @@ instance PP.Pretty V where
 
 instance Xml.Xml V where
   toXml (V v) = Xml.elt "var" [Xml.text (BS.unpack v)]
-  toCeTA      = Xml.toXml
+  toCeTA = Xml.toXml
 
 -- instance PP.Pretty BS.ByteString where
 --   pretty = PP.text . BS.unpack
@@ -83,12 +88,12 @@ instance Xml.Xml V where
 
 instance PP.Pretty F where
   pretty (F (TrsFun f)) = PP.text (BS.unpack f)
-  pretty (F (DpFun f))  = PP.text (BS.unpack f) PP.<> PP.char '#'
+  pretty (F (DpFun  f)) = PP.text (BS.unpack f) PP.<> PP.char '#'
   pretty (F (ComFun i)) = PP.pretty "c_" PP.<> PP.int i
 
 instance Xml.Xml F where
-  toXml (F (TrsFun f)) = Xml.elt "name" [Xml.text $ BS.unpack  f]
-  toXml (F (DpFun f))  = Xml.elt "sharp" [Xml.elt "name" [Xml.text $ BS.unpack f]]
-  toXml (F (ComFun f)) = Xml.elt "name" [Xml.text $ 'c':show f]
+  toXml (F (TrsFun f)) = Xml.elt "name" [Xml.text $ BS.unpack f]
+  toXml (F (DpFun f)) =
+    Xml.elt "sharp" [Xml.elt "name" [Xml.text $ BS.unpack f]]
+  toXml (F (ComFun f)) = Xml.elt "name" [Xml.text $ 'c' : show f]
   toCeTA = Xml.toXml
-

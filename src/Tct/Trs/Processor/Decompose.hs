@@ -13,6 +13,10 @@ module Tct.Trs.Processor.Decompose
   , decomposeCPDeclaration
   , decomposeCP
   , decomposeCP'
+
+  , decomposeDeclarationBestCase
+  , decomposeBestCase
+  , decomposeBestCase'
   ) where
 
 
@@ -46,6 +50,7 @@ data DecomposeBound
   | RelativeAdd
   | RelativeMul
   | RelativeComp
+  | BestCaseLBMax      -- ^ Sound for best-case lower bound analysis only!
   deriving (Eq, Show, Bounded, Enum)
 
 
@@ -56,6 +61,7 @@ isApplicableRandS prob compfn = case compfn of
   RelativeAdd  -> Nothing
   RelativeMul  -> Prob.isDCProblem' prob <|> RS.isNonSizeIncreasing' trs
   RelativeComp -> Prob.isDCProblem' prob <|> RS.isNonDuplicating' trs
+  BestCaseLBMax -> Nothing
   where trs = Prob.allComponents prob
 
 -- for Add and RelativeComp rules in rProb have to be non-size increasing
@@ -143,7 +149,9 @@ certfn bnd (T.Pair (rCert,sCert)) = case bnd of
   RelativeAdd  -> T.timeUBCert $ rUb `add` sUb
   RelativeMul  -> T.timeUBCert $ rUb `mul` sUb
   RelativeComp -> T.timeUBCert $ rUb `mul` (sUb `T.compose` (T.Poly (Just 1) `add` rUb))
+  BestCaseLBMax -> T.timeBCLBCert $ rBCLb `max` sBCLb
   where (rUb, sUb) = (T.timeUB rCert, T.timeUB sCert)
+        (rBCLb, sBCLb) = (T.timeBCLB rCert, T.timeBCLB sCert)
 
 
 --- * decompose static -----------------------------------------------------------------------------------------------
@@ -196,8 +204,8 @@ instance T.Processor DecomposeCP where
       test (isApplicableRandS prob withBoundCP_)
       let
         rs = RuleSelector
-          { rsName   = "first alternative for decompose on " ++ rsName (onSelectionCP_)
-          , rsSelect = \pr -> (BigAnd [rsSelect (selAnyOf selStricts) pr, rsSelect onSelectionCP_ pr, selectForcedRules pr withBoundCP_]) }
+          { rsName   = "first alternative for decompose on " ++ rsName onSelectionCP_
+          , rsSelect = \pr -> BigAnd [rsSelect (selAnyOf selStricts) pr, rsSelect onSelectionCP_ pr, selectForcedRules pr withBoundCP_] }
       ComplexityPair cp <- return withCP_
 
       cpproof <- lift $ CP.solveComplexityPair cp rs prob
@@ -235,19 +243,19 @@ instance PP.Pretty DecomposeProof where
       , ppbnd bound_
       , PP.empty
       , PP.text "Problem (R)"
-      , PP.indent 2 $ PP.pretty (rProb_)
+      , PP.indent 2 $ PP.pretty rProb_
       , PP.empty
       , PP.text "Problem (S)"
-      , PP.indent 2 $ PP.pretty (sProb_) ]
+      , PP.indent 2 $ PP.pretty sProb_ ]
     DecomposeCPProof{..} -> PP.vcat
       [ PP.text $ "We first use the processor " ++ show cp_ ++ " to orient following rules strictly:"
       , PP.indent 2 . PP.pretty $ CP.removableDPs cpproof_
       , PP.indent 2 . PP.pretty $ CP.removableTrs cpproof_
-      , PP.text ("The Processor induces the complexity certificate ") PP.<> PP.pretty cpcert_
+      , PP.text "The Processor induces the complexity certificate " PP.<> PP.pretty cpcert_
       , PP.empty
       , ppbnd bound_
       , PP.text "Problem (S)"
-      , PP.indent 2 $ PP.pretty (sProb_) ]
+      , PP.indent 2 $ PP.pretty sProb_ ]
     DecomposeFail -> PP.text "Decomposition failed."
     where
       ppbnd bnd = case bnd of
@@ -265,7 +273,10 @@ instance PP.Pretty DecomposeProof where
           , "Once the complexity of (R) has been assessed, it suffices "
           , "to consider only rules whose complexity has not been estimated in (R) "
           , "resulting in the following Problem (S). Overall the certificate is obtained by composition." ]
-
+        BestCaseLBMax -> PP.paragraph $ unwords
+          [ "For the best-case lower bound analysis the maximum derivation length of either sub-problem "
+          , "provides a lower bound in terms of derivation length of the original TRS."
+          ]
 instance Xml.Xml DecomposeProof where
   toXml _ = Xml.elt "decompose" []
 
@@ -296,10 +307,7 @@ selArg = selectorArg `T.optional` selAnyOf selStricts
 decomposeProcessor :: ExpressionSelector F V -> DecomposeBound -> Decompose
 decomposeProcessor rs bd = Decompose { onSelection=rs, withBound=bd }
 
-decomposeDeclaration :: T.Declaration (
-  '[ T.Argument 'T.Optional (ExpressionSelector F V)
-   , T.Argument 'T.Optional DecomposeBound ]
-   T.:-> TrsStrategy)
+decomposeDeclaration :: T.Declaration ('[ T.Argument 'T.Optional (ExpressionSelector F V), T.Argument 'T.Optional DecomposeBound] T.:-> TrsStrategy)
 decomposeDeclaration = T.declare "decompose" desc (selArg, bndArg) (\x y -> T.Apply (decomposeProcessor x y ))
 
 decompose' :: ExpressionSelector F V -> DecomposeBound -> TrsStrategy
@@ -307,6 +315,17 @@ decompose' = T.declFun decomposeDeclaration
 
 decompose :: TrsStrategy
 decompose = T.deflFun decomposeDeclaration
+
+
+decomposeDeclarationBestCase :: T.Declaration ('[T.Argument 'T.Optional (ExpressionSelector F V)] T.:-> TrsStrategy)
+decomposeDeclarationBestCase = T.declare "decompose best-case" desc (T.OneTuple selArg) (\x -> T.Apply (decomposeProcessor x BestCaseLBMax))
+
+decomposeBestCase' :: ExpressionSelector F V -> TrsStrategy
+decomposeBestCase' = T.declFun decomposeDeclarationBestCase
+
+decomposeBestCase :: TrsStrategy
+decomposeBestCase = T.deflFun decomposeDeclarationBestCase
+
 
 decomposeCPProcessor :: ExpressionSelector F V -> DecomposeBound -> ComplexityPair -> DecomposeCP
 decomposeCPProcessor rs bd cp = DecomposeCP { onSelectionCP_ = rs, withBoundCP_ = bd, withCP_ = cp }
