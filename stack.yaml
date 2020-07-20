@@ -1,19 +1,25 @@
-flags:
-  transformers-compat:
-    five-three: true
+flags: {}
 packages:
-- .
-- ../term-rewriting-xml
-- ../term-rewriting-applicative
-- ../term-rewriting-ext
-- ../term-rewriting
-- ../slogic
-- ../tct-core
-- ../tct-common
-- ../ara
-- ../hoca
-- ../union-find-array
+ - '.'
 extra-deps:
-- fgl-visualize-0.1.0.1@sha256:e682066053a6e75478a08fd6822dd0143a3b8ea23244bdb01dd389a266447c5e,995
-
-resolver: lts-16.1
+ - fgl-visualize-0.1.0.1
+ - graphviz-2999.20.0.4
+ - term-rewriting-0.4.0.2
+ - union-find-array-0.1.0.2
+ - git: https://github.com/ComputationWithBoundedResources/term-rewriting-xml
+   commit: ac8e4a5920af1e36f09995d03626cfce3d9ee69a
+ - git: https://github.com/ComputationWithBoundedResources/term-rewriting-ext
+   commit: 66f7a9eefbe8335331962bdc5710c8c4392a1188
+ - git: https://github.com/ComputationWithBoundedResources/term-rewriting-applicative
+   commit: b8446e7b4b5403f5122b901d76542eab505cb106
+ - git: https://github.com/ComputationWithBoundedResources/hoca
+   commit: 69f85a4025dfba3a691ac11793c6da9264a7a89d
+ - git: https://github.com/ComputationWithBoundedResources/ara-inference
+   commit: 970fcf905d89c3a769615cd81cc77e1903469dd5
+ - git: https://github.com/ComputationWithBoundedResources/slogic
+   commit: 378e82c0eaa265244f3a596f23bddcb0e91a23dd
+ - git: https://github.com/ComputationWithBoundedResources/tct-common
+   commit: 545d9e51da7601cca644fd6bdf54d634db62de17
+ - git: https://github.com/ComputationWithBoundedResources/tct-core
+   commit: e757d81d7d5e2fa8e4a76c04814cf80f22cbd7e2
+resolver: lts-16.5
